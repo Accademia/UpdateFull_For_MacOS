@@ -1,0 +1,587 @@
+# 自动执行的批处理：TopGrade & MacUpdater
+
+#!/bin/bash
+
+
+# -------------------------------------
+# 参数设置：用户可修改
+# -------------------------------------
+
+# 设置 ：任务中止时间范围（以便，确保任何一个时间点，只有一个更新任务在运行—）
+# 设置开始和结束时间
+STOP_TIME="03:00"  # 停止时间（建议设置为，用户在系统中预设的“定时任务启动”的时间点）
+DURATION_MINUTES=10  # 脚本执行时长，单位：分钟（注意，单位不是秒！！！）
+# 上述时间范围结束时，用户预设在系统的 “定时任务” 模块，会使用本脚本拉起新的更新任务。（所以，要避免冲突）
+# 由于本脚本执行需要大改10分钟左右，所以这个时间段内，都不适合拉起新的更新任务
+
+
+# 路径：保存日志文件的路径
+# 获取 iCloud 云盘路径，
+ICLOUD_PATH="$HOME/Library/Mobile Documents/com~apple~CloudDocs"
+# 获取 本机名称（并以本机名称作为子文件夹名称）
+COMPUTER_NAME=$(scutil --get ComputerName)
+# Log日志文件的，最终保存路径！！
+LOG_PATH="$ICLOUD_PATH/LOG/$COMPUTER_NAME"
+# 创建目录
+mkdir -p "$LOG_PATH" 
+# 注意：这里是保存到iCloud，也可以设置别的保存路径
+
+
+
+
+# ---------------------------------------
+# 参数设置：不建议用户修改
+# ---------------------------------------
+
+# 定义：日志文件
+LOG_FILE="$LOG_PATH/Update_Auto.log"
+LOG_FULL_FILE="$LOG_PATH/UpdateFull.$(date +%Y-%m).log"
+#LOG_FULL_FILE="$LOG_PATH/Update_FULL.$(date +%Y-%m-%d).log"
+LOG_ERROR_FILE="$LOG_PATH/Update_Error.log"
+LOG_MACUPDATER_FILE="$LOG_PATH/Update_MacUpdater.log"
+echo "" > "$LOG_MACUPDATER_FILE"
+
+# 定义：被测试的外网网址（需要翻墙的网址）
+TARGET_1="github.com"
+TARGET_2="brew.sh"
+TARGET_3="apps.apple.com/us/app/apple-store/id375380948"
+TARGET_4="macupdater.com"
+# 如果不能访问上述网站，会导致很多软件都更新失败。
+
+# 定义 MacUpdater 客户端路径
+MACUPDATER_CLIENT="/Applications/MacUpdater.app/Contents/Resources/macupdater_client"
+
+
+
+
+# ---------------------------------------
+# 自定义函数
+# ---------------------------------------
+
+# ************************* #
+# 定义函数：检查时间范围的函数
+# ************************* #
+check_time_range() {
+  local stop_time="$1"          # 停止时间
+  local duration_minutes="$2"    # 执行时长（分钟）
+  local log_error_file="$3"      # 日志文件
+
+  # 计算起始时间并确保格式为 HH:MM
+  local stop_time_seconds start_time
+  stop_time_seconds=$(date -j -f "%H:%M" "$stop_time" "+%s") # 将停止时间转换为时间戳
+  start_time=$(date -j -f "%s" $((stop_time_seconds - duration_minutes * 60)) "+%H:%M") # 计算起始时间，并转为 HH:MM 格式
+
+  # 获取当前时间
+  local current_time
+  current_time=$(date '+%H:%M')
+
+  # 检查当前时间是否在范围内
+  if [[ "$current_time" > "$start_time" && "$current_time" < "$stop_time" ]]; then
+    printf "\033[1;31m[STOP]\033[0m  "
+    echo "任务退出（$(date '+%Y-%m-%d %H:%M:%S')）：为避免与用户预设的 定时任务 冲突" | tee -a "$log_error_file"
+    printf "\033[1;31m[STOP]\033[0m  "
+    echo "时间范围（停止建立 更新任务）：$start_time - $stop_time" | tee -a "$log_error_file"
+    exit
+  fi
+}
+
+# ************************* #
+# 自定义函数：检查连接的函数
+# ************************* #
+check_connection() {
+  local target=$1
+  local log_file=$2
+
+  if curl -I --connect-timeout 5 "$target" > /dev/null 2>&1; then
+    printf "\033[1;32m[OK]\033[0m 已连通 [$target] \n"
+    return 0
+  else
+    printf "\033[1;31m[ERROR]\033[0m" 
+    echo "[$target] $(date '+%Y-%m-%d %H:%M:%S') 连接失败，等待10秒后重试..." | tee -a "$log_file"
+    sleep 10
+    return 1
+  fi
+}
+
+# ************************* #
+# 函定义函数：显示进度条
+# ************************* #
+show_progress() {
+    # 可输入的变量
+    local scanned=$1
+    local unrecognized=$2
+    local to_update=$3
+    local total=$4
+
+    # 定义进度条长度（注意：折行，会导致刷新异常！！！！！）
+    local bar_width=20
+
+    # 防止除以零
+    if [ "$total" -eq 0 ]; then
+        total=1
+    fi
+
+    # 计算百分比
+    local percent=$(( scanned * 100 / total ))
+
+    # 生成进度条
+    local filled=$(( scanned * bar_width / total ))
+    local empty=$(( bar_width - filled ))
+    local bar=""
+    for ((i=0; i<filled; i++)); do bar+="█"; done
+    for ((i=0; i<empty; i++)); do bar+="-"; done
+
+    # 打印进度条到终端
+    printf "\r进度: [%-${bar_width}s] %d%% | 未识别: %d | 需更新: %d | 已扫描: %d/%d" \
+        "$bar" "$percent" "$unrecognized" "$to_update" "$scanned" "$total" > /dev/tty
+}
+
+# ************************* #
+# 函定义函数：运行命令并处理输出
+# ************************* #
+run_command_with_show_progress() {
+    # 可输入的变量
+    local CMD="$1"
+    local MODE="$2" # SCAN 或 UPDATE
+    local LOCAL_LOG_FILE="$3" # 
+
+    # 初始化进度变量
+    local scanned=0
+    local unrecognized=0
+    local to_update=0
+
+    # 日志记录开始执行的命令
+    echo "执行命令: $CMD" | tee -a "$LOCAL_LOG_FILE"
+
+    # 执行命令并实时处理输出
+    eval "$CMD" 2>&1 | tee -a "$LOCAL_LOG_FILE" | while IFS= read -r line; do
+        # 检查是否为 'Scan did stop scanning' 的行
+        if [[ "$line" =~ Scan\ did\ stop\ scanning\ \'[^\']+\'\ app\.\.\. ]]; then
+            ((scanned++))
+            show_progress "$scanned" "$unrecognized" "$to_update" "$TOTAL_APPS"
+        fi
+
+        # 记录每一行到日志文件
+        echo "$line" >> "$LOCAL_LOG_FILE"
+    done
+
+    # 完成后换行（避免下次输出覆盖进度条）
+    echo "" > /dev/tty
+    echo "" | tee -a "$LOCAL_LOG_FILE"
+}
+
+
+
+# ---------------------------------------
+# 检测：外网是否能正常访问
+# ---------------------------------------
+
+echo "" >> "$LOG_ERROR_FILE"
+echo "-------------------------------------------------------------------" >> "$LOG_ERROR_FILE"
+echo "" >> "$LOG_ERROR_FILE"
+echo "$(date '+%Y-%m-%d %H:%M:%S')  开始测试，海外 HTTPS 连接 ..."  >> "$LOG_ERROR_FILE"
+echo "" >> "$LOG_ERROR_FILE"
+
+# 轮询检查网络连通性
+while true; do
+
+  # 调用检查时间范围函数
+  check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
+
+  # 检查 TARGET_1 的连接
+  if ! check_connection "$TARGET_1" "$LOG_ERROR_FILE"; then
+    continue # 如果连接失败，重新开始循环
+  fi
+
+  # 检查 TARGET_2 的连接
+  if ! check_connection "$TARGET_2" "$LOG_ERROR_FILE"; then
+    continue # 如果连接失败，重新开始循环
+  fi
+
+  # 检查 TARGET_3 的连接
+  if ! check_connection "$TARGET_3" "$LOG_ERROR_FILE"; then
+    continue # 如果连接失败，重新开始循环
+  fi
+
+  # 检查 TARGET_4 的连接
+  if ! check_connection "$TARGET_4" "$LOG_ERROR_FILE"; then
+    continue # 如果连接失败，重新开始循环
+  fi
+
+  # 如果N个目标，都成功连接，退出循环
+  echo "海外 HTTPS 连接正常 ..."
+  break
+done
+
+
+
+
+
+# -----------------------------------------------
+# 检查 & 创建 ：Log日志文件
+# -----------------------------------------------
+
+# 检查LOG_FILE日志文件是否存在
+if [ ! -f "$LOG_FILE" ]; then
+    # 文件不存在，创建文件
+    touch "$LOG_FILE"
+fi
+
+# 检查LOG_ERROR_FILE日志文件是否存在
+if [ ! -f "$LOG_ERROR_FILE" ]; then
+    # 文件不存在，创建文件
+    touch "$LOG_ERROR_FILE"
+fi
+
+# 检查LOG_FULL_FILE日志文件是否存在
+if [ ! -f "$LOG_FULL_FILE" ]; then
+    # 文件不存在，创建文件
+    touch "$LOG_FULL_FILE"
+else
+    # 文件存在，检查文件大小
+    FILE_SIZE=$(stat -f%z "$LOG_FULL_FILE") # macOS 使用 stat -f%z
+
+    if [ "$FILE_SIZE" -gt 10 ]; then
+        # 如果文件大小超过100字节，执行以下操作
+        echo "" >> "$LOG_FULL_FILE"
+        echo "" >> "$LOG_FULL_FILE"
+        echo "" >> "$LOG_FULL_FILE"
+        echo "" >> "$LOG_FULL_FILE"
+    fi
+fi
+
+# 初始化 MacUpdater 日志文件
+echo "MacUpdater 执行日志 - $(date)" > "$LOG_MACUPDATER_FILE"
+
+
+
+
+# -----------------------------------------------
+# 检查 ：Homebrew 是否安装（并更新）
+# -----------------------------------------------
+
+echo "日期：$(date '+%Y-%m-%d') ..." >> "$LOG_FULL_FILE"
+
+echo "" >> "$LOG_FULL_FILE"
+
+echo "===================================================================================" >> "$LOG_FULL_FILE"
+
+echo ""
+echo "\033[1;36m-----------------------------------------------\033[0m" 
+echo "\033[1;36m 检测 “Homebrew与系统架构” 是否匹配 ...\033[0m"
+echo "\033[1;36m-----------------------------------------------\033[0m" 
+
+# 检测系统架构
+
+architecture=$(uname -m)
+printf  "\033[1;34m[INFO]\033[0m $1"
+echo "当前系统架构为: $architecture"
+
+if [ "$architecture" = "arm64" ]; then
+    printf  "\033[1;34m[INFO]\033[0m $1"
+    printf "检测到系统为 ARM 架构 (Apple Silicon)  ｜  " | tee -a "$LOG_FULL_FILE"
+    printf  "\n"
+    
+    # 检查 Homebrew 是否已安装
+    if ! command -v brew &> /dev/null; then
+
+        printf  "\033[1;34m[INFO]\033[0m $1"
+        echo "未检测到 Homebrew，开始安装 Homebrew ..." | tee -a "$LOG_FULL_FILE"
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        
+        # 添加 Homebrew 到环境变量
+        echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
+        eval "$(/opt/homebrew/bin/brew shellenv)"
+        
+        printf  "\033[1;34m[INFO]\033[0m $1"
+        echo "Homebrew 安装完成。" | tee -a "$LOG_FULL_FILE"
+        echo ""
+        exit 0
+    fi
+
+    # 获取 Homebrew 的安装路径
+    brew_path=$(which brew)
+    printf  "\033[1;34m[INFO]\033[0m $1"
+    echo "检测到 Homebrew 安装路径: $brew_path"
+
+    if [[ $brew_path == /opt/homebrew/* ]]; then
+        printf  "\033[1;34m[INFO]\033[0m $1"
+        echo "当前 Homebrew 已安装为 ARM 版本，无需更改。" | tee -a "$LOG_FULL_FILE"
+        # 更新 Homebrew
+        echo ""
+        echo "\033[1;36m-----------------------------------------------\033[0m" 
+        echo "\033[1;36m更新 Homebrew工具 ...\033[0m"
+        echo "\033[1;36m-----------------------------------------------\033[0m" 
+        brew update
+        # exit 0
+
+    elif [[ $brew_path == /usr/local/* ]]; then
+        printf  "\033[1;34m[INFO]\033[0m $1"
+        echo "检测到当前 Homebrew 为 x86_64 版本，准备切换为 ARM 版本。" | tee -a "$LOG_FULL_FILE"
+
+        echo "检测到 Homebrew 安装路径: $brew_path"| tee -a "$LOG_FULL_FILE"
+        
+        # exit 0   # 调试使用！！！
+
+        # 提示用户确认卸载 x86_64 版本的 Homebrew
+        #read -p "此操作将卸载 x86_64 版本的 Homebrew，并安装 ARM 版本。是否继续？(y/N): " confirm
+        #if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        #    print_info "取消操作。"
+        #    exit 0
+        #fi
+
+        # 卸载 x86_64 版本的 Homebrew
+        printf  "\033[1;34m[INFO]\033[0m $1"
+        echo "正在卸载 x86_64 版本的 Homebrew..." | tee -a "$LOG_FULL_FILE"
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/uninstall.sh)"
+        
+        # 安装 ARM 版本的 Homebrew
+        printf  "\033[1;34m[INFO]\033[0m $1"
+        echo "正在安装 ARM 版本的 Homebrew..." | tee -a "$LOG_FULL_FILE"
+        # 非交互式安装
+        NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        
+        # 添加 Homebrew 到环境变量
+        echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
+        eval "$(/opt/homebrew/bin/brew shellenv)"
+        
+        printf  "\033[1;34m[INFO]\033[0m $1"
+        echo "ARM 版本的 Homebrew 安装完成。" | tee -a "$LOG_FULL_FILE"
+
+        # 获取 Homebrew 的安装路径
+        brew_newpath=$(which brew)
+        printf  "\033[1;34m[INFO]\033[0m $1"
+        echo "检测到 Homebrew 安装路径: $brew_newpath" | tee -a "$LOG_FULL_FILE"
+
+        if [[ $brew_newpath == /opt/homebrew/* ]]; then
+            printf  "\033[1;34m[INFO]\033[0m $1"
+            echo "验证结果：当前 Homebrew 已安装为 ARM 版本。" | tee -a "$LOG_FULL_FILE"
+            # exit 0
+        elif [[ $brew_newpath == /usr/local/* ]]; then
+            printf  "\033[1;34m[INFO]\033[0m $1"
+            echo "验证结果：检测到当前 Homebrew 为 x86_64 版本。退出" | tee -a "$LOG_FULL_FILE"
+            exit 0
+        else
+            printf  "\033[1;34m[INFO]\033[0m $1"
+            echo "验证结果：检测未知版本。退出" | tee -a "$LOG_FULL_FILE"
+            exit 0
+        fi
+
+    else
+        print_error "未知的 Homebrew 安装路径: $brew_path"
+    fi
+
+else
+    printf "当前系统不是 ARM 架构 (Apple Silicon)，无需调整 Homebrew。" | tee -a "$LOG_FULL_FILE"
+fi
+
+
+echo ""
+
+
+
+# -----------------------------------------------
+# 检查 ：TopGrade 是否安装（并更新）
+# -----------------------------------------------
+
+# 调用检查时间范围函数
+check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
+
+if brew list --formula | grep -q "^topgrade\$"; then
+    echo "\033[1;36m-----------------------------------------------\033[0m" 
+    echo "\033[1;36m更新 TopGrade工具 ...\033[0m"
+    echo "\033[1;36m-----------------------------------------------\033[0m" 
+    brew upgrade topgrade
+else
+    echo "\033[1;36m-----------------------------------------------\033[0m" 
+    echo "\033[1;36mTopGrade 未安装，开始安装 ...\033[0m"
+    echo "\033[1;36m-----------------------------------------------\033[0m" 
+    brew reinstall --force topgrade
+    if [ $? -eq 0 ]; then
+        echo "TopGrade 安装成功。"
+    else
+        echo "TopGrade 安装失败。"
+	exit 1  # 安装失败时退出脚本
+    fi
+fi
+
+echo ""
+
+
+
+
+# ------------------------------------------------
+# 检查 ：MacUpdater 是否安装（并更新）
+# ------------------------------------------------
+
+# 调用检查时间范围函数
+check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
+
+if brew list --cask | grep -q "^macupdater\$"; then
+    echo "\033[1;36m-----------------------------------------------\033[0m" 
+    echo "\033[1;36m更新 MacUpdater工具 ...\033[0m"
+    echo "\033[1;36m-----------------------------------------------\033[0m" 
+    brew upgrade macupdater
+else
+    echo "\033[1;36m-----------------------------------------------\033[0m" 
+    echo "\033[1;36mMacUpdater 未安装，开始安装 ...\033[0m"
+    echo "\033[1;36m-----------------------------------------------\033[0m" 
+    brew reinstall --cask --force macupdater
+    if [ $? -eq 0 ]; then
+        echo "MacUpdater 安装成功。"
+    else
+        echo "MacUpdater 安装失败。"
+	exit 1  # 安装失败时退出脚本
+    fi
+fi
+    
+echo ""
+
+
+
+# ------------------------------------------------
+# 检查 ：其他必备工具 是否安装（并更新）
+# ------------------------------------------------
+
+# 调用检查时间范围函数
+check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
+
+if ! brew list | grep -q "^jq$" || ! brew list | grep -q "^coreutils$" || ! brew list | grep -q "^parallel$"; then
+    echo "\033[1;36m-----------------------------------------------\033[0m" 
+    echo "\033[1;36m安装 其他必备工具 ...\033[0m"
+    echo "\033[1;36m-----------------------------------------------\033[0m" 
+fi
+
+if ! brew list | grep -q "^parallel$"; then
+    printf  "\033[1;34m[INFO]\033[0m "
+    echo "[安装] parallel ..."
+    brew install parallel
+    echo ""
+fi
+
+if ! brew list | grep -q "^coreutils$"; then
+    printf  "\033[1;34m[INFO]\033[0m "
+    echo "[安装] coreutils ..."
+    brew install coreutils
+    echo ""
+fi
+
+if ! brew list | grep -q "^jq$"; then
+    printf  "\033[1;34m[INFO]\033[0m "
+    echo "[安装] jq ..."
+    brew install jq
+    echo ""
+fi
+
+
+
+# ----------------------------------
+# 记录：开始时间
+# ----------------------------------
+
+# 等待3秒，开始执行
+sleep 3  
+
+# 记录当前时间戳（到$LOG_FILE）
+echo "----------------------------------------------------------------" >> "$LOG_FILE"
+echo "TopGrade & MacUpdater executed on: $(date)" >> "$LOG_FILE"
+
+# 记录当前时间戳（到$$LOG_FULL_FILE），
+echo "TopGrade & MacUpdater executed on: $(date)" >> "$LOG_FULL_FILE"
+echo "===================================================================================" >> "$LOG_FULL_FILE"
+echo  ""  >> "$LOG_FULL_FILE"
+
+
+# 此后，开始升级第三方APP！！！！！！此前都是在，检测环境 和更新 升级程序本身。
+
+
+
+
+# ----------------------------------
+# 开始执行：TopGrade
+# ----------------------------------
+
+echo "\033[1;36m-----------------------------------------------\033[0m" 
+echo "\033[1;36m运行 TopGrade ...\033[0m"
+echo "\033[1;36m-----------------------------------------------\033[0m" 
+
+echo "---------------" >> "$LOG_FULL_FILE"
+echo "运行 TopGrade" >> "$LOG_FULL_FILE"
+echo "---------------" >> "$LOG_FULL_FILE"
+echo "" >> "$LOG_FULL_FILE"
+
+# 等待3秒，开始执行
+sleep 3  
+
+# 调用检查时间范围函数
+check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
+
+# 执行 TopGrade （并捕获输出）
+topgrade --yes --cleanup 2>&1 | tee -a "$LOG_FULL_FILE"  #  --cleanup
+
+
+echo ""  | tee -a "$LOG_FULL_FILE"
+
+
+
+
+
+# ----------------------------------
+# 开始执行： MacUpdater
+# ----------------------------------
+
+echo "\033[1;36m-----------------------------------------------\033[0m" 
+echo "\033[1;36m运行 MacUpdater ...\033[0m"
+echo "\033[1;36m-----------------------------------------------\033[0m" 
+
+echo "---------------" >> "$LOG_FULL_FILE"
+echo "运行 MacUpdater" >> "$LOG_FULL_FILE"
+echo "---------------" >> "$LOG_FULL_FILE"
+echo "" >> "$LOG_FULL_FILE"
+
+# 等待3秒，开始执行
+sleep 3  
+
+# 调用检查时间范围函数
+check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
+
+# 执行MacUpdater扫描 （已安装的APP）
+# "/Applications/MacUpdater.app/Contents/Resources/macupdater_client" scan --quiet 2>&1 | tee -a "$LOG_FULL_FILE"
+
+# 获取已安装应用的总数
+echo "获取已安装的应用列表..." | tee -a "$LOG_FULL_FILE"
+TOTAL_APPS=$("$MACUPDATER_CLIENT" list | wc -l)
+echo "总应用数: $TOTAL_APPS" | tee -a "$LOG_FULL_FILE"
+
+# 执行扫描命令（并显示进度条）
+run_command_with_show_progress "\"$MACUPDATER_CLIENT\" scan" "SCAN"  "$LOG_MACUPDATER_FILE"
+
+# 执行更新命令
+"/Applications/MacUpdater.app/Contents/Resources/macupdater_client" update --force-quit-running-apps --force-major-version-update 2>&1 | tee -a "$LOG_FULL_FILE"
+
+echo "" >> "$LOG_FULL_FILE"
+echo "" >> "$LOG_FULL_FILE"
+echo "" >> "$LOG_FULL_FILE"
+
+
+
+# ----------------------------------
+# 记录：完成时间 
+# ----------------------------------
+
+# 最后打印执行完成的时间
+echo "TopGrade & MacUpdater finished at: $(date)" >> "$LOG_FILE"
+
+echo "TopGrade & MacUpdater finished at: $(date)" >> "$LOG_FULL_FILE"
+
+
+echo "" 
+echo "" 
+echo "\033[1;36m-----------------------------------------------\033[0m" 
+echo "\033[1;36m所有更新 已完成 ...\033[0m"
+echo "\033[1;36m-----------------------------------------------\033[0m" 
+echo "日志路径：$LOG_PATH"
+echo "" 
+
+# 打开Log日志文件夹
+open "$LOG_PATH"
