@@ -561,9 +561,6 @@ run_command_with_show_progress "\"$MACUPDATER_CLIENT\" scan" "SCAN"  "$LOG_MACUP
 
 echo "" >> "$LOG_FULL_FILE"
 echo "" >> "$LOG_FULL_FILE"
-echo "" >> "$LOG_FULL_FILE"
-echo "" >> "$LOG_FULL_FILE"
-echo "" >> "$LOG_FULL_FILE"
 
 
 
@@ -575,6 +572,9 @@ echo "" >> "$LOG_FULL_FILE"
 echo "TopGrade & MacUpdater finished at: $(date)" >> "$LOG_FILE"
 
 echo "TopGrade & MacUpdater finished at: $(date)" >> "$LOG_FULL_FILE"
+echo "" >> "$LOG_FULL_FILE"
+echo "" >> "$LOG_FULL_FILE"
+echo "" >> "$LOG_FULL_FILE"
 
 
 echo "" 
