@@ -25,16 +25,52 @@
 
 
 -------------------------------------------
+如何设置定时更新？
+-------------------------------------------
+ - 建议使用 Lingon X（或类似软件），将usercmd_updatefull挂载为循环任务（比如每天夜间3点钟执行）
+
+
+-------------------------------------------
 如何避免密码请求？
 -------------------------------------------
  - 可以通过类似于（brew upgrade --cask --debu）命令，查看是哪些程序触发了密码请求，
  - 然后将对应的命令行，加入到sudo visudo（或直接删除对应的无用程序）
 
+如：
 
--------------------------------------------
-如何设置定时更新？
--------------------------------------------
- - 建议使用 Lingon X（或类似软件），将usercmd_updatefull挂载为循环任务（比如每天夜间3点钟执行）
+# 免密更新  MacPorts 
+Cmnd_Alias MACPORTS_CMDS = \
+    /opt/local/bin/port selfupdate*, \
+    /opt/local/bin/port sync*, \
+    /opt/local/bin/port upgrade*, \
+    /opt/local/bin/port clean*, \
+    /opt/local/bin/port outdated*, \
+    /opt/local/bin/port rev-upgrade*, \
+    /opt/local/bin/port installed inactive*, \
+    /opt/local/bin/port uninstall inactive*, \
+    /opt/local/bin/port -u selfupdate*, \
+    /opt/local/bin/port -u sync*, \
+    /opt/local/bin/port -u upgrade*, \
+    /opt/local/bin/port -u clean*, \
+    /opt/local/bin/port -u outdated*, \
+    /opt/local/bin/port -u rev-upgrade*, \
+    /opt/local/bin/port -u installed inactive*, \
+    /opt/local/bin/port -u uninstall inactive*,\
+    /opt/local/bin/port -N reclaim*
+
+你的用户名 ALL=(ALL) NOPASSWD: MACPORTS_CMDS
+
+
+# 免密更新  homebrew 
+Cmnd_Alias BREW_UPGRADE_CMDS = \
+    /opt/homebrew/bin/brew upgrade*, \
+    /usr/local/bin/brew upgrade*, \
+    /usr/bin/xargs -0 -- /bin/rm -r -f --, \
+    /usr/bin/xargs -0 -- /bin/rm --, \
+    /opt/homebrew/Library/Homebrew/cask/utils/rmdir.sh
+
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: BREW_UPGRADE_CMDS
+
 
 
 -------------------------------------------
