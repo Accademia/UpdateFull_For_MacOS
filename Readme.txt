@@ -18,11 +18,11 @@
 可以更新哪些程序？
 -------------------------------------------
  - 本脚本会，直接（或间接）调用以下四个程序，完成自动化更新
-	- HomeBrew	：更新 Homebrew
-	- Mas		：更新 App Store
-	- Port		：更新 Linux移植APP
-	- TopGreade	：更新 其他APP
-	- MacUpdater	：更新 更多APP
+	- HomeBrew	：更新 Homebrew下载的APP
+	- Mas		：更新 App Store内的APP
+	- MacPorts	：更新 Linux移植的APP
+	- TopGreade	：更新 复查上述在线安装的APP
+	- MacUpdater	：更新 下载后离线安装的APP
 
 
 -------------------------------------------
