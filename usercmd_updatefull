@@ -497,9 +497,43 @@ echo  ""  >> "$LOG_FULL_FILE"
 
 
 
+
+# ----------------------------------
+# 开始执行：HomeBrew
+# ----------------------------------
+
+export HOMEBREW_NO_INTERACTIVE = 1
+
+echo "\033[1;36m-----------------------------------------------\033[0m" 
+echo "\033[1;36m运行 HomeBrew ...\033[0m"
+echo "\033[1;36m-----------------------------------------------\033[0m" 
+
+echo "---------------" >> "$LOG_FULL_FILE"
+echo "运行 HomeBrew" >> "$LOG_FULL_FILE"
+echo "---------------" >> "$LOG_FULL_FILE"
+echo "" >> "$LOG_FULL_FILE"
+
+# 等待3秒，开始执行
+sleep 3  
+
+# 调用检查时间范围函数
+check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
+
+# 执行：HomeBrew （并捕获输出）
+yes | brew upgrade          --greedy  2>&1 | tee -a "$LOG_FULL_FILE"  
+yes | brew upgrade  --cask  --greedy  2>&1 | tee -a "$LOG_FULL_FILE"  
+yes | brew cleanup 2>&1 | tee -a "$LOG_FULL_FILE"  
+
+echo ""  | tee -a "$LOG_FULL_FILE"
+
+
+
+
 # ----------------------------------
 # 开始执行：TopGrade
 # ----------------------------------
+
+export HOMEBREW_NO_INTERACTIVE = 1
 
 echo "\033[1;36m-----------------------------------------------\033[0m" 
 echo "\033[1;36m运行 TopGrade ...\033[0m"
@@ -529,6 +563,8 @@ echo ""  | tee -a "$LOG_FULL_FILE"
 # ----------------------------------
 # 开始执行： MacUpdater
 # ----------------------------------
+
+export HOMEBREW_NO_INTERACTIVE = 1
 
 echo "\033[1;36m-----------------------------------------------\033[0m" 
 echo "\033[1;36m运行 MacUpdater ...\033[0m"
