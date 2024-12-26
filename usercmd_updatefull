@@ -310,7 +310,7 @@ if [ "$architecture" = "arm64" ]; then
         # 更新 Homebrew
         echo ""
         echo "\033[1;36m-----------------------------------------------\033[0m" 
-        echo "\033[1;36m更新 Homebrew工具 ...\033[0m"
+        echo "\033[1;36m 更新 Homebrew工具 ...\033[0m"
         echo "\033[1;36m-----------------------------------------------\033[0m" 
         brew update
         # exit 0
@@ -380,6 +380,70 @@ echo ""
 
 
 
+
+# -----------------------------------------------
+# 检查 ：Mas 是否安装（并更新）
+# -----------------------------------------------
+
+# 调用检查时间范围函数
+check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
+
+if brew list --formula | grep -q "^mas\$"; then
+    echo "\033[1;36m-----------------------------------------------\033[0m" 
+    echo "\033[1;36m 更新 Mas 工具 ...\033[0m"
+    echo "\033[1;36m-----------------------------------------------\033[0m" 
+    brew upgrade mas
+else
+    echo "\033[1;36m-----------------------------------------------\033[0m" 
+    echo "\033[1;36m Mas 未安装，开始安装 ...\033[0m"
+    echo "\033[1;36m-----------------------------------------------\033[0m" 
+    brew reinstall --force mas
+    if [ $? -eq 0 ]; then
+        echo "Mas 安装成功。"
+    else
+        echo "Mas 安装失败。"
+	exit 1  # 安装失败时退出脚本
+    fi
+fi
+
+echo ""
+
+
+
+
+# -----------------------------------------------
+# 检查 ：MacPorts 是否安装（并更新）
+# -----------------------------------------------
+
+# 调用检查时间范围函数
+check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
+
+if port version  > /dev/null 2>&1 ; then
+    echo "\033[1;36m-----------------------------------------------\033[0m" 
+    echo "\033[1;36m 更新 MacPorts 工具 ...\033[0m"
+    echo "\033[1;36m-----------------------------------------------\033[0m" 
+    sudo port selfupdate
+else
+    echo "\033[1;36m-----------------------------------------------\033[0m" 
+    echo "\033[1;36m MacPorts 未安装，开始安装 ...\033[0m"
+    echo "\033[1;36m-----------------------------------------------\033[0m" 
+    curl -LO https://distfiles.macports.org/MacPorts/MacPorts-2.8.1-10.15-Catalina.pkg && sudo /usr/sbin/installer -pkg MacPorts-2.8.1-10.15-Catalina.pkg -target /
+    if [ $? -eq 0 ]; then
+        echo "MacPorts 安装成功。"
+    else
+        echo "MacPorts 安装失败。"
+	exit 1  # 安装失败时退出脚本
+    fi
+fi
+
+echo ""
+
+
+
+
+
+
+
 # -----------------------------------------------
 # 检查 ：TopGrade 是否安装（并更新）
 # -----------------------------------------------
@@ -389,12 +453,12 @@ check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 if brew list --formula | grep -q "^topgrade\$"; then
     echo "\033[1;36m-----------------------------------------------\033[0m" 
-    echo "\033[1;36m更新 TopGrade工具 ...\033[0m"
+    echo "\033[1;36m 更新 TopGrade 工具 ...\033[0m"
     echo "\033[1;36m-----------------------------------------------\033[0m" 
     brew upgrade topgrade
 else
     echo "\033[1;36m-----------------------------------------------\033[0m" 
-    echo "\033[1;36mTopGrade 未安装，开始安装 ...\033[0m"
+    echo "\033[1;36m TopGrade 未安装，开始安装 ...\033[0m"
     echo "\033[1;36m-----------------------------------------------\033[0m" 
     brew reinstall --force topgrade
     if [ $? -eq 0 ]; then
@@ -419,12 +483,12 @@ check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 if brew list --cask | grep -q "^macupdater\$"; then
     echo "\033[1;36m-----------------------------------------------\033[0m" 
-    echo "\033[1;36m更新 MacUpdater工具 ...\033[0m"
+    echo "\033[1;36m 更新 MacUpdater工具 ...\033[0m"
     echo "\033[1;36m-----------------------------------------------\033[0m" 
     brew upgrade macupdater
 else
     echo "\033[1;36m-----------------------------------------------\033[0m" 
-    echo "\033[1;36mMacUpdater 未安装，开始安装 ...\033[0m"
+    echo "\033[1;36m MacUpdater 未安装，开始安装 ...\033[0m"
     echo "\033[1;36m-----------------------------------------------\033[0m" 
     brew reinstall --cask --force macupdater
     if [ $? -eq 0 ]; then
@@ -439,6 +503,8 @@ echo ""
 
 
 
+
+
 # ------------------------------------------------
 # 检查 ：其他必备工具 是否安装（并更新）
 # ------------------------------------------------
@@ -448,7 +514,7 @@ check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 if ! brew list | grep -q "^jq$" || ! brew list | grep -q "^coreutils$" || ! brew list | grep -q "^parallel$"; then
     echo "\033[1;36m-----------------------------------------------\033[0m" 
-    echo "\033[1;36m安装 其他必备工具 ...\033[0m"
+    echo "\033[1;36m 安装 其他必备工具 ...\033[0m"
     echo "\033[1;36m-----------------------------------------------\033[0m" 
 fi
 
@@ -502,7 +568,7 @@ echo  ""  >> "$LOG_FULL_FILE"
 # 开始执行：HomeBrew
 # ----------------------------------
 
-export HOMEBREW_NO_INTERACTIVE = 1
+export HOMEBREW_NO_INTERACTIVE=1
 
 echo "\033[1;36m-----------------------------------------------\033[0m" 
 echo "\033[1;36m运行 HomeBrew ...\033[0m"
@@ -530,13 +596,74 @@ echo ""  | tee -a "$LOG_FULL_FILE"
 
 
 # ----------------------------------
+# 开始执行：Mas
+# ----------------------------------
+
+export HOMEBREW_NO_INTERACTIVE=1
+
+echo "\033[1;36m-----------------------------------------------\033[0m" 
+echo "\033[1;36m 运行 Mas ...\033[0m"
+echo "\033[1;36m-----------------------------------------------\033[0m" 
+
+echo "---------------" >> "$LOG_FULL_FILE"
+echo "运行 Mas" >> "$LOG_FULL_FILE"
+echo "---------------" >> "$LOG_FULL_FILE"
+echo "" >> "$LOG_FULL_FILE"
+
+# 等待3秒，开始执行
+sleep 3  
+
+# 调用检查时间范围函数
+check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
+
+# 执行：HomeBrew （并捕获输出）
+yes | mas upgrade  2>&1 | tee -a "$LOG_FULL_FILE"  
+
+echo ""  | tee -a "$LOG_FULL_FILE"
+
+
+
+
+
+
+# ----------------------------------
+# 开始执行：MacPorts
+# ----------------------------------
+
+export HOMEBREW_NO_INTERACTIVE=1
+
+echo "\033[1;36m-----------------------------------------------\033[0m" 
+echo "\033[1;36m 运行 MacPorts ...\033[0m"
+echo "\033[1;36m-----------------------------------------------\033[0m" 
+
+echo "---------------" >> "$LOG_FULL_FILE"
+echo "运行 MacPorts" >> "$LOG_FULL_FILE"
+echo "---------------" >> "$LOG_FULL_FILE"
+echo "" >> "$LOG_FULL_FILE"
+
+# 等待3秒，开始执行
+sleep 3  
+
+# 调用检查时间范围函数
+check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
+
+# 执行：HomeBrew （并捕获输出）
+yes | sudo port upgrade outdated -N  2>&1 | tee -a "$LOG_FULL_FILE"  
+
+echo ""  | tee -a "$LOG_FULL_FILE"
+
+
+
+
+
+# ----------------------------------
 # 开始执行：TopGrade
 # ----------------------------------
 
-export HOMEBREW_NO_INTERACTIVE = 1
+export HOMEBREW_NO_INTERACTIVE=1
 
 echo "\033[1;36m-----------------------------------------------\033[0m" 
-echo "\033[1;36m运行 TopGrade ...\033[0m"
+echo "\033[1;36m 运行 TopGrade ...\033[0m"
 echo "\033[1;36m-----------------------------------------------\033[0m" 
 
 echo "---------------" >> "$LOG_FULL_FILE"
@@ -567,7 +694,7 @@ echo ""  | tee -a "$LOG_FULL_FILE"
 export HOMEBREW_NO_INTERACTIVE = 1
 
 echo "\033[1;36m-----------------------------------------------\033[0m" 
-echo "\033[1;36m运行 MacUpdater ...\033[0m"
+echo "\033[1;36m 运行 MacUpdater ...\033[0m"
 echo "\033[1;36m-----------------------------------------------\033[0m" 
 
 echo "---------------" >> "$LOG_FULL_FILE"
