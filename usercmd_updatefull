@@ -605,7 +605,7 @@ if [ -n "$packages" ]; then
 
   # 第 2 步：并行下载
   printf  "\033[1;34m[Download]\033[0m "
-  echo "下载更新包（多线程=32） ..." 
+  echo "下载更新包（并行下载） ..." 
   echo "$packages" | xargs -n1 -P32 brew fetch --force --verbose
   echo ""
 
@@ -616,7 +616,7 @@ if [ -n "$packages" ]; then
     brew upgrade --force --greedy --verbose "$pkg"
   done
 else
-  echo "当前没有需要更新的 Homebrew 包。"
+  echo "当前没有需要更新的 Homebrew 包。" | tee -a "$LOG_FULL_FILE"
 fi
 
 
