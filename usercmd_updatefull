@@ -310,7 +310,7 @@ if [ "$architecture" = "arm64" ]; then
         # 更新 Homebrew
         echo ""
         echo "\033[1;36m-----------------------------------------------\033[0m" 
-        echo "\033[1;36m 更新 Homebrew工具 ...\033[0m"
+        echo "\033[1;36m 更新 Homebrew 工具 ...\033[0m"
         echo "\033[1;36m-----------------------------------------------\033[0m" 
         brew update
         # exit 0
@@ -512,10 +512,17 @@ echo ""
 # 调用检查时间范围函数
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
-if ! brew list | grep -q "^jq$" || ! brew list | grep -q "^coreutils$" || ! brew list | grep -q "^parallel$"; then
+if ! brew list | grep -q "^jq$" || ! brew list | grep -q "^coreutils$" || ! brew list | grep -q "^parallel$" || ! brew list | grep -q "^aria2$";  then
     echo "\033[1;36m-----------------------------------------------\033[0m" 
     echo "\033[1;36m 安装 其他必备工具 ...\033[0m"
     echo "\033[1;36m-----------------------------------------------\033[0m" 
+fi
+
+if ! brew list | grep -q "^aria2$"; then
+    printf  "\033[1;34m[INFO]\033[0m "
+    echo "[安装] aria2 ..."
+    brew install aria2
+    echo ""
 fi
 
 if ! brew list | grep -q "^parallel$"; then
@@ -570,8 +577,9 @@ echo  ""  >> "$LOG_FULL_FILE"
 
 export HOMEBREW_NO_INTERACTIVE=1
 
+echo ""
 echo "\033[1;36m-----------------------------------------------\033[0m" 
-echo "\033[1;36m运行 HomeBrew ...\033[0m"
+echo "\033[1;36m 运行 HomeBrew ...\033[0m"
 echo "\033[1;36m-----------------------------------------------\033[0m" 
 
 echo "---------------" >> "$LOG_FULL_FILE"
@@ -585,9 +593,38 @@ sleep 3
 # 调用检查时间范围函数
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
+printf  "\033[1;34m[Scan]\033[0m "
+echo " 需要更新的包 ..."
+
+# 第 1 步：获取所有需要更新的包名，并在终端打印输出
+packages=$(brew outdated --greedy | tee /dev/tty | awk '{print $1}')
+echo ""
+
+# 如果有更新包则执行，否则跳过
+if [ -n "$packages" ]; then
+
+  # 第 2 步：并行下载
+  printf  "\033[1;34m[Download]\033[0m "
+  echo "下载更新包（多线程=32） ..." 
+  echo "$packages" | xargs -n1 -P32 brew fetch --force --verbose
+  echo ""
+
+  # 第 3 步：安装更新包（仍然用 brew upgrade 即可）
+  printf  "\033[1;34m[Install]\033[0m "
+  echo "开始安装更新包 ..."
+  for pkg in $packages; do
+    brew upgrade --force --greedy --verbose "$pkg"
+  done
+else
+  echo "当前没有需要可更新的 Homebrew 包。"
+fi
+
+
 # 执行：HomeBrew （并捕获输出）
-yes | brew upgrade          --greedy  2>&1 | tee -a "$LOG_FULL_FILE"  
-yes | brew upgrade  --cask  --greedy  2>&1 | tee -a "$LOG_FULL_FILE"  
+# yes | brew upgrade --greedy 2>&1 | tee -a "$LOG_FULL_FILE"                 # brew upgrade --greedy --debug         对于反复需要输入password的情况，可以使用此命令进行排查到底是那个命令引起的，从而加入sudo visudo
+# yes | brew upgrade --greedy --cask 2>&1 | tee -a "$LOG_FULL_FILE"          # brew upgrade --cask --greedy --debug
+
+# 清洁
 yes | brew cleanup 2>&1 | tee -a "$LOG_FULL_FILE"  
 
 echo ""  | tee -a "$LOG_FULL_FILE"
@@ -601,6 +638,7 @@ echo ""  | tee -a "$LOG_FULL_FILE"
 
 export HOMEBREW_NO_INTERACTIVE=1
 
+echo ""
 echo "\033[1;36m-----------------------------------------------\033[0m" 
 echo "\033[1;36m 运行 Mas ...\033[0m"
 echo "\033[1;36m-----------------------------------------------\033[0m" 
@@ -632,6 +670,7 @@ echo ""  | tee -a "$LOG_FULL_FILE"
 
 export HOMEBREW_NO_INTERACTIVE=1
 
+echo ""
 echo "\033[1;36m-----------------------------------------------\033[0m" 
 echo "\033[1;36m 运行 MacPorts ...\033[0m"
 echo "\033[1;36m-----------------------------------------------\033[0m" 
@@ -662,6 +701,7 @@ echo ""  | tee -a "$LOG_FULL_FILE"
 
 export HOMEBREW_NO_INTERACTIVE=1
 
+echo ""
 echo "\033[1;36m-----------------------------------------------\033[0m" 
 echo "\033[1;36m 运行 TopGrade ...\033[0m"
 echo "\033[1;36m-----------------------------------------------\033[0m" 
@@ -691,8 +731,9 @@ echo ""  | tee -a "$LOG_FULL_FILE"
 # 开始执行： MacUpdater
 # ----------------------------------
 
-export HOMEBREW_NO_INTERACTIVE = 1
+export HOMEBREW_NO_INTERACTIVE=1
 
+echo ""
 echo "\033[1;36m-----------------------------------------------\033[0m" 
 echo "\033[1;36m 运行 MacUpdater ...\033[0m"
 echo "\033[1;36m-----------------------------------------------\033[0m" 
@@ -747,6 +788,7 @@ echo "\033[1;36m所有更新 已完成 ...\033[0m"
 echo "\033[1;36m-----------------------------------------------\033[0m" 
 echo "日志路径：$LOG_PATH"
 echo "" 
+
 
 # 打开Log日志文件夹
 open "$LOG_PATH"

@@ -17,10 +17,10 @@
 -------------------------------------------
 可以更新哪些程序？
 -------------------------------------------
- - 本脚本会，直接（或间接）调用以下四个程序，完成自动化更新
+ - 本脚本会，调用以下个程序，完成自动化更新
 	- HomeBrew	：更新 Homebrew下载的APP
-	- Mas		：更新 App Store内的APP
-	- MacPorts	：更新 Linux移植的APP
+	- Mas		：更新 App Store下载的APP
+	- MacPorts	：更新 MacPorts下载（Linux移植）的APP
 	- TopGreade	：更新 复查上述在线安装的APP
 	- MacUpdater	：更新 下载后离线安装的APP
 
@@ -65,7 +65,11 @@ Cmnd_Alias MACPORTS_CMDS = \
 # 免密更新  homebrew 
 Cmnd_Alias BREW_UPGRADE_CMDS = \
     /opt/homebrew/bin/brew upgrade*, \
+    /opt/homebrew/bin/brew upgrade --greedy*, \
+    /opt/homebrew/bin/brew upgrade --cask --greedy*, \
     /usr/local/bin/brew upgrade*, \
+    /usr/local/bin/brew upgrade --greedy*, \
+    /usr/local/bin/brew upgrade --cask --greedy*, \
     /usr/bin/xargs -0 -- /bin/rm -r -f --, \
     /usr/bin/xargs -0 -- /bin/rm --, \
     /opt/homebrew/Library/Homebrew/cask/utils/rmdir.sh
