@@ -1,4 +1,4 @@
-# 自动执行的批处理：TopGrade & MacUpdater
+# 自动执行的批处理：HomeBrew \ Mas \ MacPorts \ TopGrade \ MacUpdater
 
 #!/bin/bash
 
@@ -616,7 +616,7 @@ if [ -n "$packages" ]; then
     brew upgrade --force --greedy --verbose "$pkg"
   done
 else
-  echo "当前没有需要可更新的 Homebrew 包。"
+  echo "当前没有需要更新的 Homebrew 包。"
 fi
 
 
