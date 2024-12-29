@@ -578,9 +578,9 @@ echo  ""  >> "$LOG_FULL_FILE"
 export HOMEBREW_NO_INTERACTIVE=1
 
 echo ""
-echo "\033[1;36m-----------------------------------------------\033[0m" 
-echo "\033[1;36m 运行 HomeBrew ...\033[0m"
-echo "\033[1;36m-----------------------------------------------\033[0m" 
+echo "\033[1;32m-----------------------------------------------\033[0m" 
+echo "\033[1;32m 运行 HomeBrew ...                             \033[0m"
+echo "\033[1;32m-----------------------------------------------\033[0m" 
 
 echo "---------------" >> "$LOG_FULL_FILE"
 echo "运行 HomeBrew" >> "$LOG_FULL_FILE"
@@ -590,32 +590,53 @@ echo "" >> "$LOG_FULL_FILE"
 # 等待3秒，开始执行
 sleep 3  
 
+
+
 # 调用检查时间范围函数
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 printf  "\033[1;34m[Scan]\033[0m "
-echo " 需要更新的包 ..."
+echo "需要更新的包 ..." | tee -a "$LOG_FULL_FILE"
 
-# 第 1 步：获取所有需要更新的包名，并在终端打印输出
-packages=$(brew outdated --greedy | tee /dev/tty | awk '{print $1}')
+# 第 1 步：获取所有需要更新的公式和 cask 名称
+formulae=$(brew outdated --formula --greedy | tee /dev/tty | awk '{print $1}')
+casks=$(brew outdated --cask --greedy | tee /dev/tty | awk '{print $1}')
+
+# 将需要更新的包分别存储
+packages_formulae=($formulae)
+packages_casks=($casks)
+
 echo ""
 
 # 如果有更新包则执行，否则跳过
-if [ -n "$packages" ]; then
+if [ ${#packages_formulae[@]} -ne 0 ] || [ ${#packages_casks[@]} -ne 0 ]; then
 
-  # 第 2 步：并行下载
-  printf  "\033[1;34m[Download]\033[0m "
-  echo "下载更新包（并行下载） ..." 
-  echo "$packages" | xargs -n1 -P32 brew fetch --force --verbose
-  echo ""
+  # 第 2 步：并行下载和安装公式
+  if [ ${#packages_formulae[@]} -ne 0 ]; then
+    printf  "\033[1;34m[Download Formulae]\033[0m "
+    echo "下载并安装更新的公式包（并行） ..." | tee -a "$LOG_FULL_FILE"
 
-  # 第 3 步：安装更新包（仍然用 brew upgrade 即可）
-  printf  "\033[1;34m[Install]\033[0m "
-  echo "开始安装更新包 ..."
-  for pkg in $packages; do
-    brew upgrade --force --greedy --verbose "$pkg"
-  done
+    # 并行下载公式
+    echo "${packages_formulae[@]}" | xargs -n1 -P32 brew fetch --force --verbose --formula | tee -a "$LOG_FULL_FILE"
+    
+    echo ""
+    
+    # 并行安装公式
+    echo "${packages_formulae[@]}" | xargs -n1 -P32 brew upgrade --force --greedy --verbose | tee -a "$LOG_FULL_FILE"
+  fi
+
+  # 第 3 步：串行安装 cask
+  if [ ${#packages_casks[@]} -ne 0 ]; then
+    printf  "\033[1;34m[Download Casks]\033[0m "
+    echo "开始安装更新的 cask 包（串行） ..." | tee -a "$LOG_FULL_FILE"
+
+    for pkg in "${packages_casks[@]}"; do
+      brew upgrade --force --greedy --verbose --cask "$pkg" | tee -a "$LOG_FULL_FILE"
+    done
+  fi
+
 else
+  printf  "\033[1;32m[OK]\033[0m "
   echo "当前没有需要更新的 Homebrew 包。" | tee -a "$LOG_FULL_FILE"
 fi
 
@@ -639,9 +660,9 @@ echo ""  | tee -a "$LOG_FULL_FILE"
 export HOMEBREW_NO_INTERACTIVE=1
 
 echo ""
-echo "\033[1;36m-----------------------------------------------\033[0m" 
-echo "\033[1;36m 运行 Mas ...\033[0m"
-echo "\033[1;36m-----------------------------------------------\033[0m" 
+echo "\033[1;32m-----------------------------------------------\033[0m" 
+echo "\033[1;32m 运行 Mas ...                                  \033[0m"
+echo "\033[1;32m-----------------------------------------------\033[0m" 
 
 echo "---------------" >> "$LOG_FULL_FILE"
 echo "运行 Mas" >> "$LOG_FULL_FILE"
@@ -671,9 +692,9 @@ echo ""  | tee -a "$LOG_FULL_FILE"
 export HOMEBREW_NO_INTERACTIVE=1
 
 echo ""
-echo "\033[1;36m-----------------------------------------------\033[0m" 
-echo "\033[1;36m 运行 MacPorts ...\033[0m"
-echo "\033[1;36m-----------------------------------------------\033[0m" 
+echo "\033[1;32m-----------------------------------------------\033[0m" 
+echo "\033[1;32m 运行 MacPorts ...                             \033[0m"
+echo "\033[1;32m-----------------------------------------------\033[0m" 
 
 echo "---------------" >> "$LOG_FULL_FILE"
 echo "运行 MacPorts" >> "$LOG_FULL_FILE"
@@ -702,9 +723,9 @@ echo ""  | tee -a "$LOG_FULL_FILE"
 export HOMEBREW_NO_INTERACTIVE=1
 
 echo ""
-echo "\033[1;36m-----------------------------------------------\033[0m" 
-echo "\033[1;36m 运行 TopGrade ...\033[0m"
-echo "\033[1;36m-----------------------------------------------\033[0m" 
+echo "\033[1;32m-----------------------------------------------\033[0m" 
+echo "\033[1;32m 运行 TopGrade ...                             \033[0m"
+echo "\033[1;32m-----------------------------------------------\033[0m" 
 
 echo "---------------" >> "$LOG_FULL_FILE"
 echo "运行 TopGrade" >> "$LOG_FULL_FILE"
@@ -734,9 +755,9 @@ echo ""  | tee -a "$LOG_FULL_FILE"
 export HOMEBREW_NO_INTERACTIVE=1
 
 echo ""
-echo "\033[1;36m-----------------------------------------------\033[0m" 
-echo "\033[1;36m 运行 MacUpdater ...\033[0m"
-echo "\033[1;36m-----------------------------------------------\033[0m" 
+echo "\033[1;32m-----------------------------------------------\033[0m" 
+echo "\033[1;32m 运行 MacUpdater ...                           \033[0m"
+echo "\033[1;32m-----------------------------------------------\033[0m" 
 
 echo "---------------" >> "$LOG_FULL_FILE"
 echo "运行 MacUpdater" >> "$LOG_FULL_FILE"
@@ -783,9 +804,9 @@ echo "" >> "$LOG_FULL_FILE"
 
 echo "" 
 echo "" 
-echo "\033[1;36m-----------------------------------------------\033[0m" 
-echo "\033[1;36m所有更新 已完成 ...\033[0m"
-echo "\033[1;36m-----------------------------------------------\033[0m" 
+echo "\033[1;30m-----------------------------------------------\033[0m" 
+echo "\033[1;30m所有更新 已完成 ...\033[0m"
+echo "\033[1;30m-----------------------------------------------\033[0m" 
 echo "日志路径：$LOG_PATH"
 echo "" 
 
