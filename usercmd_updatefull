@@ -614,13 +614,15 @@ if [ ${#packages_formulae[@]} -ne 0 ] || [ ${#packages_casks[@]} -ne 0 ]; then
   # 第 2 步：并行下载和安装公式
   if [ ${#packages_formulae[@]} -ne 0 ]; then
     printf  "\033[1;34m[Download Formulae]\033[0m "
-    echo "下载并安装更新的公式包（并行） ..." | tee -a "$LOG_FULL_FILE"
+    echo "（并行）下载 Formulae包 ..." | tee -a "$LOG_FULL_FILE"
 
     # 并行下载公式
     echo "${packages_formulae[@]}" | xargs -n1 -P32 brew fetch --force --verbose --formula | tee -a "$LOG_FULL_FILE"
     
     echo ""
     
+    printf  "\033[1;34m[Install Formulae]\033[0m "
+    echo "（并行）安装 Formulae包 ..." | tee -a "$LOG_FULL_FILE"
     # 并行安装公式
     echo "${packages_formulae[@]}" | xargs -n1 -P32 brew upgrade --force --greedy --verbose | tee -a "$LOG_FULL_FILE"
   fi
@@ -628,7 +630,7 @@ if [ ${#packages_formulae[@]} -ne 0 ] || [ ${#packages_casks[@]} -ne 0 ]; then
   # 第 3 步：串行安装 cask
   if [ ${#packages_casks[@]} -ne 0 ]; then
     printf  "\033[1;34m[Download Casks]\033[0m "
-    echo "开始安装更新的 cask 包（串行） ..." | tee -a "$LOG_FULL_FILE"
+    echo "（串行）下载并安装 cask 包（串行） ..." | tee -a "$LOG_FULL_FILE"
 
     for pkg in "${packages_casks[@]}"; do
       brew upgrade --force --greedy --verbose --cask "$pkg" | tee -a "$LOG_FULL_FILE"
