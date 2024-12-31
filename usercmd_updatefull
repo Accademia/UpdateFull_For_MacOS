@@ -606,40 +606,41 @@ casks=$(brew outdated --cask --greedy | tee /dev/tty | awk '{print $1}')
 packages_formulae=($formulae)
 packages_casks=($casks)
 
-echo ""
 
 # 如果有更新包则执行，否则跳过
 if [ ${#packages_formulae[@]} -ne 0 ] || [ ${#packages_casks[@]} -ne 0 ]; then
-
+  
   # 第 2 步：并行下载和安装公式
   if [ ${#packages_formulae[@]} -ne 0 ]; then
-    printf  "\033[1;34m[Download Formulae]\033[0m "
-    echo "（并行）下载 Formulae包 ..." | tee -a "$LOG_FULL_FILE"
+    echo ""
+    printf  "\033[1;34m[Download - Formulae]\033[0m "
+    echo "下载 Formulae包（并行）..." | tee -a "$LOG_FULL_FILE"
 
     # 并行下载公式
     echo "${packages_formulae[@]}" | xargs -n1 -P32 brew fetch --force --verbose --formula | tee -a "$LOG_FULL_FILE"
-    
+
     echo ""
-    
-    printf  "\033[1;34m[Install Formulae]\033[0m "
-    echo "（并行）安装 Formulae包 ..." | tee -a "$LOG_FULL_FILE"
+    printf  "\033[1;34m[Install - Formulae]\033[0m "
+    echo "安装 Formulae包（并行）..." | tee -a "$LOG_FULL_FILE"
     # 并行安装公式
     echo "${packages_formulae[@]}" | xargs -n1 -P32 brew upgrade --force --greedy --verbose | tee -a "$LOG_FULL_FILE"
   fi
 
   # 第 3 步：串行安装 cask
   if [ ${#packages_casks[@]} -ne 0 ]; then
-    printf  "\033[1;34m[Download Casks]\033[0m "
-    echo "（串行）下载并安装 cask 包（串行） ..." | tee -a "$LOG_FULL_FILE"
+    echo ""
+    printf  "\033[1;34m[Download & Install - Casks]\033[0m "
+    echo "下载并安装 cask 包（串行）..." | tee -a "$LOG_FULL_FILE"
 
     for pkg in "${packages_casks[@]}"; do
       brew upgrade --force --greedy --verbose --cask "$pkg" | tee -a "$LOG_FULL_FILE"
     done
+    echo ""
   fi
 
 else
-  printf  "\033[1;32m[OK]\033[0m "
-  echo "当前没有需要更新的 Homebrew 包。" | tee -a "$LOG_FULL_FILE"
+  printf  "\033[1;32m[ OK ]\033[0m "
+  echo "当前没有需要更新的 Homebrew 包 !!! " | tee -a "$LOG_FULL_FILE"
 fi
 
 
@@ -647,8 +648,11 @@ fi
 # yes | brew upgrade --greedy 2>&1 | tee -a "$LOG_FULL_FILE"                 # brew upgrade --greedy --debug         对于反复需要输入password的情况，可以使用此命令进行排查到底是那个命令引起的，从而加入sudo visudo
 # yes | brew upgrade --greedy --cask 2>&1 | tee -a "$LOG_FULL_FILE"          # brew upgrade --cask --greedy --debug
 
+
 # 清洁
-yes | brew cleanup 2>&1 | tee -a "$LOG_FULL_FILE"  
+printf  "\033[1;34m[Clean]\033[0m "
+echo "清理Homebrew残留 ..." | tee -a "$LOG_FULL_FILE"
+brew cleanup --prune=all 2>&1 | tee -a "$LOG_FULL_FILE"  
 
 echo ""  | tee -a "$LOG_FULL_FILE"
 
@@ -741,8 +745,8 @@ sleep 3
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 # 执行 TopGrade （并捕获输出）
-topgrade --yes --cleanup 2>&1 | tee -a "$LOG_FULL_FILE"  #  --cleanup
-
+topgrade --yes --cleanup 2>&1 | tee -a "$LOG_FULL_FILE"  
+brew cleanup --prune=all 2>&1 | tee -a "$LOG_FULL_FILE"  
 
 echo ""  | tee -a "$LOG_FULL_FILE"
 
