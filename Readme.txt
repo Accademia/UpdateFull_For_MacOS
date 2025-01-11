@@ -65,11 +65,15 @@ Cmnd_Alias MACPORTS_CMDS = \
 # 免密更新  homebrew 
 Cmnd_Alias BREW_UPGRADE_CMDS = \
     /opt/homebrew/bin/brew upgrade*, \
+    /opt/homebrew/bin/brew upgrade --force*, \
     /opt/homebrew/bin/brew upgrade --greedy*, \
-    /opt/homebrew/bin/brew upgrade --cask --greedy*, \
+    /opt/homebrew/bin/brew upgrade --force --greedy*, \
+    /opt/homebrew/bin/brew upgrade --force --greedy --verbose*, \
     /usr/local/bin/brew upgrade*, \
+    /usr/local/bin/brew upgrade --force*, \
     /usr/local/bin/brew upgrade --greedy*, \
-    /usr/local/bin/brew upgrade --cask --greedy*, \
+    /usr/local/bin/brew upgrade --force --greedy*, \
+    /usr/local/bin/brew upgrade --force --greedy --verbose*, \
     /usr/bin/xargs -0 -- /bin/rm -r -f --, \
     /usr/bin/xargs -0 -- /bin/rm --, \
     /opt/homebrew/Library/Homebrew/cask/utils/rmdir.sh
