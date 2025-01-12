@@ -64,18 +64,32 @@ Cmnd_Alias MACPORTS_CMDS = \
 
 # 免密更新  homebrew 
 Cmnd_Alias BREW_UPGRADE_CMDS = \
-    /opt/homebrew/bin/brew upgrade*, \
-    /opt/homebrew/bin/brew upgrade --force*, \
-    /opt/homebrew/bin/brew upgrade --greedy*, \
-    /opt/homebrew/bin/brew upgrade --force --greedy*, \
-    /opt/homebrew/bin/brew upgrade --force --greedy --verbose*, \
-    /usr/local/bin/brew upgrade*, \
-    /usr/local/bin/brew upgrade --force*, \
-    /usr/local/bin/brew upgrade --greedy*, \
-    /usr/local/bin/brew upgrade --force --greedy*, \
-    /usr/local/bin/brew upgrade --force --greedy --verbose*, \
-    /usr/bin/xargs -0 -- /bin/rm -r -f --, \
-    /usr/bin/xargs -0 -- /bin/rm --, \
+    /opt/homebrew/bin/brew upgrade *, \
+    /opt/homebrew/bin/brew upgrade --force *, \
+    /opt/homebrew/bin/brew upgrade --greedy *, \
+    /opt/homebrew/bin/brew upgrade --force --greedy *, \
+    /opt/homebrew/bin/brew upgrade --force --greedy --verbose *, \
+    /usr/local/bin/brew upgrade *, \
+    /usr/local/bin/brew upgrade --force *, \
+    /usr/local/bin/brew upgrade --greedy *,\
+    /usr/local/bin/brew upgrade --force --greedy *, \
+    /usr/local/bin/brew upgrade --force --greedy --verbose *, \
+    /usr/bin/launchctl remove *, \
+    /usr/bin/launchctl list *, \
+    /usr/bin/launchctl unload *, \
+    /bin/launchctl remove *, \
+    /bin/launchctl list *, \
+    /bin/launchctl unload *, \
+    /usr/bin/sudo -u root -E -- /usr/bin/launchctl remove *, \
+    /usr/bin/sudo -u root -E -- /usr/bin/launchctl list *, \
+    /usr/bin/sudo -u root -E -- /usr/bin/launchctl unload *, \
+    /usr/bin/sudo -u root -E -- /bin/launchctl remove *, \
+    /usr/bin/sudo -u root -E -- /bin/launchctl list *, \
+    /usr/bin/sudo -u root -E -- /bin/launchctl unload *, \
+    /usr/bin/sudo -u root -E -- /bin/rm -f -- *, \
+    /usr/bin/sudo -u root -E -- /bin/rm *, \
+    /usr/bin/xargs -0 -- /bin/rm -r -f --*, \
+    /usr/bin/xargs -0 -- /bin/rm --*, \
     /opt/homebrew/Library/Homebrew/cask/utils/rmdir.sh
 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: BREW_UPGRADE_CMDS
