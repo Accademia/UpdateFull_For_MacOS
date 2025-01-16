@@ -34,7 +34,7 @@
 -------------------------------------------
 如何避免密码请求？
 -------------------------------------------
- - 可以通过类似于（brew upgrade --cask --debu）命令，查看是哪些程序触发了密码请求，
+ - 可以通过类似于（  brew upgrade --greedy --debug  ）命令，查看是哪些程序触发了密码请求，
  - 然后将对应的命令行，加入到sudo visudo（或直接删除对应的无用程序）
 
 如：
@@ -95,13 +95,35 @@ Cmnd_Alias BREW_UPGRADE_CMDS = \
     /usr/bin/sudo -E -- /usr/bin/xargs -0 -- /bin/rm *,\
     /usr/bin/xargs -0 -- /bin/rm -r -f -- *, \
     /usr/bin/xargs -0 -- /bin/rm -- *, \
+    /usr/bin/sudo -u root -E -- /usr/sbin/kextstat -l -b /Library/Extensions/AirParrotDriver.kext, \
     /opt/homebrew/Library/Homebrew/cask/utils/rmdir.sh
 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: BREW_UPGRADE_CMDS
 
 
 
+
+
+使用如下命令 ：检测visudo是否生效
+
+sudo -l
+
+
+使用如下命令 ：查看visudo配置文件
+
+sudo cat /etc/sudoers
+
+
+
+使用如下命令 ：编辑visudo配置文件 （注意，退出保存时，新配置回立刻生效，无需手动reload ）
+
+sudo visudo
+
+
+
+
 -------------------------------------------
 声明：
 -------------------------------------------
+
  - 本脚本所有代码均来自于ChatGPT，且经过长期测试。本工程使用MIT协议分发
