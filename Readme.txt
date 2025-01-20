@@ -80,45 +80,62 @@ Cmnd_Alias BREW_UPGRADE_CMDS = \
     /bin/launchctl remove *, \
     /bin/launchctl list *, \
     /bin/launchctl unload *, \
-    /usr/bin/sudo -u root -E -- /usr/bin/launchctl remove *, \
-    /usr/bin/sudo -u root -E -- /usr/bin/launchctl list *, \
-    /usr/bin/sudo -u root -E -- /usr/bin/launchctl unload *, \
-    /usr/bin/sudo -u root -E -- /bin/launchctl remove *, \
-    /usr/bin/sudo -u root -E -- /bin/launchctl list *, \
-    /usr/bin/sudo -u root -E -- /bin/launchctl unload *, \
-    /usr/bin/sudo -u root -E -- /bin/rm -f -- *, \
-    /usr/bin/sudo -u root -E -- /bin/rm -- *, \
-    /usr/bin/sudo -u root -E -- /bin/rm *, \
-    /usr/bin/sudo -u root -E -- /usr/bin/xargs -0 -- /bin/rm -r -f --,\
-    /usr/bin/sudo -u root -E -- /usr/bin/xargs -0 -- /bin/rm *,\
-    /usr/bin/sudo -E -- /usr/bin/xargs -0 -- /bin/rm -r -f --,\
-    /usr/bin/sudo -E -- /usr/bin/xargs -0 -- /bin/rm *,\
-    /usr/bin/xargs -0 -- /bin/rm -r -f -- *, \
-    /usr/bin/xargs -0 -- /bin/rm -- *, \
-    /usr/bin/sudo -u root -E -- /usr/sbin/kextstat -l -b /Library/Extensions/AirParrotDriver.kext, \
-    /opt/homebrew/Library/Homebrew/cask/utils/rmdir.sh
+    /usr/bin/xargs -0 -- /bin/rm -r -f *
 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: BREW_UPGRADE_CMDS
 
 
+# 注意：/usr/bin/sudo -E -- 等前缀不要添加到免密命令中，添加后会造成无法匹配的情况
+
+# Office
+你的用户名 ALL=(ALL) NOPASSWD: /bin/launchctl list com.microsoft.office.licensingV2.helper
+你的用户名 ALL=(ALL) NOPASSWD: /bin/rm -f -- /Library/LaunchDaemons/com.microsoft.office.licensingV2.helper.plist
+
+# Zoom
+你的用户名 ALL=(ALL) NOPASSWD: /bin/launchctl list us.zoom.updater
+你的用户名 ALL=(ALL) NOPASSWD: /bin/rm -f -- /Library/LaunchAgents/us.zoom.updater.plist
+
+# AirParrot
+你的用户名 ALL=(ALL) NOPASSWD: /usr/sbin/kextstat -l -b /Library/Extensions/AirParrotDriver.kext
+
+# OpenVPN
+你的用户名 ALL=(ALL) NOPASSWD: /bin/launchctl list org.openvpn.*
+你的用户名 ALL=(ALL) NOPASSWD: /bin/launchctl remove org.openvpn.*
+你的用户名 ALL=(ALL) NOPASSWD: /usr/sbin/pkgutil --forget org.openvpn.*
+
+# ForkLift
+你的用户名 ALL=(ALL) NOPASSWD: /bin/launchctl list com.binarynights.ForkLift*
+你的用户名 ALL=(ALL) NOPASSWD: /bin/launchctl remove com.binarynights.ForkLift*
 
 
 
-使用如下命令 ：检测visudo是否生效
-
+-------------------------------------------
+如何检测visudo是否生效
+-------------------------------------------
 sudo -l
 
 
-使用如下命令 ：查看visudo配置文件
-
+-------------------------------------------
+如何查看visudo配置文件
+-------------------------------------------
 sudo cat /etc/sudoers
 
 
 
-使用如下命令 ：编辑visudo配置文件 （注意，退出保存时，新配置回立刻生效，无需手动reload ）
-
+-------------------------------------------
+如何编辑visudo配置文件 
+-------------------------------------------
 sudo visudo
+注意，退出保存时，新配置回立刻生效，无需手动reload 
 
+
+
+-------------------------------------------
+特别提示： 
+-------------------------------------------
+在编辑visudoers时，一定 一定 一定 一定 不要修改如下配置内容！！！
+root            ALL = (ALL) ALL
+不然不可能要要面临重装系统！
 
 
 
