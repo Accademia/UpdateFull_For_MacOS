@@ -45,83 +45,89 @@
  Defaults        env_keep += "PATH"
  Defaults        env_keep += "HOME"
 
-# ------------------
-# 免密更新  MacPorts 
-# ------------------
-Cmnd_Alias MACPORTS_CMDS = \
-    /opt/local/bin/port selfupdate*, \
-    /opt/local/bin/port sync*, \
-    /opt/local/bin/port upgrade*, \
-    /opt/local/bin/port clean*, \
-    /opt/local/bin/port outdated*, \
-    /opt/local/bin/port rev-upgrade*, \
-    /opt/local/bin/port installed inactive*, \
-    /opt/local/bin/port uninstall inactive*, \
-    /opt/local/bin/port -u selfupdate*, \
-    /opt/local/bin/port -u sync*, \
-    /opt/local/bin/port -u upgrade*, \
-    /opt/local/bin/port -u clean*, \
-    /opt/local/bin/port -u outdated*, \
-    /opt/local/bin/port -u rev-upgrade*, \
-    /opt/local/bin/port -u installed inactive*, \
-    /opt/local/bin/port -u uninstall inactive*,\
-    /opt/local/bin/port -N reclaim*
+# ----------------------------
+# 免密更新 MacOS Update
+# ----------------------------
 
-你的用户名 ALL=(ALL) NOPASSWD: SETENV: MACPORTS_CMDS
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/softwareupdate* 
 
+# ----------------------------
+# 免密更新 MacPorts
+# ----------------------------
 
-# ------------------
-# 免密更新  homebrew 
-# ------------------
-Cmnd_Alias BREW_UPGRADE_CMDS = \
-    /opt/homebrew/bin/brew upgrade *, \
-    /opt/homebrew/bin/brew upgrade --force *, \
-    /opt/homebrew/bin/brew upgrade --greedy *, \
-    /opt/homebrew/bin/brew upgrade --force --greedy *, \
-    /opt/homebrew/bin/brew upgrade --force --greedy --verbose *, \
-    /usr/local/bin/brew upgrade *, \
-    /usr/local/bin/brew upgrade --force *, \
-    /usr/local/bin/brew upgrade --greedy *, \
-    /usr/local/bin/brew upgrade --force --greedy *, \
-    /usr/local/bin/brew upgrade --force --greedy --verbose *, \
-    /usr/bin/launchctl remove *, \
-    /usr/bin/launchctl list *, \
-    /usr/bin/launchctl unload *, \
-    /bin/launchctl remove *, \
-    /bin/launchctl list *, \
-    /bin/launchctl unload *, \
-    /bin/rm -f -- /Library/LaunchDaemons/*, \
-    /bin/rm -f -- /Library/LaunchAgents/*, \
-    /usr/bin/xargs -0 -- /bin/rm -r -f *, \
-    /usr/bin/touch /Applications/*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port selfupdate*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port sync*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port upgrade*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port clean*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port outdated*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port rev-upgrade*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port installed inactive*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port uninstall inactive*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port -u selfupdate*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port -u sync*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port -u upgrade*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port -u clean*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port -u outdated*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port -u rev-upgrade*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port -u installed inactive*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port -u uninstall inactive*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port -N reclaim*
 
-你的用户名 ALL=(ALL) NOPASSWD: SETENV: BREW_UPGRADE_CMDS
+# --------------------------------
+# 免密更新 Homebrew 
+# --------------------------------
 
 # SETENV: 这个标签用于告诉 sudo 允许使用 -E（preserve environment）等与环境变量相关的功能。
-# 如果不加，则不能使用 -E参数！！！
+# 如果不加，则不能使用 -E参数！！
 
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/homebrew/bin/brew upgrade *
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/local/bin/brew upgrade *
 
+# ------------------------
+# 免密更新 Homebrew间接调用
+# -------------------------
+
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/bin/launchctl remove*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/bin/launchctl list*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/bin/launchctl unload*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl unload*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -R -f -- /Applications/*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm /Applications/*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/bin/touch /Applications/*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/bin/xargs -0 -- /bin/rm --*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/bin/xargs -0 -- /bin/rm -r -f --*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/bin/xargs -0 -- /opt/homebrew/Library/Homebrew/*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil *
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/*
 
 # ------------------
-# 免密更新  Office
+# 免密更新 Office
 # ------------------
+
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list com.microsoft.office.licensingV2.helper
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/com.microsoft.office.licensingV2.helper.plist
 
 # ------------------
-# 免密更新  Zoom
+# 免密更新 Zoom
 # ------------------
+
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list us.zoom.updater
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/us.zoom.updater.plist
 
 # ------------------
-# 免密更新  AirParrot
+# 免密更新 AirParrot
 # ------------------
+
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/kextstat -l -b /Library/Extensions/AirParrotDriver.kext
 
 # ------------------
-# 免密更新  OpenVPN
+# 免密更新 OpenVPN
 # ------------------
+
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list org.openvpn.*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove org.openvpn.*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget org.openvpn.*
@@ -129,13 +135,19 @@ Cmnd_Alias BREW_UPGRADE_CMDS = \
 # ------------------
 # 免密更新 ForkLift
 # ------------------
+
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list com.binarynights.ForkLift*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove com.binarynights.ForkLift*
 
 # ------------------
 # 免密更新 Capcut
 # ------------------
+
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/bin/touch /Applications/CapCut*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm /Applications/CapCut*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/cp -pR /opt/homebrew/Caskroom/capcut*
+leixi ALL=(ALL) NOPASSWD: SETENV: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift -target arm64-apple-macosx15 /opt/homebrew/Library/Homebrew/cask/utils/copy-xattrs.swift /opt/homebrew/Caskroom/capcut*
+
 
 
 # ... 代码结束 ！！！！！！！
