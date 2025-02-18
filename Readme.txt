@@ -45,11 +45,13 @@
  Defaults        env_keep += "PATH"
  Defaults        env_keep += "HOME"
 
+
 # ----------------------------
 # 免密更新 MacOS Update
 # ----------------------------
 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/softwareupdate* 
+
 
 # ----------------------------
 # 免密更新 MacPorts
@@ -73,6 +75,7 @@
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port -u uninstall inactive*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port -N reclaim*
 
+
 # --------------------------------
 # 免密更新 Homebrew 
 # --------------------------------
@@ -82,6 +85,7 @@
 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/homebrew/bin/brew upgrade *
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/local/bin/brew upgrade *
+
 
 # ------------------------
 # 免密更新 Homebrew间接调用
@@ -103,6 +107,8 @@
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/bin/xargs -0 -- /opt/homebrew/Library/Homebrew/*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil *
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/chown -R -- 你的用户名\:staff /usr/local/include /usr/local/lib
+
 
 # ------------------
 # 免密更新 Office
@@ -111,6 +117,7 @@
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list com.microsoft.office.licensingV2.helper
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/com.microsoft.office.licensingV2.helper.plist
 
+
 # ------------------
 # 免密更新 Zoom
 # ------------------
@@ -118,11 +125,13 @@
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list us.zoom.updater
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/us.zoom.updater.plist
 
+
 # ------------------
 # 免密更新 AirParrot
 # ------------------
 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/kextstat -l -b /Library/Extensions/AirParrotDriver.kext
+
 
 # ------------------
 # 免密更新 OpenVPN
@@ -132,12 +141,14 @@
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove org.openvpn.*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget org.openvpn.*
 
+
 # ------------------
 # 免密更新 ForkLift
 # ------------------
 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list com.binarynights.ForkLift*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove com.binarynights.ForkLift*
+
 
 # ------------------
 # 免密更新 Capcut
