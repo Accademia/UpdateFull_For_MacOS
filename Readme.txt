@@ -113,6 +113,8 @@
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/chown -R -- 你的用户名\:staff /usr/local/include /usr/local/lib
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/chown -R -- 你的用户名\:staff /Applications/*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/cp -pR /opt/homebrew/*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift *
 
 
 
