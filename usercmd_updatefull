@@ -659,12 +659,12 @@ sleep 3
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 # 显示未更新APP列表：Mas （并捕获输出）
-echo  "\033[1;34m[扫描 APP]\033[0m"
+echo  "\033[1;34m[Scan]\033[0m"
 yes | mas outdated  2>&1 | tee -a "$LOG_FULL_FILE"  
 echo ""  | tee -a "$LOG_FULL_FIL*E"
 
 # 开始执行：Mas （并捕获输出）
-echo  "\033[1;34m[安装 下载 APP]\033[0m"
+echo  "\033[1;34m[Download-Install]\033[0m"
 yes | mas upgrade  2>&1 | tee -a "$LOG_FULL_FILE"  
 echo ""  | tee -a "$LOG_FULL_FILE"
 
@@ -704,18 +704,18 @@ echo ""  | tee -a "$LOG_FULL_FILE"
 
 
 # ----------------------------------
-# SoftwareUpdate
+# MacOS System Update
 # ----------------------------------
 
 export SoftwareUpdate_NO_INTERACTIVE=1
 
 echo ""
 echo "\033[1;32m-----------------------------------------------\033[0m" 
-echo "\033[1;32m 运行 SoftwareUpdate ...                             \033[0m"
+echo "\033[1;32m 运行 MacOS System Update ...                             \033[0m"
 echo "\033[1;32m-----------------------------------------------\033[0m" 
 
 echo "---------------" >> "$LOG_FULL_FILE"
-echo "运行 SoftwareUpdate" >> "$LOG_FULL_FILE"
+echo "运行 MacOS System Update" >> "$LOG_FULL_FILE"
 echo "---------------" >> "$LOG_FULL_FILE"
 echo "" >> "$LOG_FULL_FILE"
 
@@ -726,8 +726,10 @@ sleep 3
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 # 自动执行：SoftwareUpdate （并捕获输出）
-softwareupdate --install --all --force 2>&1 | tee -a "$LOG_FULL_FILE"  
-# softwareupdate --install --all --force --verbose
+softwareupdate --list --force 2>&1 | tee -a "$LOG_FULL_FILE"  
+softwareupdate --download --force 2>&1 | tee -a "$LOG_FULL_FILE"  
+# softwareupdate --install --all --force --verbose   
+# 注意：安装更新会强制要求输入密码，无法免密，所以，建议只下载，再通过系统的自动更细功能进行更新
 
 echo ""  | tee -a "$LOG_FULL_FILE"
 
