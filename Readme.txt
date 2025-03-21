@@ -38,7 +38,7 @@
  - 可以通过类似于（  brew upgrade --debug --verbose --greedy ）命令，查看是哪些程序触发了密码请求，
  - 然后将对应的命令行，加入到sudo visudo（或直接删除对应的无用程序）
 
-如：
+如：（注意，用户名，不区分 大小写）
 
 # ... 代码开始 ！！！
 
@@ -113,6 +113,8 @@
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/chown -R -- 你的用户名\:staff /usr/local/include /usr/local/lib
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/chown -R -- 你的用户名\:staff /Applications/*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/chown -R -- 你的用户名 /usr/local/include /usr/local/lib
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/chown -R -- 你的用户名 /Applications/*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/cp -pR /opt/homebrew/*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift *
 
@@ -171,6 +173,13 @@
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm /Applications/CapCut*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/cp -pR /opt/homebrew/Caskroom/capcut*
 leixi ALL=(ALL) NOPASSWD: SETENV: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift -target arm64-apple-macosx15 /opt/homebrew/Library/Homebrew/cask/utils/copy-xattrs.swift /opt/homebrew/Caskroom/capcut*
+
+
+# ------------------
+# 免密更新 Dropshare
+# ------------------
+
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/chown -R -- 你的用户名 /Applications/Dropshare*
 
 
 
