@@ -628,7 +628,8 @@ fi
 echo ""
 printf  "\033[1;34m[Clean]\033[0m "
 echo "清理Homebrew残留 ..." | tee -a "$LOG_FULL_FILE"
-brew cleanup --prune=all 2>&1 | tee -a "$LOG_FULL_FILE"  
+brew cleanup --prune=all 2>&1 | tee -a "$LOG_FULL_FILE" 
+brew autoremove 2>&1 | tee -a "$LOG_FULL_FILE"  
 echo ""  | tee -a "$LOG_FULL_FILE"
 
 
@@ -760,8 +761,9 @@ sleep 3
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 # 执行 TopGrade （并捕获输出）
-brew cleanup --prune=all 2>&1 | tee -a "$LOG_FULL_FILE"  
 topgrade --yes --cleanup 2>&1 | tee -a "$LOG_FULL_FILE"  
+brew cleanup --prune=all 2>&1 | tee -a "$LOG_FULL_FILE"   
+brew autoremove 2>&1 | tee -a "$LOG_FULL_FILE"  
 
 echo ""  | tee -a "$LOG_FULL_FILE"
 

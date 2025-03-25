@@ -183,6 +183,13 @@ leixi ALL=(ALL) NOPASSWD: SETENV: /Applications/Xcode.app/Contents/Developer/Too
 
 
 
+# ----------------------------
+# 免密更新 nVidia GeForce Now
+# ----------------------------
+
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/chmod -- u+rw /Applications/NVIDIA\ GeForce\ NOW.app *
+你的用户名 ALL=(ALL) NOPASSWD: /usr/bin/xattr -w * /Applications/NVIDIA\ GeForce\ NOW.app
+
 # ... 代码结束 ！！！！！！！
 
 
