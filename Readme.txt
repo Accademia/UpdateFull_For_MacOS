@@ -228,6 +228,23 @@ root            ALL = (ALL) ALL
 
 
 ===========================================
+其他： 
+===========================================
+如果想 “强制全自动重装” 已安装的软件软件，可以使用如下命令：
+
+# 重装所有 命令行软件
+brew list --formula | xargs brew reinstall
+
+# 重装所有 图形软件
+brew list --cask | xargs brew reinstall --cask
+
+# 如果发生中断，请使用如下命令继续执行
+brew list --formula | sed -n '/软件的homebrew英文名称/,$p' | xargs brew reinstall
+brew list --cask    | sed -n '/软件的homebrew英文名称/,$p' | xargs brew reinstall --cask
+
+
+
+===========================================
 声明：
 ===========================================
 
