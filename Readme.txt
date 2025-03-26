@@ -237,11 +237,16 @@ brew list --formula | xargs brew reinstall --force
 
 # 重装所有 图形软件
 brew list --cask    | xargs brew reinstall --force --cask --debug --verbose
+或（遇到Error也不间断执行，错误记录在txt文件当中）
+brew list --cask | xargs -I {} sh -c 'brew reinstall --force --cask --debug --verbose {} || echo "Error reinstalling {}" >> reinstall_errors.txt'
+
 
 # 如果发生中断，请使用如下命令继续执行
 brew list --formula | sed -n '/软件的homebrew英文名称/,$p' | xargs brew reinstall --force --debug --verbose
 brew list --cask    | sed -n '/软件的homebrew英文名称/,$p' | xargs brew reinstall --force --debug --verbose --cask
 
+或（遇到Error也不间断执行，错误记录在txt文件当中）
+brew list --cask | sed -n '/软件的homebrew英文名称/,$p' | xargs -I {} sh -c 'brew reinstall --force --debug --verbose --cask {} || echo "Error reinstalling {}" >> reinstall_errors.txt'
 
 
 ===========================================
