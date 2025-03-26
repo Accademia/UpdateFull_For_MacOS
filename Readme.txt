@@ -236,11 +236,11 @@ root            ALL = (ALL) ALL
 brew list --formula | xargs brew reinstall --force
 
 # 重装所有 图形软件
-brew list --cask    | xargs brew reinstall --force --cask
+brew list --cask    | xargs brew reinstall --force --cask --debug --verbose
 
 # 如果发生中断，请使用如下命令继续执行
-brew list --formula | sed -n '/软件的homebrew英文名称/,$p' | xargs brew reinstall --force
-brew list --cask    | sed -n '/软件的homebrew英文名称/,$p' | xargs brew reinstall --force --cask
+brew list --formula | sed -n '/软件的homebrew英文名称/,$p' | xargs brew reinstall --force --debug --verbose
+brew list --cask    | sed -n '/软件的homebrew英文名称/,$p' | xargs brew reinstall --force --debug --verbose --cask
 
 
 
