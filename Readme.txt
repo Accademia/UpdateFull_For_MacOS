@@ -156,6 +156,13 @@
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift -target arm64-apple-macosx15 /opt/homebrew/Library/Homebrew/cask/utils/copy-xattrs.swift /opt/homebrew/Caskroom/115browser/*/115Browser.app /Applications/115Browser.app
 
 
+# ----------------------------
+# 免密更新 86Box
+# ----------------------------
+
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/cp -pR /opt/homebrew/Caskroom/86box*/86Box.app /Applications/86Box/86Box.app
+
+
 # ------------------------------
 # 免密更新 Adobe Creative Cloud 
 # ------------------------------
