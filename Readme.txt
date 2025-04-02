@@ -125,6 +125,8 @@
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Applications/*/.DS_Store
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Applications/*/Icon*
 
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm /Applications/*.app/.homebrew-write-test
+
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/cp -pR /opt/homebrew/Caskroom/*.app/Contents /Applications/*.app
 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/chown -R -- 你的用户名\:staff /usr/local/include /usr/local/lib
@@ -156,8 +158,9 @@
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift -target arm64-apple-macosx15 /opt/homebrew/Library/Homebrew/cask/utils/copy-xattrs.swift /opt/homebrew/Caskroom/115browser/*/115Browser.app /Applications/115Browser.app
 
 
+
 # ----------------------------
-# 免密更新 86Box
+# 免密更新 86box
 # ----------------------------
 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/cp -pR /opt/homebrew/Caskroom/86box*/86Box.app /Applications/86Box/86Box.app
@@ -214,6 +217,7 @@
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list com.apphousekitchen*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove com.apphousekitchen*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/com.apphousekitchen.*.plist
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/com.apphousekitchen.*.plist
 
 
 # ---------------------------
@@ -246,6 +250,7 @@
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list com.bearisdriving*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove com.bearisdriving*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/com.bearisdriving.*.plist
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/com.bearisdriving.*.plist
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/bin/killall coreaudiod
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget com.bearisdriving.BGM
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/background-music/*/BackgroundMusic*.pkg *
@@ -282,7 +287,8 @@
 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list com.cloudflare*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove com.cloudflare*
-你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/com.cloudflare.*.macos.warp.daemon.plist
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/com.cloudflare.*.plist
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/com.cloudflare.*.plist
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /Applications/Cloudflare\ WARP.app/Contents/Resources/uninstall.sh
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/cloudflare-warp/*/Cloudflare_WARP*.pkg *
 
@@ -363,7 +369,8 @@
 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list com.gog.galaxy*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove com.gog.galaxy*
-你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/com.gog.galaxy.commservice.plist
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/com.gog.galaxy.*.plist
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/com.gog.galaxy.*.plist
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/gog-galaxy/*/galaxy_client*.pkg *
 
 
@@ -389,6 +396,7 @@
 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list org.gpgtools.*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove org.gpgtools.*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/org.gpgtools.*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/org.gpgtools.*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/homebrew/Caskroom/gpg-suite/*/Uninstall.app/Contents/Resources/GPG\ Suite\ Uninstaller.app/Contents/Resources/uninstall.sh
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/gpg-suite/*/Install.pkg *
@@ -435,6 +443,17 @@
 
 
 # ---------------------------
+# 免密更新 Logitech : Logi  Options+ \ Logi Options
+# ---------------------------
+
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list com.logi.*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove com.logi.*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/homebrew/Caskroom/logi-*/*/logi*_installer.app/Contents/MacOS/logi*_installer *
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/com.logi.*.plist
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/com.logi.*.plist
+
+
+# ---------------------------
 # 免密更新 MacCleaner Pro
 # ---------------------------
 
@@ -455,8 +474,8 @@
 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list com.macenhance.MacForge*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove com.macenhance.MacForge*
-你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/com.macenhance.MacForge.Injector.plist
-
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/com.macenhance.MacForge.*.plist
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/com.macenhance.MacForge.*.plist
 
 # ---------------------------
 # 免密更新 Macfuse
@@ -513,6 +532,7 @@
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list com.microsoft.office.licensing*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove com.microsoft.office.licensing*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/com.microsoft.office.licensing*.plist
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/com.microsoft.office.licensing*.plist
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget com.microsoft.package.Microsoft_*.app
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget com.microsoft.pkg.licensing
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/microsoft-excel/*/Microsoft_Excel_*.pkg *
@@ -576,6 +596,7 @@
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list com.ninxsoft.mist*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove com.ninxsoft.mist*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/com.ninxsoft.mist*.plist
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/com.ninxsoft.mist*.plist
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget com.ninxsoft.pkg.mist
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/mist/*/Mist.*.pkg *
 
@@ -629,8 +650,8 @@
 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list org.openvpn*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove org.openvpn*
-你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/org.openvpn.client.plist
-你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/org.openvpn.helper.plist
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/org.openvpn.*.plist
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/org.openvpn.*.plist
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget org.openvpn.*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/openvpn-connect/*.pkg *
 
@@ -654,8 +675,8 @@
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/kextstat * com.paragon-software.filesystems.*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/kextfind * com.paragon-software.filesystems.*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -rf /Library/Extensions/ufsd_*.kext
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/com.paragon-software.*.plist
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/com.paragon-software.*.plist
-
 
 # ---------------------------
 # 免密更新 Parsec 
@@ -679,6 +700,7 @@
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list com.pritunl*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove com.pritunl*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/com.pritunl.service.plist
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/com.pritunl.service.plist
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget com.pritunl.pkg.Pritunl
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/pritunl/*.pkg * 
 
@@ -738,6 +760,7 @@
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list com.tclementdev.timemachineeditor*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove com.tclementdev.timemachineeditor*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/com.tclementdev.timemachineeditor*.plist 
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/com.tclementdev.timemachineeditor*.plist
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget com.tclementdev.pkg.timemachineeditor
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/timemachineeditor/*.pkg *
 
@@ -748,7 +771,8 @@
 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list org.cindori*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove org.cindori*
-你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/org.cindori.TEHelper.plist
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/org.cindori.TE*.plist
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/org.cindori.TE*.plist
 
 
 # ---------------------------
@@ -774,6 +798,7 @@
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list com.corecode.UninstallPKG*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove com.corecode.UninstallPKG* 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/com.corecode.UninstallPKG*.plist
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/com.corecode.UninstallPKG*.plist
 
 
 # ---------------------------
@@ -807,6 +832,7 @@
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list org.wireshark*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove org.wireshark*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/org.wireshark*.plist
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/org.wireshark*.plist
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget org.wireshark*.pkg
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/wireshark/*.pkg *
 
@@ -817,6 +843,7 @@
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list org.xquartz*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove org.xquartz*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/org.xquartz.*.plist
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/org.xquartz.*.plist
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget org.xquartz.X11
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/xquartz/*.pkg *
 
@@ -827,10 +854,20 @@
 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list us.zoom*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove us.zoom*
-你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/us.zoom.*.plist
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/us.zoom.*.plist
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/us.zoom.*.plist
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget us.zoom.*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/zoom/*.pkg *
+
+
+
+# --------------------------------------------------------
+# 系统密码 统缓时间 （缓存实效后，才需要二次输入密码）
+# --------------------------------------------------------
+
+Defaults timestamp_timeout=3            #  缓存   3 分钟
+# Defaults timestamp_timeout=120        #  缓存 120 分钟 (不建议)
+
 
 
 # ... 代码结束 ！！！！！！！
