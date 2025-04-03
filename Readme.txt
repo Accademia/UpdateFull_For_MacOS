@@ -934,6 +934,19 @@ brew list --cask | sed -n '/软件的homebrew英文名称/,$p' | xargs -I {} sh 
 
 
 
+# 如果想快速将APP与homebrew解绑，而不删除app，请使用如下命令
+
+rm -rf /opt/homebrew/Caskroom/应用名.app
+brew clwanup
+
+如：
+rm -rf /opt/homebrew/Caskroom/microsoft-excel
+rm -rf /opt/homebrew/Caskroom/microsoft-outlook
+rm -rf /opt/homebrew/Caskroom/microsoft-powerpoint
+rm -rf /opt/homebrew/Caskroom/microsoft-onenote
+rm -rf /opt/homebrew/Caskroom/microsoft-onedrive
+
+
 ===========================================
 声明：
 ===========================================
