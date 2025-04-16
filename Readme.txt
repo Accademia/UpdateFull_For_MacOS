@@ -209,6 +209,8 @@ topgrade --edit-config
 # 免密更新 Adobe Acrobat Pro
 # ---------------------------
 
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list  com.adobe.ARMDC.* 
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove  com.adobe.ARMDC.* 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget com.adobe.acrobat.*.pkg*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget com.adobe.armdc.app.pkg 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/adobe-acrobat-pro/*/Acrobat/Acrobat\ DC\ Installer.pkg*
