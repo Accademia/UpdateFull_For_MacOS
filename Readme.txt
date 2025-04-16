@@ -968,4 +968,4 @@ rm -rf /opt/homebrew/Caskroom/microsoft-onedrive
 声明：
 ===========================================
 
- - 本脚本所有代码均来自于ChatGPT O1 ，且经过长期测试。本工程使用MIT协议分发
+ - 本脚本，初试代码来自于ChatGPT O1，后期升级来自于xAI Grok DeepThink ，且经过长期测试。本工程使用MIT协议分发

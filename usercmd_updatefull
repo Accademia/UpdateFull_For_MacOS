@@ -637,6 +637,9 @@ echo ""  | tee -a "$LOG_FULL_FILE"
 
 
 
+
+
+
 # ----------------------------------
 # 开始执行：Mas
 # ----------------------------------
@@ -656,18 +659,75 @@ echo "" >> "$LOG_FULL_FILE"
 # 等待3秒，开始执行
 sleep 3  
 
-# 调用检查时间范围函数
+# 调用检查时间范围函数（假设此函数已定义）
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 # 显示未更新APP列表：Mas （并捕获输出）
-echo  "\033[1;34m[Scan]\033[0m"
-yes | mas outdated  2>&1 | tee -a "$LOG_FULL_FILE"  
-echo ""  | tee -a "$LOG_FULL_FIL*E"
+echo "\033[1;34m[Scan]\033[0m"
+outdated_apps=$(yes | mas outdated 2>&1 | tee -a "$LOG_FULL_FILE")
+echo "" | tee -a "$LOG_FULL_FILE"
 
-# 开始执行：Mas （并捕获输出）
-echo  "\033[1;34m[Download-Install]\033[0m"
-yes | mas upgrade  2>&1 | tee -a "$LOG_FULL_FILE"  
-echo ""  | tee -a "$LOG_FULL_FILE"
+# 获取过时应用程序的ID
+app_ids=$(echo "$outdated_apps" | awk '{print $1}' | grep -E '^[0-9]+$')
+
+# 获取已安装应用程序的列表
+installed_apps=$(mas list)
+
+# 存储需要关闭和重启的应用程序
+apps_to_restart=()
+
+# 检查并关闭正在运行的应用程序
+for id in $app_ids; do
+  # 从已安装应用列表中提取应用名称，去掉ID和可能的版本号
+  app_name=$(echo "$installed_apps" | grep "^$id" | awk '{$1=""; print substr($0,2)}' | sed 's/ ([0-9].*)$//')
+  if [ -n "$app_name" ]; then
+    # 使用 osascript 检查应用是否正在运行
+    if osascript -e "tell application \"System Events\" to (name of processes) contains \"$app_name\"" | grep -q "true"; then
+      echo "检测到 $app_name 正在运行，正在尝试关闭..." | tee -a "$LOG_FULL_FILE"
+      # 安全关闭应用程序
+      osascript -e "tell application \"$app_name\" to quit"
+      # 等待应用完全关闭（最多10秒）
+      for i in {1..10}; do
+        if ! osascript -e "tell application \"System Events\" to (name of processes) contains \"$app_name\"" | grep -q "true"; then
+          break
+        fi
+        sleep 1
+      done
+      # 如果应用仍未关闭，尝试强制关闭
+      if osascript -e "tell application \"System Events\" to (name of processes) contains \"$app_name\"" | grep -q "true"; then
+        echo "无法正常关闭 $app_name，正在尝试强制关闭..." | tee -a "$LOG_FULL_FILE"
+        # 获取应用程序的PID
+        pid=$(pgrep -f "$app_name")
+        if [ -n "$pid" ]; then
+          kill -9 $pid
+          echo "已强制关闭 $app_name (PID: $pid)" | tee -a "$LOG_FULL_FILE"
+        else
+          echo "无法获取 $app_name 的PID，跳过强制关闭" | tee -a "$LOG_FULL_FILE"
+        fi
+      fi
+      apps_to_restart+=("$app_name")
+    fi
+  fi
+done
+
+# 开始执行：Mas 更新（并捕获输出）
+echo "\033[1;34m[Download-Install]\033[0m"
+yes | mas upgrade 2>&1 | tee -a "$LOG_FULL_FILE"
+echo "" | tee -a "$LOG_FULL_FILE"
+
+# 重新启动之前关闭的应用程序
+for app in "${apps_to_restart[@]}"; do
+  echo "正在重新启动 $app..." | tee -a "$LOG_FULL_FILE"
+  open -a "$app"
+  sleep 1  # 短暂延迟以确保应用启动
+done
+
+echo "\033[1;32mMas 更新完成，所有受影响的应用已重新启动。\033[0m" | tee -a "$LOG_FULL_FILE"
+
+
+
+
+
 
 
 
