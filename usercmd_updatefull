@@ -821,7 +821,7 @@ sleep 3
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 # 执行 TopGrade （并捕获输出）
-topgrade --yes --cleanup 2>&1 | tee -a "$LOG_FULL_FILE"  
+topgrade  --disable mas --yes --cleanup 2>&1 | tee -a "$LOG_FULL_FILE"  
 brew cleanup --prune=all 2>&1 | tee -a "$LOG_FULL_FILE"   
 brew autoremove 2>&1 | tee -a "$LOG_FULL_FILE"  
 
