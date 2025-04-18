@@ -188,6 +188,8 @@ topgrade --edit-config
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/chown -R -- 你的用户名\:staff /Library/Application\ Support/Adobe
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list Adobe_Genuine_Software_Integrity_Service
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list com.adobe.*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove Adobe_Genuine_Software_Integrity_Service
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove com.adobe.*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/com.adobe.*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/com.adobe.*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/bin/xargs -0 -- /bin/rm -r -f  --
