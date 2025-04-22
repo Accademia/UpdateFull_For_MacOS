@@ -47,23 +47,28 @@
 
 
 ===========================================
-如何让内置的TopGrade命令，更新所有的APP？
+需要哪些额外设置？
 ===========================================
 
-默认TopGreade只会更新不带有自动更新的APP，如果要更新通过Homebrew安装的所有APP，需要对TopGrade配置文件进行修改，命令如下：
+需要对TopGreade命令进行如下额外设置：
 
-topgrade --edit-config
 
-进入编辑器后，查找到
-#greedy_cask = true
+    让TopGrade命令，更新所有的Homebrew APP（而非，只更新不带自动更新的Homebrew APP）
+    默认TopGreade只会更新不带有自动更新的APP，需要对TopGrade配置文件进行修改，命令如下：
 
-删除掉注释符号#。
+	topgrade --edit-config
+
+    进入编辑器后，查找到
+    #greedy_cask = true  （删除掉注释符号# 使这行有效）
+   
 
 
 
 ===========================================
 如何避免密码请求？
 ===========================================
+
+
  - 可以通过类似于（  brew upgrade --debug --verbose --greedy ）命令，查看是哪些程序触发了密码请求，
  - 然后将对应的命令行，加入到sudo visudo（或直接删除对应的无用程序）
 
@@ -76,6 +81,9 @@ topgrade --edit-config
 
  Defaults        env_keep += "PATH"
  Defaults        env_keep += "HOME"
+
+
+
 
 
 # ----------------------------
@@ -187,8 +195,8 @@ topgrade --edit-config
 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/chown -R -- 你的用户名\:staff /Library/Application\ Support/Adobe
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list Adobe_Genuine_Software_Integrity_Service
-你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list com.adobe.*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove Adobe_Genuine_Software_Integrity_Service
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list com.adobe.*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove com.adobe.*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/com.adobe.*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/com.adobe.*
@@ -212,7 +220,7 @@ topgrade --edit-config
 # ---------------------------
 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list  com.adobe.ARMDC.* 
-你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove  com.adobe.ARMDC.* 
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove com.adobe.ARMDC.* 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget com.adobe.acrobat.*.pkg*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget com.adobe.armdc.app.pkg 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/adobe-acrobat-pro/*/Acrobat/Acrobat\ DC\ Installer.pkg*
@@ -281,6 +289,15 @@ topgrade --edit-config
 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list com.zeroonetwenty.BlueHarvestHelper*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove com.zeroonetwenty.BlueHarvestHelper*
+
+
+# --------------------------- 
+# 免密更新 BusyCal
+# --------------------------- 
+
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list *com.busymac.busycal*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove *com.busymac.busycal*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/busycal/*/BusyCal*.pkg *
 
 
 # --------------------------- 
@@ -496,6 +513,7 @@ topgrade --edit-config
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/com.macenhance.MacForge.*.plist
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/com.macenhance.MacForge.*.plist
 
+
 # ---------------------------
 # 免密更新 Macfuse
 # ---------------------------
@@ -697,6 +715,7 @@ topgrade --edit-config
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/com.paragon-software.*.plist
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/com.paragon-software.*.plist
 
+
 # ---------------------------
 # 免密更新 Parsec 
 # ---------------------------
@@ -754,6 +773,15 @@ topgrade --edit-config
 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list com.valvesoftware.steam*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove com.valvesoftware.steam*
+
+
+# ---------------------------
+# 免密更新 Synology Drive
+# ---------------------------
+
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list com.synology.*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove com.synology.*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/synology*/*/*Synology*.pkg *
 
 
 # ---------------------------
@@ -855,6 +883,7 @@ topgrade --edit-config
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget org.wireshark*.pkg
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/wireshark/*.pkg *
 
+
 # ---------------------------
 # 免密更新 Xquartz 
 # ---------------------------
@@ -865,6 +894,17 @@ topgrade --edit-config
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/org.xquartz.*.plist
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget org.xquartz.X11
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/xquartz/*.pkg *
+
+
+# ---------------------------
+# 免密更新 ZeroTier
+# ---------------------------
+
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list com.zerotier.*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove com.zerotier.*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/com.zerotier.*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/com.zerotier.*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/zerotier*/*/ZeroTier*.pkg *
 
 
 # ---------------------------
@@ -889,6 +929,7 @@ Defaults timestamp_timeout=3            #  缓存   3 分钟
 
 
 
+
 # ... 代码结束 ！！！！！！！
 
 
@@ -898,12 +939,14 @@ Defaults timestamp_timeout=3            #  缓存   3 分钟
 ===========================================
 如何检测visudo是否生效
 ===========================================
+
 sudo -l
 
 
 ===========================================
 如何查看visudo配置文件
 ===========================================
+
 sudo cat /etc/sudoers
 
 
@@ -911,6 +954,7 @@ sudo cat /etc/sudoers
 ===========================================
 如何编辑visudo配置文件 
 ===========================================
+
 sudo visudo
 注意，退出保存时，新配置回立刻生效，无需手动reload 
 
@@ -919,6 +963,7 @@ sudo visudo
 ===========================================
 特别提示： 
 ===========================================
+
 在编辑visudoers时，一定 一定 一定 一定 不要修改(删除) 如下配置！！！
 root            ALL = (ALL) ALL
 
@@ -929,6 +974,7 @@ root            ALL = (ALL) ALL
 ===========================================
 其他： 
 ===========================================
+
 如果想 全自动 “强制重装” 已安装的 “所有软件” ，可以使用如下命令：
 
 # 重装所有 命令行软件
