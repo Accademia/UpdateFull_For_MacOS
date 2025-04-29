@@ -866,6 +866,7 @@ echo ""  | tee -a "$LOG_FULL_FILE"
 #
 ## 执行更新命令
 #"/Applications/MacUpdater.app/Contents/Resources/macupdater_client" update --force-quit-running-apps --force-major-version-update 2>&1 | tee -a "$LOG_FULL_FILE"
+#"/Applications/MacUpdater.app/Contents/Resources/macupdater_client" update --force-quit-running-apps  2>&1 | tee -a "$LOG_FULL_FILE"
 #
 #echo "" >> "$LOG_FULL_FILE"
 #echo "" >> "$LOG_FULL_FILE"

@@ -865,7 +865,8 @@ echo "总应用数: $TOTAL_APPS" | tee -a "$LOG_FULL_FILE"
 run_command_with_show_progress "\"$MACUPDATER_CLIENT\" scan" "SCAN"  "$LOG_MACUPDATER_FILE"
 
 # 执行更新命令
-"/Applications/MacUpdater.app/Contents/Resources/macupdater_client" update --force-quit-running-apps --force-major-version-update 2>&1 | tee -a "$LOG_FULL_FILE"
+#"/Applications/MacUpdater.app/Contents/Resources/macupdater_client" update --force-quit-running-apps --force-major-version-update 2>&1 | tee -a "$LOG_FULL_FILE"
+"/Applications/MacUpdater.app/Contents/Resources/macupdater_client" update --force-quit-running-apps 2>&1 | tee -a "$LOG_FULL_FILE"
 
 echo "" >> "$LOG_FULL_FILE"
 echo "" >> "$LOG_FULL_FILE"
