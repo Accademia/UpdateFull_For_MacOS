@@ -297,6 +297,9 @@
 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list *com.busymac.busycal*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove *com.busymac.busycal*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/com.busymac.busycal*.plist
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/com.busymac.busycal*.plist
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget com.busymac.busycal*.pkg
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/busycal/*/BusyCal*.pkg *
 
 
