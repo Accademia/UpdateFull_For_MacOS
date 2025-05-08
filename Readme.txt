@@ -978,7 +978,13 @@ root            ALL = (ALL) ALL
 其他： 
 ===========================================
 
-如果想 全自动 “强制重装” 已安装的 “所有软件” ，可以使用如下命令：
+如果想 全自动 “强制升级” 已安装的 “所有Homebrew cask软件” ，可以使用如下命令：
+
+brew tap buo/cask-upgrade
+brew cu -a -y -f
+
+
+如果想 全自动 “强制重装” 已安装的 “所有Homebrew软件” ，可以使用如下命令：
 
 # 重装所有 命令行软件
 brew list --formula | xargs brew reinstall --force
