@@ -876,6 +876,18 @@
 
 
 # ---------------------------
+# 免密更新 WIFI Explorer
+# ---------------------------
+
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list com.intuitibits.wifiexplorer*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove com.intuitibits.wifiexplorer*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/com.intuitibits.wifiexplorer*.plist
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/com.intuitibits.wifiexplorer*.plist
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget com.intuitibits.wifiexplorer*.pkg
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/wifi-explorer-pro/*.pkg *
+
+
+# ---------------------------
 # 免密更新 WireShark 
 # ---------------------------
 
