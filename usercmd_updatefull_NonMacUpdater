@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # 自动执行的批处理：HomeBrew \ Mas \ MacPorts \ TopGrade \ MacUpdater
 
 # -------------------------------------
