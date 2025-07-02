@@ -755,6 +755,16 @@
 
 
 # ---------------------------
+# 免密更新 Stash
+# ---------------------------
+
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list ws.stash.app.mac.*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove ws.stash.app.mac.*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/PrivilegedHelperTools/ws.stash.app.mac.*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl load -w /Library/LaunchDaemons/ws.stash.app.mac.*
+
+
+# ---------------------------
 # 免密更新 SourceTree
 # ---------------------------
 
