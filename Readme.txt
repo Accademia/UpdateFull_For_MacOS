@@ -213,6 +213,8 @@
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/com.adguard.*.plist
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget com.adguard.mac.adguard*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/adguard/*/AdGuard.pkg *
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rmdir -- /Library/Application\ Support/AdGuard*/com.adguard.*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rmdir -- /Library/Application\ Support/AdGuard\ Software
 
 
 # ---------------------------
