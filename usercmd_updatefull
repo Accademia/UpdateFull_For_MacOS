@@ -36,6 +36,7 @@ mkdir -p "$LOG_PATH"
 # ---------------------------------------
 
 # 定义：日志文件
+LOG_FULL_LAST="$LOG_PATH/UpdateFull.[Last].log"
 LOG_FILE="$LOG_PATH/Update_Auto.log"
 LOG_FULL_FILE="$LOG_PATH/UpdateFull.$(date +%Y-%m).log"
 #LOG_FULL_FILE="$LOG_PATH/Update_FULL.$(date +%Y-%m-%d).log"
@@ -223,6 +224,9 @@ done
 # 检查 & 创建 ：Log日志文件
 # -----------------------------------------------
 
+# 重置LOG_FULL_LAST日志文件
+cat /dev/null > "$LOG_FULL_LAST"
+
 # 检查LOG_FILE日志文件是否存在
 if [ ! -f "$LOG_FILE" ]; then
     # 文件不存在，创建文件
@@ -262,11 +266,11 @@ echo -e "MacUpdater 执行日志 - $(date)" > "$LOG_MACUPDATER_FILE"
 # 检查 1 ：Homebrew 是否安装（并更新）
 # -----------------------------------------------
 
-echo -e "日期：$(date '+%Y-%m-%d %H:%M:%S') ..." >> "$LOG_FULL_FILE"
+echo -e "日期：$(date '+%Y-%m-%d %H:%M:%S') ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
-echo -e "" >> "$LOG_FULL_FILE"
+echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
-echo -e "===================================================================================" >> "$LOG_FULL_FILE"
+echo -e "===================================================================================" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 echo -e ""
 echo -e "\033[1;36m-----------------------------------------------\033[0m" 
@@ -281,24 +285,24 @@ echo -e "当前系统架构为: $architecture"
 
 if [ "$architecture" = "arm64" ]; then
     printf  "\033[1;34m[INFO]\033[0m $1"
-    printf "检测到系统为 ARM 架构: $architecture  ｜  " | tee -a "$LOG_FULL_FILE"
+    printf "检测到系统为 ARM 架构: $architecture  ｜  " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     printf  "\n"
     
-   #printf "检查 Homebrew 是否已安装:  ｜  " | tee -a "$LOG_FULL_FILE"
+   #printf "检查 Homebrew 是否已安装:  ｜  " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
    #path_status=$(echo $PATH)
-   #printf "检查 PATH: %s  ｜  " "$path_status" | tee -a "$LOG_FULL_FILE"
+   #printf "检查 PATH: %s  ｜  " "$path_status" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
    #printf  "\n"
 
    #homebrew_status=$(command -v brew > /dev/null 2>&1 && echo "已安装" || echo "未安装")
-   #printf "检查 Homebrew 是否已安装: %s  ｜  " "$homebrew_status" | tee -a "$LOG_FULL_FILE"
+   #printf "检查 Homebrew 是否已安装: %s  ｜  " "$homebrew_status" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
    #printf  "\n"
 
     # 检查 Homebrew 是否已安装
     if ! command -v brew > /dev/null 2>&1 ; then
 
         printf  "\033[1;34m[INFO]\033[0m $1"
-        echo -e "未检测到 Homebrew，开始安装 Homebrew ..." | tee -a "$LOG_FULL_FILE"
+        echo -e "未检测到 Homebrew，开始安装 Homebrew ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
         
         # 添加 Homebrew 到环境变量
@@ -306,7 +310,7 @@ if [ "$architecture" = "arm64" ]; then
         eval "$(/opt/homebrew/bin/brew shellenv)"
         
         printf  "\033[1;34m[INFO]\033[0m $1"
-        echo -e "Homebrew 安装完成。" | tee -a "$LOG_FULL_FILE"
+        echo -e "Homebrew 安装完成。" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         echo -e ""
         exit 0
     fi
@@ -318,7 +322,7 @@ if [ "$architecture" = "arm64" ]; then
 
     if [[ $brew_path == /opt/homebrew/* ]]; then
         printf  "\033[1;34m[INFO]\033[0m $1"
-        echo -e "当前 Homebrew 已安装为 ARM 版本，无需更改。" | tee -a "$LOG_FULL_FILE"
+        echo -e "当前 Homebrew 已安装为 ARM 版本，无需更改。" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 更新 Homebrew
         echo -e ""
         echo -e "\033[1;36m-----------------------------------------------\033[0m" 
@@ -329,9 +333,9 @@ if [ "$architecture" = "arm64" ]; then
 
     elif [[ $brew_path == /usr/local/* ]]; then
         printf  "\033[1;34m[INFO]\033[0m $1"
-        echo -e "检测到当前 Homebrew 为 x86_64 版本，准备切换为 ARM 版本。" | tee -a "$LOG_FULL_FILE"
+        echo -e "检测到当前 Homebrew 为 x86_64 版本，准备切换为 ARM 版本。" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
-        echo -e "检测到 Homebrew 安装路径: $brew_path"| tee -a "$LOG_FULL_FILE"
+        echo -e "检测到 Homebrew 安装路径: $brew_path" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         
         # exit 0   # 调试使用！！！
 
@@ -344,12 +348,12 @@ if [ "$architecture" = "arm64" ]; then
 
         # 卸载 x86_64 版本的 Homebrew
         printf  "\033[1;34m[INFO]\033[0m $1"
-        echo -e "正在卸载 x86_64 版本的 Homebrew..." | tee -a "$LOG_FULL_FILE"
+        echo -e "正在卸载 x86_64 版本的 Homebrew..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/uninstall.sh)"
         
         # 安装 ARM 版本的 Homebrew
         printf  "\033[1;34m[INFO]\033[0m $1"
-        echo -e "正在安装 ARM 版本的 Homebrew..." | tee -a "$LOG_FULL_FILE"
+        echo -e "正在安装 ARM 版本的 Homebrew..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 非交互式安装
         NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
         
@@ -358,24 +362,24 @@ if [ "$architecture" = "arm64" ]; then
         eval "$(/opt/homebrew/bin/brew shellenv)"
         
         printf  "\033[1;34m[INFO]\033[0m $1"
-        echo -e "ARM 版本的 Homebrew 安装完成。" | tee -a "$LOG_FULL_FILE"
+        echo -e "ARM 版本的 Homebrew 安装完成。" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
         # 获取 Homebrew 的安装路径
         brew_newpath=$(which brew)
         printf  "\033[1;34m[INFO]\033[0m $1"
-        echo -e "检测到 Homebrew 安装路径: $brew_newpath" | tee -a "$LOG_FULL_FILE"
+        echo -e "检测到 Homebrew 安装路径: $brew_newpath" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
         if [[ $brew_newpath == /opt/homebrew/* ]]; then
             printf  "\033[1;34m[INFO]\033[0m $1"
-            echo -e "验证结果：当前 Homebrew 已安装为 ARM 版本。" | tee -a "$LOG_FULL_FILE"
+            echo -e "验证结果：当前 Homebrew 已安装为 ARM 版本。" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             # exit 0
         elif [[ $brew_newpath == /usr/local/* ]]; then
             printf  "\033[1;34m[INFO]\033[0m $1"
-            echo -e "验证结果：检测到当前 Homebrew 为 x86_64 版本。退出" | tee -a "$LOG_FULL_FILE"
+            echo -e "验证结果：检测到当前 Homebrew 为 x86_64 版本。退出" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             exit 0
         else
             printf  "\033[1;34m[INFO]\033[0m $1"
-            echo -e "验证结果：检测未知版本。退出" | tee -a "$LOG_FULL_FILE"
+            echo -e "验证结果：检测未知版本。退出" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             exit 0
         fi
 
@@ -384,7 +388,7 @@ if [ "$architecture" = "arm64" ]; then
     fi
 
 else
-    printf "当前系统不是 ARM 架构 (Apple Silicon)，无需调整 Homebrew。" | tee -a "$LOG_FULL_FILE"
+    printf "当前系统不是 ARM 架构 (Apple Silicon)，无需调整 Homebrew。" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 fi
 
 
@@ -588,9 +592,9 @@ echo -e "----------------------------------------------------------------" >> "$
 echo -e "TopGrade & MacUpdater executed on: $(date)" >> "$LOG_FILE"
 
 # 记录当前时间戳（到$$LOG_FULL_FILE），
-echo -e "TopGrade & MacUpdater executed on: $(date)" >> "$LOG_FULL_FILE"
-echo -e "===================================================================================" >> "$LOG_FULL_FILE"
-echo -e  ""  >> "$LOG_FULL_FILE"
+echo -e "TopGrade & MacUpdater executed on: $(date)" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "===================================================================================" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e  ""  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 
 # 此后，开始升级第三方APP！！！！！！此前都是在，检测环境 和更新 升级程序本身。
@@ -610,10 +614,10 @@ echo -e "\033[1;32m-----------------------------------------------\033[0m"
 echo -e "\033[1;32m 运行 HomeBrew ...                             \033[0m"
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 
-echo -e "---------------" >> "$LOG_FULL_FILE"
-echo -e "运行 HomeBrew" >> "$LOG_FULL_FILE"
-echo -e "---------------" >> "$LOG_FULL_FILE"
-echo -e "" >> "$LOG_FULL_FILE"
+echo -e "---------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "运行 HomeBrew" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "---------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 # 等待3秒，开始执行
 sleep 3  
@@ -636,31 +640,31 @@ if [ ${#packages_brew[@]} -ne 0 ] ; then
  ## 第 2 步：并行下载（Homebrew 包）
  #echo -e ""
  #printf  "\033[1;34m[Download]\033[0m "
- #echo -e "下载 HomeBrew包（并行）..." | tee -a "$LOG_FULL_FILE"
- #printf '%s\n' "${packages_brew[@]}" | xargs -n1 -P32 brew fetch | tee -a "$LOG_FULL_FILE"
+ #echo -e "下载 HomeBrew包（并行）..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+ #printf '%s\n' "${packages_brew[@]}" | xargs -n1 -P32 brew fetch | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
    
   # 第 3 步：串行安装（Homebrew 包）
   echo -e ""
   printf  "\033[1;34m[Install]\033[0m "
-  echo -e "安装 HomeBrew包（串行）..." | tee -a "$LOG_FULL_FILE"
-  brew upgrade --greedy --force | tee -a "$LOG_FULL_FILE"
- #brew upgrade --greedy --debug --force | tee -a "$LOG_FULL_FILE"  ###### 仅作为Debug使用！！！
+  echo -e "安装 HomeBrew包（串行）..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+  brew upgrade --greedy --force | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+ #brew upgrade --greedy --debug --force | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE""  ###### 仅作为Debug使用！！！
 
 else
   printf  "\033[1;32m[ OK ]\033[0m "
-  echo -e "当前没有需要更新的 Homebrew 包 !!! " | tee -a "$LOG_FULL_FILE"
+  echo -e "当前没有需要更新的 Homebrew 包 !!! " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 fi
 
 
 # 清洁
 echo -e ""
 printf  "\033[1;34m[Clean]\033[0m "
-echo -e "清理Homebrew残留 ..." | tee -a "$LOG_FULL_FILE"
-brew cleanup --prune=all 2>&1 | tee -a "$LOG_FULL_FILE" 
-brew autoremove 2>&1 | tee -a "$LOG_FULL_FILE"  
+echo -e "清理Homebrew残留 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+brew cleanup --prune=all 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+brew autoremove 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
-echo -e ""  | tee -a "$LOG_FULL_FILE"
-echo -e ""  | tee -a "$LOG_FULL_FILE"
+echo -e ""  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e ""  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 
 
@@ -681,10 +685,10 @@ echo -e "\033[1;32m-----------------------------------------------\033[0m"
 echo -e "\033[1;32m 运行 Mas ...                                  \033[0m"
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 
-echo -e "---------------" >> "$LOG_FULL_FILE"
-echo -e "运行 Mas" >> "$LOG_FULL_FILE"
-echo -e "---------------" >> "$LOG_FULL_FILE"
-echo -e "" >> "$LOG_FULL_FILE"
+echo -e "---------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "运行 Mas" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "---------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 # 等待3秒，开始执行
 sleep 3  
@@ -694,8 +698,8 @@ check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 # 显示未更新APP列表：Mas （并捕获输出）
 echo -e "\033[1;34m[Scan]\033[0m"
-outdated_apps=$(yes | mas outdated 2>&1 | tee -a "$LOG_FULL_FILE")
-echo -e "" | tee -a "$LOG_FULL_FILE"
+outdated_apps=$(yes | mas outdated 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" )
+echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 # 获取过时应用程序的ID
 app_ids=$(echo -e "$outdated_apps" | awk '{print $1}' | grep -E '^[0-9]+$')
@@ -713,7 +717,7 @@ for id in $app_ids; do
   if [ -n "$app_name" ]; then
     # 使用 osascript 检查应用是否正在运行
     if osascript -e "tell application \"System Events\" to (name of processes) contains \"$app_name\"" | grep -q "true"; then
-      echo -e "检测到 $app_name 正在运行，正在尝试关闭..." | tee -a "$LOG_FULL_FILE"
+      echo -e "检测到 $app_name 正在运行，正在尝试关闭..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
       # 安全关闭应用程序
       osascript -e "tell application \"$app_name\" to quit"
       # 等待应用完全关闭（最多10秒）
@@ -725,14 +729,14 @@ for id in $app_ids; do
       done
       # 如果应用仍未关闭，尝试强制关闭
       if osascript -e "tell application \"System Events\" to (name of processes) contains \"$app_name\"" | grep -q "true"; then
-        echo -e "无法正常关闭 $app_name，正在尝试强制关闭..." | tee -a "$LOG_FULL_FILE"
+        echo -e "无法正常关闭 $app_name，正在尝试强制关闭..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
         # 获取应用程序的PID
         pid=$(pgrep -f "$app_name")
         if [ -n "$pid" ]; then
           kill -9 $pid
-          echo -e "已强制关闭 $app_name (PID: $pid)" | tee -a "$LOG_FULL_FILE"
+          echo -e "已强制关闭 $app_name (PID: $pid)" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
         else
-          echo -e "无法获取 $app_name 的PID，跳过强制关闭" | tee -a "$LOG_FULL_FILE"
+          echo -e "无法获取 $app_name 的PID，跳过强制关闭" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
         fi
       fi
       apps_to_restart+=("$app_name")
@@ -742,20 +746,22 @@ done
 
 # 开始执行：Mas 更新（并捕获输出）
 echo -e "\033[1;34m[Download-Install]\033[0m"
-yes | mas upgrade 2>&1 | tee -a "$LOG_FULL_FILE"
-echo -e "" | tee -a "$LOG_FULL_FILE"
+yes | mas upgrade 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 # 重新启动之前关闭的应用程序
 for app in "${apps_to_restart[@]}"; do
-  echo -e "正在重新启动 $app..." | tee -a "$LOG_FULL_FILE"
+  echo -e "正在重新启动 $app..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
   open -a "$app"
   sleep 1  # 短暂延迟以确保应用启动
 done
 
-echo -e "\033[1;32mMas 更新完成，所有受影响的应用已重新启动。\033[0m" | tee -a "$LOG_FULL_FILE"
+echo -e "\033[1;32mMas 更新完成，所有受影响的应用已重新启动。\033[0m"
 
-echo -e "" | tee -a "$LOG_FULL_FILE"
-echo -e "" | tee -a "$LOG_FULL_FILE"
+echo -e "Mas 更新完成，所有受影响的应用已重新启动" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+
+echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 
 
@@ -776,10 +782,10 @@ echo -e "\033[1;32m-----------------------------------------------\033[0m"
 echo -e "\033[1;32m 运行 MacPorts ...                             \033[0m"
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 
-echo -e "---------------" >> "$LOG_FULL_FILE"
-echo -e "运行 MacPorts" >> "$LOG_FULL_FILE"
-echo -e "---------------" >> "$LOG_FULL_FILE"
-echo -e "" >> "$LOG_FULL_FILE"
+echo -e "---------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "运行 MacPorts"   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "---------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e ""                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 # 等待3秒，开始执行
 sleep 3  
@@ -788,10 +794,10 @@ sleep 3
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 # 执行：MacPorts （并捕获输出）
-yes | sudo port upgrade outdated -N  2>&1 | tee -a "$LOG_FULL_FILE"  
+yes | sudo port upgrade outdated -N  2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
-echo -e ""  | tee -a "$LOG_FULL_FILE"
-echo -e ""  | tee -a "$LOG_FULL_FILE"
+echo -e ""  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+echo -e ""  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 
 
@@ -808,10 +814,10 @@ echo -e "\033[1;32m-----------------------------------------------\033[0m"
 echo -e "\033[1;32m 运行 MacOS System Update ...                             \033[0m"
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 
-echo -e "---------------" >> "$LOG_FULL_FILE"
-echo -e "运行 MacOS System Update" >> "$LOG_FULL_FILE"
-echo -e "---------------" >> "$LOG_FULL_FILE"
-echo -e "" >> "$LOG_FULL_FILE"
+echo -e "---------------"           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "运行 MacOS System Update"  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "---------------"           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e ""                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 # 等待3秒，开始执行
 sleep 3  
@@ -820,13 +826,12 @@ sleep 3
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 # 自动执行：SoftwareUpdate （并捕获输出）
-softwareupdate --list --force 2>&1 | tee -a "$LOG_FULL_FILE"  
-softwareupdate --download --force 2>&1 | tee -a "$LOG_FULL_FILE"  
+softwareupdate --list --force 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+softwareupdate --download --force 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 # softwareupdate --install --all --force --verbose   
 # 注意：安装更新会强制要求输入密码，无法免密，所以，建议只下载，再通过系统的自动更细功能进行更新
 
-echo -e ""  | tee -a "$LOG_FULL_FILE"
-echo -e ""  | tee -a "$LOG_FULL_FILE"
+echo -e ""  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 
 
@@ -843,10 +848,10 @@ echo -e "\033[1;32m-----------------------------------------------\033[0m"
 echo -e "\033[1;32m 运行 TopGrade ...                             \033[0m"
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 
-echo -e "---------------" >> "$LOG_FULL_FILE"
-echo -e "运行 TopGrade" >> "$LOG_FULL_FILE"
-echo -e "---------------" >> "$LOG_FULL_FILE"
-echo -e "" >> "$LOG_FULL_FILE"
+echo -e "---------------"   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "运行 TopGrade"     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "---------------"   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e ""                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 # 等待3秒，开始执行
 sleep 3  
@@ -855,12 +860,12 @@ sleep 3
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 # 执行 TopGrade （并捕获输出）
-topgrade --disable brew_formula --disable brew_cask --disable mas --yes --cleanup 2>&1 | tee -a "$LOG_FULL_FILE"   # 不执行 Homebrew更新 +  不执行 Mas更新 （因为在前面已经执行过了）
-brew cleanup --prune=all 2>&1 | tee -a "$LOG_FULL_FILE"   
-brew autoremove 2>&1 | tee -a "$LOG_FULL_FILE"  
+topgrade --disable brew_formula --disable brew_cask --disable mas --yes --cleanup 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"    # 不执行 Homebrew更新 +  不执行 Mas更新 （因为在前面已经执行过了）
+brew cleanup --prune=all 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
+brew autoremove 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
-echo -e ""  | tee -a "$LOG_FULL_FILE"
-echo -e ""  | tee -a "$LOG_FULL_FILE"
+echo -e ""  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+echo -e ""  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 
 
@@ -877,10 +882,10 @@ echo -e "\033[1;32m-----------------------------------------------\033[0m"
 echo -e "\033[1;32m 运行 MacUpdater ...                           \033[0m"
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 
-echo -e "---------------" >> "$LOG_FULL_FILE"
-echo -e "运行 MacUpdater" >> "$LOG_FULL_FILE"
-echo -e "---------------" >> "$LOG_FULL_FILE"
-echo -e "" >> "$LOG_FULL_FILE"
+echo -e "---------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "运行 MacUpdater" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "---------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e ""                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 # 等待3秒，开始执行
 sleep 3  
@@ -889,25 +894,25 @@ sleep 3
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 # 执行MacUpdater扫描 （已安装的APP）
-# "/Applications/MacUpdater.app/Contents/Resources/macupdater_client" scan --quiet 2>&1 | tee -a "$LOG_FULL_FILE"
+# "/Applications/MacUpdater.app/Contents/Resources/macupdater_client" scan --quiet 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 # 获取已安装应用的总数
-echo -e "获取已安装的应用列表..." | tee -a "$LOG_FULL_FILE"
+echo -e "获取已安装的应用列表..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 # TOTAL_APPS=$("$MACUPDATER_CLIENT" list | wc -l)
 TOTAL_APPS=$("/Applications/MacUpdater.app/Contents/Resources/macupdater_client" list | wc -l)
-echo -e "APP 数量（全部总计）: $TOTAL_APPS" | tee -a "$LOG_FULL_FILE"
+echo -e "APP 数量（全部总计）: $TOTAL_APPS" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 # TOTAL_APPS=$("/Applications/MacUpdater.app/Contents/Resources/macupdater_client" list --hide-mas-apps --hide-unsupported-apps | wc -l)
-# echo -e "APP 数量（支持更新）: $TOTAL_APPS" | tee -a "$LOG_FULL_FILE"
+# echo -e "APP 数量（支持更新）: $TOTAL_APPS" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 # 执行扫描命令（并显示进度条）
 run_command_with_show_progress "\"$MACUPDATER_CLIENT\" scan" "SCAN"  "$LOG_MACUPDATER_FILE"
 
 # 执行更新命令
-"/Applications/MacUpdater.app/Contents/Resources/macupdater_client" update --force-quit-running-apps --force-major-version-update 2>&1 | tee -a "$LOG_FULL_FILE"
-#"/Applications/MacUpdater.app/Contents/Resources/macupdater_client" update --force-quit-running-apps 2>&1 | tee -a "$LOG_FULL_FILE"
+"/Applications/MacUpdater.app/Contents/Resources/macupdater_client" update --force-quit-running-apps --force-major-version-update 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+#"/Applications/MacUpdater.app/Contents/Resources/macupdater_client" update --force-quit-running-apps 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
-echo -e "" >> "$LOG_FULL_FILE"
-echo -e "" >> "$LOG_FULL_FILE"
+echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 
 
@@ -918,21 +923,27 @@ echo -e "" >> "$LOG_FULL_FILE"
 # ----------------------------------
 
 # 最后打印执行完成的时间
-echo -e "TopGrade & MacUpdater finished at: $(date)" >> "$LOG_FILE"
 
-echo -e "TopGrade & MacUpdater finished at: $(date)" >> "$LOG_FULL_FILE"
-echo -e "" >> "$LOG_FULL_FILE"
-echo -e "" >> "$LOG_FULL_FILE"
-echo -e "" >> "$LOG_FULL_FILE"
+echo -e "TopGrade & MacUpdater finished at: $(date)" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  "$LOG_FILE"
+
+echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
+echo -e "---------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "已完成 所有更新" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "---------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+
+echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 
 echo -e "" 
 echo -e "" 
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
-echo -e "\033[1;32m所有更新 已完成 ...                            \033[0m"
+echo -e "\033[1;32m已完成 所有更新  ...                           \033[0m"
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 echo -e "日志路径：$LOG_PATH"
-echo -e "" 
 
 
 # 打开Log日志文件夹
