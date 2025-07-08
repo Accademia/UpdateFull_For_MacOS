@@ -253,6 +253,8 @@ else
         echo -e "" >> "$LOG_FULL_FILE"
         echo -e "" >> "$LOG_FULL_FILE"
         echo -e "" >> "$LOG_FULL_FILE"
+        echo -e "" >> "$LOG_FULL_FILE"
+        echo -e "" >> "$LOG_FULL_FILE"
     fi
 fi
 
@@ -272,10 +274,18 @@ echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 echo -e "===================================================================================" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
-echo -e ""
+echo -e ""                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+
 echo -e "\033[1;36m-----------------------------------------------\033[0m" 
 echo -e "\033[1;36m 检测 “Homebrew与系统架构” 是否匹配 ...\033[0m"
 echo -e "\033[1;36m-----------------------------------------------\033[0m" 
+
+echo -e "----------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "检测 “Homebrew与系统架构” 是否匹配" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "----------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+
+echo -e ""                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+
 
 # 检测系统架构
 
@@ -310,25 +320,33 @@ if [ "$architecture" = "arm64" ]; then
         eval "$(/opt/homebrew/bin/brew shellenv)"
         
         printf  "\033[1;34m[INFO]\033[0m $1"
-        echo -e "Homebrew 安装完成。" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        echo -e ""
+        echo -e "Homebrew 安装完成。"           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e ""                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
         exit 0
     fi
 
     # 获取 Homebrew 的安装路径
     brew_path=$(which brew)
     printf  "\033[1;34m[INFO]\033[0m $1"
-    echo -e "检测到 Homebrew 安装路径: $brew_path"
+    echo -e "检测到 Homebrew 安装路径: $brew_path" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     if [[ $brew_path == /opt/homebrew/* ]]; then
         printf  "\033[1;34m[INFO]\033[0m $1"
         echo -e "当前 Homebrew 已安装为 ARM 版本，无需更改。" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 更新 Homebrew
-        echo -e ""
+        echo -e ""                             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+
         echo -e "\033[1;36m-----------------------------------------------\033[0m" 
         echo -e "\033[1;36m 更新 Homebrew 工具 ...\033[0m"
         echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-        brew update
+
+        echo -e "-------------------"         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+        echo -e "更新 Homebrew 工具 "         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+        echo -e "-------------------"         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+
+        echo -e ""                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+
+        brew update                           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
         # exit 0
 
     elif [[ $brew_path == /usr/local/* ]]; then
@@ -349,13 +367,13 @@ if [ "$architecture" = "arm64" ]; then
         # 卸载 x86_64 版本的 Homebrew
         printf  "\033[1;34m[INFO]\033[0m $1"
         echo -e "正在卸载 x86_64 版本的 Homebrew..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/uninstall.sh)"
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/uninstall.sh)"  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         
         # 安装 ARM 版本的 Homebrew
         printf  "\033[1;34m[INFO]\033[0m $1"
         echo -e "正在安装 ARM 版本的 Homebrew..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 非交互式安装
-        NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
         
         # 添加 Homebrew 到环境变量
         echo -e 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
@@ -372,27 +390,31 @@ if [ "$architecture" = "arm64" ]; then
         if [[ $brew_newpath == /opt/homebrew/* ]]; then
             printf  "\033[1;34m[INFO]\033[0m $1"
             echo -e "验证结果：当前 Homebrew 已安装为 ARM 版本。" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-            # exit 0
+            echo -e ""                             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+            #exit 0
         elif [[ $brew_newpath == /usr/local/* ]]; then
             printf  "\033[1;34m[INFO]\033[0m $1"
             echo -e "验证结果：检测到当前 Homebrew 为 x86_64 版本。退出" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            echo -e ""                             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
             exit 0
         else
             printf  "\033[1;34m[INFO]\033[0m $1"
             echo -e "验证结果：检测未知版本。退出" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            echo -e ""                             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
             exit 0
         fi
 
     else
-        print_error "未知的 Homebrew 安装路径: $brew_path"
+        print_error "未知的 Homebrew 安装路径: $brew_path" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+        echo -e ""                                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     fi
 
 else
     printf "当前系统不是 ARM 架构 (Apple Silicon)，无需调整 Homebrew。" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e ""                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 fi
 
 
-echo -e ""
 
 
 
@@ -406,44 +428,50 @@ echo -e ""
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 if ! brew list | grep -q "^jq$" || ! brew list | grep -q "^coreutils$" || ! brew list | grep -q "^parallel$" || ! brew list | grep -q "^aria2$";  then
+    echo -e ""                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
     echo -e "\033[1;36m 安装 其他必备工具 ...\033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
+
+    echo -e "------------------"          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "安装 其他必备工具 "          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "------------------"          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e ""                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 fi
 
 if ! brew list | grep -q "^aria2$"; then
     printf  "\033[1;34m[INFO]\033[0m "
-    echo -e "[安装] aria2 ..."
-    brew install aria2
-    echo -e ""
+    echo -e "[安装] aria2 ..."            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    brew install aria2                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    echo -e ""                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 fi
 
 if ! brew list | grep -q "^parallel$"; then
     printf  "\033[1;34m[INFO]\033[0m "
-    echo -e "[安装] parallel ..."
-    brew install parallel
-    echo -e ""
+    echo -e "[安装] parallel ..."         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    brew install parallel                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    echo -e ""                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 fi
 
 if ! brew list | grep -q "^coreutils$"; then
     printf  "\033[1;34m[INFO]\033[0m "
-    echo -e "[安装] coreutils ..."
-    brew install coreutils
-    echo -e ""
+    echo -e "[安装] coreutils ..."        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    brew install coreutils                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    echo -e ""                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 fi
 
 if ! brew list | grep -q "^jq$"; then
     printf  "\033[1;34m[INFO]\033[0m "
-    echo -e "[安装] jq ..."
-    brew install jq
-    echo -e ""
+    echo -e "[安装] jq ..."               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    brew install jq                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    echo -e ""                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 fi
 
 if ! brew tap | grep -q '^buo/cask-upgrade$'; then
     printf  "\033[1;34m[INFO]\033[0m "
-    echo -e "[安装] buo/cask-upgrad ..."
-    brew tap buo/cask-upgrade
-    echo -e ""
+    echo -e "[安装] buo/cask-upgrad ..."  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    brew tap buo/cask-upgrade             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    echo -e ""                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 fi
 
 
@@ -456,24 +484,35 @@ fi
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 if brew list --formula | grep -q "^mas\$"; then
+    echo -e ""                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
     echo -e "\033[1;36m 更新 Mas 工具 ...\033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    brew upgrade --greedy --force mas
+    echo -e "------------------"          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "更新 Mas 工具     "          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "------------------"          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e ""                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    brew upgrade --greedy --force mas     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    echo -e ""                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 else
+    echo -e ""                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
     echo -e "\033[1;36m Mas 未安装，开始安装 ...\033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    brew reinstall --force mas
+    echo -e "--------------------"        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "Mas 未安装，开始安装"        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "--------------------"        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e ""                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    brew reinstall --force mas            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    echo -e ""                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     if [ $? -eq 0 ]; then
-        echo -e "Mas 安装成功。"
+        echo -e "Mas 安装成功。"          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     else
-        echo -e "Mas 安装失败。"
-	exit 1  # 安装失败时退出脚本
+        echo -e "Mas 安装失败。"          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+	      exit 1  # 安装失败时退出脚本
     fi
 fi
 
-echo -e ""
 
 
 
@@ -486,24 +525,37 @@ echo -e ""
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 if port version  > /dev/null 2>&1 ; then
+    echo -e ""                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
     echo -e "\033[1;36m 更新 MacPorts 工具 ...\033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    sudo port selfupdate
+    echo -e "--------------------"        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "更新 MacPorts 工具  "        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "--------------------"        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e ""                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    sudo port selfupdate                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    echo -e ""                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 else
+    echo -e ""                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
     echo -e "\033[1;36m MacPorts 未安装，开始安装 ...\033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
+    echo -e "---------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "MacPorts 未安装，开始安装  " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "---------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e ""                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     curl -LO https://distfiles.macports.org/MacPorts/MacPorts-2.8.1-10.15-Catalina.pkg && sudo /usr/sbin/installer -pkg MacPorts-2.8.1-10.15-Catalina.pkg -target /
+    echo -e ""                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     if [ $? -eq 0 ]; then
-        echo -e "MacPorts 安装成功。"
+        echo -e "MacPorts 安装成功。"     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+        echo -e ""                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     else
-        echo -e "MacPorts 安装失败。"
+        echo -e "MacPorts 安装失败。"     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+        echo -e ""                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 	exit 1  # 安装失败时退出脚本
     fi
 fi
 
-echo -e ""
 
 
 
@@ -519,24 +571,34 @@ echo -e ""
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 if brew list --formula | grep -q "^topgrade\$"; then
+    echo -e ""                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
     echo -e "\033[1;36m 更新 TopGrade 工具 ...\033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    yes | brew upgrade --greedy topgrade
+    echo -e "---------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "更新 TopGrade 工具         " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "---------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    yes | brew upgrade --greedy topgrade  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    echo -e ""                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 else
+    echo -e ""                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
     echo -e "\033[1;36m TopGrade 未安装，开始安装 ...\033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    brew reinstall --force topgrade
+    echo -e "---------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "TopGrade 未安装，开始安装  " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "---------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    brew reinstall --force topgrade | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    echo -e ""                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     if [ $? -eq 0 ]; then
-        echo -e "TopGrade 安装成功。"
+        echo -e "TopGrade 安装成功。"     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+        echo -e ""                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     else
-        echo -e "TopGrade 安装失败。"
-	exit 1  # 安装失败时退出脚本
+        echo -e "TopGrade 安装失败。"     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+        echo -e ""                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+	      exit 1  # 安装失败时退出脚本
     fi
 fi
-
-echo -e ""
 
 
 
@@ -549,10 +611,15 @@ echo -e ""
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 if brew list --cask | grep -q "^macupdater\$"; then
+    echo -e ""                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
     echo -e "\033[1;36m 更新 MacUpdater工具 ...\033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    yes | brew upgrade --greedy --cask --force macupdater
+    echo -e "---------------------------"                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "更新 MacUpdater工具        "                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "---------------------------"                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    yes | brew upgrade --greedy --cask --force macupdater | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+        echo -e ""                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
   # 功能：只检查 macupdater 是否过期，若过期则静默强制重装，否则跳过
   # if brew outdated --cask --greedy macupdater| grep -q '^macupdater$'; then
   #   echo -e "检测到 macupdater 有新版本，开始静默升级…"
@@ -562,20 +629,25 @@ if brew list --cask | grep -q "^macupdater\$"; then
   #   echo -e "macupdater 已是最新版本，无需升级。"
   # fi 
 else
+    echo -e ""                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
     echo -e "\033[1;36m MacUpdater 未安装，开始安装 ...\033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    brew reinstall --cask --force macupdater
+    echo -e "-----------------------------"               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e " MacUpdater 未安装，开始安装 "               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "-----------------------------"               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    brew reinstall --cask --force macupdater              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    echo -e ""                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     if [ $? -eq 0 ]; then
-        echo -e "MacUpdater 安装成功。"
+        echo -e "MacUpdater 安装成功。"                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+        echo -e ""                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     else
-        echo -e "MacUpdater 安装失败。"
-	exit 1  # 安装失败时退出脚本
+        echo -e "MacUpdater 安装失败。"                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+        echo -e ""                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+	      exit 1  # 安装失败时退出脚本
     fi
 fi
     
-echo -e ""
-
 
 
 
@@ -593,8 +665,8 @@ echo -e "TopGrade & MacUpdater executed on: $(date)" >> "$LOG_FILE"
 
 # 记录当前时间戳（到$$LOG_FULL_FILE），
 echo -e "TopGrade & MacUpdater executed on: $(date)" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "===================================================================================" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e  ""  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "----------------------------------------------------------------"  tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e  ""  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 
 # 此后，开始升级第三方APP！！！！！！此前都是在，检测环境 和更新 升级程序本身。
@@ -609,15 +681,17 @@ echo -e  ""  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 export HOMEBREW_NO_INTERACTIVE=1
 
-echo -e ""
+echo -e ""                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 echo -e "\033[1;32m 运行 HomeBrew ...                             \033[0m"
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 
 echo -e "---------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "运行 HomeBrew" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "运行 HomeBrew  " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "---------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+
+echo -e ""                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 # 等待3秒，开始执行
 sleep 3  
@@ -628,7 +702,7 @@ check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 # 第 1 步：获取所有需要更新的公式和 cask 名称
 printf  "\033[1;34m[Scan]\033[0m "
-echo -e "扫描哪些软件需要更新 ... ( BUG排查命令 ：brew upgrade --debug --verbose --greedy )" | tee -a "$LOG_FULL_FILE"
+echo -e "扫描哪些软件需要更新 ... ( BUG排查命令 ：brew upgrade --debug --verbose --greedy )" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 brew_outdated=$(brew outdated --greedy | tee /dev/tty | awk '{print $1}')
 
 # 将需要更新的包分别存储
@@ -644,8 +718,9 @@ if [ ${#packages_brew[@]} -ne 0 ] ; then
  #printf '%s\n' "${packages_brew[@]}" | xargs -n1 -P32 brew fetch | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
    
   # 第 3 步：串行安装（Homebrew 包）
-  echo -e ""
+  echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
   printf  "\033[1;34m[Install]\033[0m "
+  printf  "[Install] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
   echo -e "安装 HomeBrew包（串行）..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
   brew upgrade --greedy --force | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
  #brew upgrade --greedy --debug --force | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE""  ###### 仅作为Debug使用！！！
@@ -657,13 +732,14 @@ fi
 
 
 # 清洁
-echo -e ""
+echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
 printf  "\033[1;34m[Clean]\033[0m "
+printf  "[Clean]" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "清理Homebrew残留 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 brew cleanup --prune=all 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 brew autoremove 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
-echo -e ""  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 echo -e ""  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 
@@ -680,15 +756,17 @@ echo -e ""  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 export Mas_NO_INTERACTIVE=1
 
-echo -e ""
+echo -e ""                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 echo -e "\033[1;32m 运行 Mas ...                                  \033[0m"
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 
 echo -e "---------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "运行 Mas" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "运行 Mas"        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "---------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+
+echo -e ""                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 # 等待3秒，开始执行
 sleep 3  
@@ -698,7 +776,8 @@ check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 # 显示未更新APP列表：Mas （并捕获输出）
 echo -e "\033[1;34m[Scan]\033[0m"
-outdated_apps=$(yes | mas outdated 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" )
+echo -e "[Scan]" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+outdated_apps=$(yes | mas outdated | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" )
 echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 # 获取过时应用程序的ID
@@ -739,28 +818,29 @@ for id in $app_ids; do
           echo -e "无法获取 $app_name 的PID，跳过强制关闭" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
         fi
       fi
-      apps_to_restart+=("$app_name")
+      apps_to_restart+=("$app_name") | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     fi
   fi
 done
 
 # 开始执行：Mas 更新（并捕获输出）
+echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 echo -e "\033[1;34m[Download-Install]\033[0m"
+echo -e "[Download-Install]" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 yes | mas upgrade 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 # 重新启动之前关闭的应用程序
 for app in "${apps_to_restart[@]}"; do
   echo -e "正在重新启动 $app..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-  open -a "$app"
+  open -a "$app" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
   sleep 1  # 短暂延迟以确保应用启动
 done
 
 echo -e "\033[1;32mMas 更新完成，所有受影响的应用已重新启动。\033[0m"
 
-echo -e "Mas 更新完成，所有受影响的应用已重新启动" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+echo -e "Mas 更新完成，所有受影响的应用已重新启动" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
-echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 
@@ -777,7 +857,8 @@ echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 export MacPorts_NO_INTERACTIVE=1
 
-echo -e ""
+echo -e ""                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 echo -e "\033[1;32m 运行 MacPorts ...                             \033[0m"
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
@@ -785,7 +866,8 @@ echo -e "\033[1;32m-----------------------------------------------\033[0m"
 echo -e "---------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "运行 MacPorts"   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "---------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e ""                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+
+echo -e ""                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 # 等待3秒，开始执行
 sleep 3  
@@ -796,8 +878,8 @@ check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 # 执行：MacPorts （并捕获输出）
 yes | sudo port upgrade outdated -N  2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
-echo -e ""  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-echo -e ""  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+echo -e ""                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+echo -e ""                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 
 
@@ -809,7 +891,8 @@ echo -e ""  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 export SoftwareUpdate_NO_INTERACTIVE=1
 
-echo -e ""
+echo -e ""                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 echo -e "\033[1;32m 运行 MacOS System Update ...                             \033[0m"
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
@@ -817,7 +900,8 @@ echo -e "\033[1;32m-----------------------------------------------\033[0m"
 echo -e "---------------"           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "运行 MacOS System Update"  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "---------------"           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e ""                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+
+echo -e ""                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 # 等待3秒，开始执行
 sleep 3  
@@ -843,7 +927,8 @@ echo -e ""  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 export TopGrade_NO_INTERACTIVE=1
 
-echo -e ""
+echo -e ""                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 echo -e "\033[1;32m 运行 TopGrade ...                             \033[0m"
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
@@ -851,7 +936,8 @@ echo -e "\033[1;32m-----------------------------------------------\033[0m"
 echo -e "---------------"   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "运行 TopGrade"     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "---------------"   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e ""                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+
+echo -e ""                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 # 等待3秒，开始执行
 sleep 3  
@@ -877,7 +963,8 @@ echo -e ""  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 export MacUpdater_NO_INTERACTIVE=1
 
-echo -e ""
+echo -e ""                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 echo -e "\033[1;32m 运行 MacUpdater ...                           \033[0m"
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
@@ -885,7 +972,8 @@ echo -e "\033[1;32m-----------------------------------------------\033[0m"
 echo -e "---------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "运行 MacUpdater" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "---------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e ""                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+
+echo -e ""                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 # 等待3秒，开始执行
 sleep 3  
@@ -911,8 +999,7 @@ run_command_with_show_progress "\"$MACUPDATER_CLIENT\" scan" "SCAN"  "$LOG_MACUP
 "/Applications/MacUpdater.app/Contents/Resources/macupdater_client" update --force-quit-running-apps --force-major-version-update 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 #"/Applications/MacUpdater.app/Contents/Resources/macupdater_client" update --force-quit-running-apps 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
-echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 
 
@@ -926,25 +1013,22 @@ echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 echo -e "TopGrade & MacUpdater finished at: $(date)" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  "$LOG_FILE"
 
-echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e ""                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
-echo -e "---------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "已完成 所有更新" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "---------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-
-echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-
-
-echo -e "" 
-echo -e "" 
-echo -e "\033[1;32m-----------------------------------------------\033[0m" 
+echo -e "\033[1;32m===============================================\033[0m" 
 echo -e "\033[1;32m已完成 所有更新  ...                           \033[0m"
-echo -e "\033[1;32m-----------------------------------------------\033[0m" 
-echo -e "日志路径：$LOG_PATH"
+echo -e "\033[1;32m===============================================\033[0m" 
 
+echo -e "==============="       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "已完成 所有更新"       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "==============="       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+
+echo -e "日志路径：$LOG_PATH"   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+
+echo -e ""                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+echo -e ""                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+echo -e ""                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+echo -e ""                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 # 打开Log日志文件夹
 open "$LOG_PATH"
