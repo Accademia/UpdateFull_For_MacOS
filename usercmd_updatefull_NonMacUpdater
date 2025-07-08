@@ -829,7 +829,7 @@ for id in $app_ids; do
 done
 
 # 开始执行：Mas 更新（并捕获输出）
-echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+#echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 echo -e "\033[1;34m[Download-Install]\033[0m"
 echo -e "[Download-Install]" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 yes | mas upgrade  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
