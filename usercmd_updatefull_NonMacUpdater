@@ -666,7 +666,7 @@ echo -e "TopGrade & MacUpdater executed on: $(date)" >> "$LOG_FILE"
 # 记录当前时间戳（到$$LOG_FULL_FILE），
 echo -e "TopGrade & MacUpdater executed on: $(date)" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "----------------------------------------------------------------"  tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e  ""  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e  ""                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 
 # 此后，开始升级第三方APP！！！！！！此前都是在，检测环境 和更新 升级程序本身。
@@ -702,6 +702,7 @@ check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 # 第 1 步：获取所有需要更新的公式和 cask 名称
 printf  "\033[1;34m[Scan]\033[0m "
+printf  "[ Scan ] "                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "扫描哪些软件需要更新 ... ( BUG排查命令 ：brew upgrade --debug --verbose --greedy )" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 brew_outdated=$(brew outdated --greedy | tee /dev/tty | awk '{print $1}')
 
@@ -718,16 +719,17 @@ if [ ${#packages_brew[@]} -ne 0 ] ; then
  #printf '%s\n' "${packages_brew[@]}" | xargs -n1 -P32 brew fetch | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
    
   # 第 3 步：串行安装（Homebrew 包）
-  echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+  echo -e ""                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
   printf  "\033[1;34m[Install]\033[0m "
-  printf  "[Install] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-  echo -e "安装 HomeBrew包（串行）..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-  brew upgrade --greedy --force | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
- #brew upgrade --greedy --debug --force | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE""  ###### 仅作为Debug使用！！！
+  printf  "[Install]"                             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+  echo -e "安装 HomeBrew包（串行）..."            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+  brew upgrade --greedy --force                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+ #brew upgrade --greedy --debug --force           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE""  ###### 仅作为Debug使用！！！
 
 else
   printf  "\033[1;32m[ OK ]\033[0m "
-  echo -e "当前没有需要更新的 Homebrew 包 !!! " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+  printf  "[ OK ] "                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+  echo -e "当前没有需要更新的 Homebrew 包 !!! "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 fi
 
 
@@ -735,12 +737,12 @@ fi
 echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 printf  "\033[1;34m[Clean]\033[0m "
-printf  "[Clean]" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "清理Homebrew残留 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-brew cleanup --prune=all 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-brew autoremove 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+printf  "[ Clean ]"                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "清理Homebrew残留 ..."                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+brew cleanup --prune=all                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+brew autoremove                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
-echo -e ""  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e ""                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 
 
@@ -827,7 +829,7 @@ done
 echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 echo -e "\033[1;34m[Download-Install]\033[0m"
 echo -e "[Download-Install]" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-yes | mas upgrade 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+yes | mas upgrade  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 # 重新启动之前关闭的应用程序
@@ -876,9 +878,8 @@ sleep 3
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 # 执行：MacPorts （并捕获输出）
-yes | sudo port upgrade outdated -N  2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+yes | sudo port upgrade outdated -N   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
-echo -e ""                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 echo -e ""                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 
@@ -910,8 +911,8 @@ sleep 3
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 # 自动执行：SoftwareUpdate （并捕获输出）
-softwareupdate --list --force 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-softwareupdate --download --force 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+softwareupdate --list --force  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+softwareupdate --download --force  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 # softwareupdate --install --all --force --verbose   
 # 注意：安装更新会强制要求输入密码，无法免密，所以，建议只下载，再通过系统的自动更细功能进行更新
 
@@ -946,11 +947,10 @@ sleep 3
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 # 执行 TopGrade （并捕获输出）
-topgrade --disable brew_formula --disable brew_cask --disable mas --yes --cleanup 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"    # 不执行 Homebrew更新 +  不执行 Mas更新 （因为在前面已经执行过了）
-brew cleanup --prune=all 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
-brew autoremove 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+topgrade --disable brew_formula --disable brew_cask --disable mas --yes --cleanup  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"    # 不执行 Homebrew更新 +  不执行 Mas更新 （因为在前面已经执行过了）
+brew cleanup --prune=all | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
+brew autoremove  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
-echo -e ""  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 echo -e ""  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 
