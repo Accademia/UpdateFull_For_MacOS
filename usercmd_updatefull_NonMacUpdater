@@ -979,7 +979,7 @@ echo -e ""                                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL
 
 #export MacUpdater_NO_INTERACTIVE=1
 #
-#echo -e ""                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+##echo -e ""                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 #
 #echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 #echo -e "\033[1;32m 运行 MacUpdater ...                           \033[0m"
