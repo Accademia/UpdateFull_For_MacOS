@@ -922,7 +922,7 @@ softwareupdate --download --force  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 # softwareupdate --install --all --force --verbose   
 # 注意：安装更新会强制要求输入密码，无法免密，所以，建议只下载，再通过系统的自动更细功能进行更新
 
-echo -e ""  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+#echo -e ""  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 
 
