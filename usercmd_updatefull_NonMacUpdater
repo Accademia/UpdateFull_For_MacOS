@@ -97,7 +97,7 @@ check_connection() {
 
   if curl -I --connect-timeout 5 "$target" > /dev/null 2>&1; then
     printf "\033[1;32m[OK]\033[0m 已连通 [$target] \n"  
-    printf " 已连通 [$target] \n"  | tee -a "$log_file" "$LOG_FULL_LAST"   "$LOG_FULL_FILE" > /dev/null  
+    printf " 已连通 [$target] \n"  | tee -a  "$LOG_FULL_LAST"   "$LOG_FULL_FILE" > /dev/null  
     return 0
   else
     printf "\033[1;31m[ERROR]\033[0m" 
@@ -260,7 +260,7 @@ while true; do
   fi
 
   # 如果N个目标，都成功连接，退出循环
-  echo -e "海外 HTTPS 连接正常 ..." | tee -a "$LOG_ERROR_FILE" "$LOG_FULL_LAST"  "$LOG_FULL_FILE" 
+  echo -e "海外 HTTPS 连接正常 ..." | tee -a  "$LOG_FULL_LAST"  "$LOG_FULL_FILE" 
   break
 done
 
@@ -350,6 +350,9 @@ if [ "$architecture" = "arm64" ]; then
         echo -e ""                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
         brew update                           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+
+        echo -e ""                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+
         # exit 0
 
     elif [[ $brew_path == /usr/local/* ]]; then
@@ -955,6 +958,7 @@ brew cleanup --prune=all | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 brew autoremove  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 echo -e ""  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+echo -e ""  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 
 
@@ -1014,19 +1018,26 @@ echo -e ""  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 # 最后打印执行完成的时间
 
-echo -e "TopGrade & MacUpdater finished at: $(date)" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  "$LOG_FILE"
 
 echo -e ""                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
-echo -e "\033[1;32m===============================================\033[0m" 
+echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 echo -e "\033[1;32m已完成 所有更新  ...                           \033[0m"
-echo -e "\033[1;32m===============================================\033[0m" 
+echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 
-echo -e "==============="       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "---------------"       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "已完成 所有更新"       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "==============="       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "---------------"       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+
+echo -e ""                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 echo -e "日志路径：$LOG_PATH"   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+
+echo -e ""                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+
+echo -e "\033[1;32mFinished at: $(date) \033[0m"
+echo -e "Finished at: $(date)"  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  "$LOG_FILE" > /dev/null
+
 
 echo -e ""                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 echo -e ""                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
