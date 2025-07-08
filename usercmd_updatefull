@@ -1015,7 +1015,8 @@ run_command_with_show_progress "\"$MACUPDATER_CLIENT\" scan" "SCAN"  "$LOG_MACUP
 "/Applications/MacUpdater.app/Contents/Resources/macupdater_client" update --force-quit-running-apps --force-major-version-update 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 #"/Applications/MacUpdater.app/Contents/Resources/macupdater_client" update --force-quit-running-apps 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
-echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e ""                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+echo -e ""                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 
 
@@ -1026,9 +1027,6 @@ echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 # ----------------------------------
 
 # 最后打印执行完成的时间
-
-
-#echo -e ""                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 echo -e "\033[1;32m已完成 所有更新  ...                           \033[0m"
