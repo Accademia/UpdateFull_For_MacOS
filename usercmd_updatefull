@@ -585,6 +585,7 @@ if brew list --formula | grep -q "^topgrade\$"; then
     echo -e "----------------------------------"  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e "更新 TopGrade 工具"                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e "----------------------------------"  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e ""                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     yes | brew upgrade --greedy topgrade 2>&1     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     echo -e ""                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 else
@@ -595,6 +596,7 @@ else
     echo -e "----------------------------------"  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e "TopGrade 未安装，开始安装"           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e "----------------------------------"  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e ""                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     brew reinstall --force topgrade  2>&1         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     echo -e ""                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     if [ $? -eq 0 ]; then
@@ -625,6 +627,7 @@ if brew list --cask | grep -q "^macupdater\$"; then
     echo -e "----------------------------------"                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e "更新 MacUpdater工具"                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e "----------------------------------"                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e ""                                                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     yes | brew upgrade --greedy --cask --force macupdater  2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     echo -e ""                                                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
   # 功能：只检查 macupdater 是否过期，若过期则静默强制重装，否则跳过
@@ -708,10 +711,10 @@ sleep 3
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 # 第 1 步：获取所有需要更新的公式和 cask 名称
-printf  "\033[1;34m[Scan]\033[0m "
+printf  "\033[1;34m[ Scan ]\033[0m "
 printf  "[ Scan ] "                           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "扫描哪些软件需要更新 ... ( BUG排查命令 ：brew upgrade --debug --verbose --greedy )" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-brew_outdated=$(brew outdated --greedy        | tee /dev/tty | awk '{print $1}')
+brew_outdated=$(brew outdated --greedy  2>&1  | tee /dev/tty | awk '{print $1}')
 
 # 将需要更新的包分别存储
 packages_brew=($brew_outdated)
@@ -727,8 +730,8 @@ if [ ${#packages_brew[@]} -ne 0 ] ; then
    
   # 第 3 步：串行安装（Homebrew 包）
   echo -e ""                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-  printf  "\033[1;34m[Install]\033[0m "
-  printf  "[Install]"                             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+  printf  "\033[1;34m[ Install ]\033[0m "
+  printf  "[ Install ] "                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
   echo -e "安装 HomeBrew包（串行）..."            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
   brew upgrade --greedy --force  2>&1             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
  #brew upgrade --greedy --debug --force           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE""  ###### 仅作为Debug使用！！！
@@ -744,7 +747,7 @@ fi
 echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 printf  "\033[1;34m[Clean]\033[0m "
-printf  "[ Clean ]"                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+printf  "[ Clean ] "                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "清理Homebrew残留 ..."                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 brew cleanup --prune=all  2>&1                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 brew autoremove  2>&1                             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -784,8 +787,8 @@ sleep 3
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 # 显示未更新APP列表：Mas （并捕获输出）
-echo -e "\033[1;34m[Scan]\033[0m"
-echo -e "[Scan]" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "\033[1;34m[ Scan ] \033[0m"
+echo -e "[ Scan ] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 outdated_apps=$(yes | mas outdated | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" )
 echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
@@ -834,8 +837,8 @@ done
 
 # 开始执行：Mas 更新（并捕获输出）
 #echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-echo -e "\033[1;34m[Download-Install]\033[0m"
-echo -e "[Download-Install]"              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "\033[1;34m[ Download-Install ]\033[0m "
+echo -e "[ Download-Install ] "              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 yes | mas upgrade  2>&1                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 echo -e ""                                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
@@ -902,7 +905,7 @@ export SoftwareUpdate_NO_INTERACTIVE=1
 echo -e ""                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
-echo -e "\033[1;32m 运行 MacOS System Update ...                             \033[0m"
+echo -e "\033[1;32m 运行 MacOS System Update ...                  \033[0m"
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 
 echo -e "----------------------------------"  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
@@ -918,8 +921,8 @@ sleep 3
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 # 自动执行：SoftwareUpdate （并捕获输出）
-softwareupdate --list --force  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-softwareupdate --download --force  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+softwareupdate --list --force 2>&1          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+softwareupdate --download --force 2>&1      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 # softwareupdate --install --all --force --verbose   
 # 注意：安装更新会强制要求输入密码，无法免密，所以，建议只下载，再通过系统的自动更细功能进行更新
 
@@ -935,7 +938,7 @@ softwareupdate --download --force  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 export TopGrade_NO_INTERACTIVE=1
 
-echo -e ""                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e ""                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 echo -e "\033[1;32m 运行 TopGrade ...                             \033[0m"
@@ -971,7 +974,7 @@ echo -e ""                                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL
 
 export MacUpdater_NO_INTERACTIVE=1
 
-echo -e ""                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e ""                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 echo -e "\033[1;32m 运行 MacUpdater ...                           \033[0m"
@@ -1020,7 +1023,7 @@ echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 # 最后打印执行完成的时间
 
 
-echo -e ""                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+echo -e ""                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 echo -e "\033[1;32m已完成 所有更新  ...                           \033[0m"
