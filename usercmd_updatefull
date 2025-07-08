@@ -36,7 +36,7 @@ mkdir -p "$LOG_PATH"
 # ---------------------------------------
 
 # 定义：日志文件
-LOG_FULL_LAST="$LOG_PATH/UpdateFull.[Last].log"
+LOG_FULL_LAST="$LOG_PATH/--UpdateFull.--Last--.log"
 LOG_FILE="$LOG_PATH/Update_Auto.log"
 LOG_FULL_FILE="$LOG_PATH/UpdateFull.$(date +%Y-%m).log"
 #LOG_FULL_FILE="$LOG_PATH/Update_FULL.$(date +%Y-%m-%d).log"
