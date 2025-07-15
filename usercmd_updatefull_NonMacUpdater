@@ -357,17 +357,27 @@ if [ "$architecture" = "arm64" ]; then
         exit 0
     fi
 
-    # 获取 Homebrew 的安装路径
-    brew_path=$(which brew)
+    # 获取 Homebrew 的 安装路径
+    brew_path=$(brew --prefix)
     printf  "\033[1;34m[INFO]\033[0m "
     printf  "[INFO] "                                                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "检测到 Homebrew 安装路径: $brew_path"                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "Homebrew目录 : $brew_path"                                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    # 获取 CPU 的 处理器指令集
+    cpu_isa=$(uname -m)
+    printf  "\033[1;34m[INFO]\033[0m "
+    printf  "[INFO] "                                                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "CPU   指令集 : $cpu_isa"                                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    # 获取 CPU 的 芯片型号
+    cpu_chip=$(sysctl -n machdep.cpu.brand_string)
+    printf  "\033[1;34m[INFO]\033[0m "
+    printf  "[INFO] "                                                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "CPU 芯片型号 : $cpu_chip"                                                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    
    #echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-
-    if [[ $brew_path == /opt/homebrew/* ]]; then
+    if [[ $cpu_isa == "arm64" && $brew_path == "/opt/homebrew" ]]; then
         printf  "\033[1;32m[OK]\033[0m   "
         printf  "[OK]   "                                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-        echo -e "当前 Homebrew 为 arm64，无需更改"                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "Homebrew 无需更改"                                                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 更新 Homebrew
         echo -e ""                                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
         echo -e ""                                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
@@ -388,11 +398,7 @@ if [ "$architecture" = "arm64" ]; then
 
         # exit 0
 
-    elif [[ $brew_path == /usr/local/* ]]; then
-
-        printf  "\033[1;34m[INFO]\033[0m "
-        printf  "[INFO] "                                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-        echo -e "检测到 Homebrew 安装路径: $brew_path"                                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+     elif [[ $cpu_isa == "arm64" && $brew_path == "/usr/local" ]]; then
 
         printf  "\033[1;31m[ERROR]\033[0m "
         printf  "[ERROR] "                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
@@ -457,8 +463,9 @@ if [ "$architecture" = "arm64" ]; then
     fi
 
 else
-    printf "当前系统不是 ARM 架构 (Apple Silicon)，无需调整 Homebrew。"                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    printf "当前系统不是 ARM 架构 (Apple Silicon)，本脚本暂不支持。"                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    exit 0 
 fi
 
 
