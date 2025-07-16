@@ -959,7 +959,6 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             # 如果该应用正在运行，先尝试退出
             if pgrep -ix "$app_name" > /dev/null; then
                 echo -e "检测到 $app_name 正在运行，尝试退出应用..."                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-               #osascript -e "tell application \"$app_name\" to quit" || killall "$app_name"            
                # 组合命令，用 () 分组，再把 stderr 合并到 stdout 后送给 tee 
                 ( osascript -e "tell application \"$app_name\" to quit" || killall "$app_name" ) 2>&1           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 sleep 5  # 等待数秒让应用完全退出   
@@ -975,26 +974,39 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         final_exit=$upgrade_exit               # 先假定最终状态为 upgrade 的状态    
 
         if [ $upgrade_exit -ne 0 ]; then    
-            echo -e "upgrade 升级失败，$cask，尝试使用 reinstall 进行安装..."           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            echo -e "upgrade 升级失败，$cask，尝试使用 reinstall 重新安装..."           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             brew reinstall --cask --force "$cask" 2>&1                                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             reinstall_exit=${PIPESTATUS[0]}    # 获取 brew reinstall 的退出码   
-            final_exit=$reinstall_exit         # 将最终状态更新为 reinstall 的状态  
+            #  -------- 以下代码 未验证  如遇问题请关闭 -------- #
+            if [ $reinstall_exit -ne 0 ]; then
+                # 若重装失败且检测到应用仍在运行，强制关闭后再重试一次
+                if pgrep -ix "$app_name" > /dev/null; then
+                    echo -e "检测到 $app_name 仍在运行，强制关闭后再次尝试安装..."               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    pid=$(pgrep -f "$app_name")
+                    if [ -n "$pid" ]; then
+                        kill -9 "$pid"
+                    fi
+                    brew reinstall --cask --force "$cask" 2>&1                             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    reinstall_exit=${PIPESTATUS[0]}
+                fi
+            fi
+            #  -------- 以上代码 未验证  如遇问题请关闭 -------- #
+            final_exit=$reinstall_exit       # 将最终状态更新为 reinstall 的状态  
         fi  
 
-        # 如果该应用之前在运行且被我们关闭了，更新后重新打开它  
+        # 如果之前关闭了应用，更新完成后重新打开 
         if [[ "$was_running" = true && -n "$app_name" ]]; then  
             echo "重新启动此前关闭的应用：$app_name ..."                                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             open -a "$app_name" 2>&1                                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         fi
 
-        # 根据最终状态输出成功或失败
+        # 根据最终状态输出结果（成功或失败），然后继续处理下一个 cask
         if [ $final_exit -eq 0 ]; then
             echo "✅  更新成功 [cask] : $cask."                                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-            echo -e ""                                                                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         else    
             echo "❌  更新失败 [cask] : $cask."                                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-            echo -e ""                                                                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         fi
+        echo -e "--------------------"                                                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     done
     echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
   else  
@@ -1104,8 +1116,8 @@ done
 
 # 开始执行：Mas 更新（并捕获输出）
 #echo -e ""                                                                             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-echo -e "\033[1;34m[Download&Install]\033[0m "
-echo -e "[Download&Install] "                                                           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "\033[1;34m[Download & Install]\033[0m "
+echo -e "[Download & Install] "                                                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 mas upgrade 2>&1                                                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
@@ -1220,7 +1232,7 @@ sleep 3
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 # 执行 TopGrade （并捕获输出）
-topgrade --disable brew_formula --disable brew_cask --disable mas --yes --cleanup 2>&1  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"   # 不执行 Homebrew更新 +  不执行 Mas更新 （前面已更新过，且tograde的homebrew更新不会调用--greedy参数对通过homebrew安装的APP进行足量更新）
+topgrade --disable brew_formula --disable brew_cask --disable mas --disable system --disable macports --yes --cleanup 2>&1  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"   # 不执行 Homebrew更新 +  不执行 Mas更新 （前面已更新过，且tograde的homebrew更新不会调用--greedy参数对通过homebrew安装的APP进行足量更新）
 brew cleanup --prune=all 2>&1                                                           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 brew autoremove 2>&1                                                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
