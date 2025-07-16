@@ -1076,7 +1076,7 @@ echo -e ""                                                                      
 # 开始执行：Mas 更新（并捕获输出）
 printf  "\033[1;34m[Download & Install]\033[0m "
 printf  "[Download & Install] "                                                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e " 下载 & 安装 ..."                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e "下载 & 安装 ..."                                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 # 获取过时应用程序的ID
 app_ids=$(echo -e "$outdated_mas_apps" | awk '{print $1}'  | grep -E '^[0-9]+$')
