@@ -787,7 +787,7 @@ echo -e ""                                                                      
 
 
 # ----------------------------------
-# 开始执行：HomeBrew
+# 开始执行：Homebrew
 # ----------------------------------
 
 export HOMEBREW_NO_INTERACTIVE=1
@@ -834,7 +834,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
   # 第 2 步：并行下载（提高下载速度）
   printf "\033[1;34m[Download]\033[0m "
   printf "[Download] "                                                                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-  echo -e "开始下载：HomeBrew formula / cask（并行）..."                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+  echo -e "开始下载：HomeBrew formula / cask（ 并行 ）..."                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
   
   # 筛选需要下载的 formula 软件包：如果缓存中已有完整的新版本则跳过
   packages_to_fetch_formulas=()
@@ -899,14 +899,15 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
   wait  # 等待所有并行任务完成
  #echo -e "✅ 所有下载任务 已完成/已退出"                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
-  # exit 0        # 用于调试 ！！
+ #brew doctor  2>&1                                                                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+ #exit 1        # 用于调试 ！！
 
   # 第 3 步：串行安装（Homebrew formula）
   if [ ${#packages_brew_formulas[@]} -ne 0 ] ; then
       echo -e ""                                                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
       printf "\033[1;34m[Install]\033[0m "
       printf "[Install] "                                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-      echo -e "开始更新：HomeBrew formula（串行）..."                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+      echo -e "开始更新：HomeBrew formula（ 串行 ）..."                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
       # 循环逐个处理每个过期的 Homebrew formula
       for formula in "${packages_brew_formulas[@]}"; do
@@ -944,7 +945,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
   if [ ${#packages_brew_casks[@]} -ne 0 ] ; then
     printf  "\033[1;34m[Install]\033[0m "
     printf  "[Install] "                                                                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "开始更新：HomeBrew cask（串行 ）..."                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "开始更新：HomeBrew cask（ 串行 ）..."                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     # 逐个安装 每个待更新的 cask app
     for cask in $brew_outdated_casks; do
         # 利用 brew info 提取 Cask 安装的 .app 应用包名称
@@ -957,15 +958,20 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         if [[ -n "$app_name" ]]; then
             # 如果该应用正在运行，先尝试退出
             if pgrep -ix "$app_name" > /dev/null; then
-                echo -e "检测到 $app_name 正在运行，尝试退出应用..."                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "🗹 检测到 $app_name 正在运行，尝试退出应用..."                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                # 组合命令，用 () 分组，再把 stderr 合并到 stdout 后送给 tee 
                 ( osascript -e "tell application \"$app_name\" to quit" || killall "$app_name" ) 2>&1         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 sleep 5  # 等待数秒让应用完全退出   
-                was_running=true    
+                was_running=true   
+            else
+                echo "🗹 $app_name 未运行，直接升级 !!! "                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                # exit 1
             fi  
         else    
             echo "⚠️ 警告：无法从 brew info 提取 $cask 的应用名称，无法自动关闭应用，将直接升级"              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         fi  
+        
+        # exit 1
 
         # 升级 cask 应用    
         brew upgrade --cask --greedy "$cask" 2>&1                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -973,29 +979,29 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         final_exit=$upgrade_exit               # 先假定最终状态为 upgrade 的状态    
 
         if [ $upgrade_exit -ne 0 ]; then    
-            echo -e "⚠️ upgrade 升级失败，$cask，尝试使用 reinstall 重新安装 ..."       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            echo -e "⚠️ upgrade 升级失败，$cask ，尝试使用 reinstall 覆盖安装 ..."     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             brew reinstall --cask --force "$cask" 2>&1                                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-            reinstall_exit=${PIPESTATUS[0]}    # 获取 brew reinstall 的退出码   
-            #  -------- 以下代码 未验证  如遇问题请关闭 -------- #
+            reinstall_exit=${PIPESTATUS[0]}    # 获取 brew reinstall 的退出码  
             if [ $reinstall_exit -ne 0 ]; then
                 # 若重装失败且检测到应用仍在运行，强制关闭后再重试一次
                 if pgrep -ix "$app_name" > /dev/null; then
-                    echo -e "⚠️ 检测到 $app_name 仍在运行，强制关闭后再次尝试安装 ..."  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    echo -e "⚠️ 检测到 $app_name ( PID = $pid ) 仍在运行，尝试强制关闭，然后再次尝试 reinstall 覆盖安装 ..."  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     pid=$(pgrep -f "$app_name")
                     if [ -n "$pid" ]; then
                         kill -9 "$pid"
                     fi
-                    brew reinstall --cask --force "$cask" 2>&1                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                    reinstall_exit=${PIPESTATUS[0]}
+                else
+                    echo "🗹 $app_name 仍未发现其运行，再次尝试 reinstall 覆盖安装 !!! "          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 fi
+                brew reinstall --cask --force "$cask" 2>&1                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                reinstall_exit=${PIPESTATUS[0]}
             fi
-            #  -------- 以上代码 未验证  如遇问题请关闭 -------- #
             final_exit=$reinstall_exit       # 将最终状态更新为 reinstall 的状态  
         fi  
 
         # 如果之前关闭了应用，更新完成后重新打开 
         if [[ "$was_running" = true && -n "$app_name" ]]; then  
-            echo "重新启动此前关闭的应用：$app_name ..."                                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            echo "🗹 重新启动此前关闭的应用：$app_name ..."                             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             open -a "$app_name" 2>&1                                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         fi
 
@@ -1040,7 +1046,7 @@ echo -e "[OK] Homebrew 更新已完成"                                         
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
-
+#exit 1
 
 # ----------------------------------
 # 开始执行：Mas

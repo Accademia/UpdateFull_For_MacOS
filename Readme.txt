@@ -52,6 +52,8 @@
  - 建议使用 Lingon Pro（或类似软件），将usercmd_updatefull挂载为循环任务（比如每天夜间3点钟执行）
     https://lingon-x.macupdate.com/
 
+ - 挂在命令：/usr/bin/open /命令的保存路径/usercmd_updatefull  #（比如：/usr/local/bin/usercmd_updatefull）
+
 
 
 ===========================================
