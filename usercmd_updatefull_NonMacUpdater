@@ -44,7 +44,7 @@ TARGET_1="github.com"
 TARGET_2="brew.sh"
 TARGET_3="apps.apple.com/us/app/apple-store/id375380948"
 TARGET_4="macupdater.com"
-# 如果不能访问上述网站，会导致很多软件都更新失败。
+# 如果不能访问上述网站，会导致很多软件都 更新失败。
 
 # 定义 MacUpdater 客户端路径
 MACUPDATER_CLIENT="/Applications/MacUpdater.app/Contents/Resources/macupdater_client"
@@ -368,6 +368,7 @@ if [ "$architecture" = "arm64" ]; then
     printf  "\033[1;34m[INFO]\033[0m "
     printf  "[INFO] "                                                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e "CPU 芯片型号 : '$cpu_chip'"                                                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     
    #echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     if [[ $cpu_isa == "arm64" && $brew_path == "/opt/homebrew" ]]; then
@@ -777,9 +778,8 @@ echo -e "桌面布局 恢复路径: '$PATH_DesktopLayout_db_SOURCE'"            
 #echo -e "TMPDIR: $TMPDIR"                                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-printf  "\033[1;32m[OK]\033[0m   "
-printf  "[OK]   "                                                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "桌面布局 备份已完成 ✅ "                                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e "\033[1;32m[OK]   桌面布局 备份已完成 ✅ \033[0m"
+echo -e "[OK]   桌面布局 备份已完成 ✅ "                                                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
@@ -835,7 +835,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
   # 第 2 步：并行下载（提高下载速度）
   printf "\033[1;34m[Download]\033[0m "
   printf "[Download] "                                                                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-  echo -e "开始 “并行下载” 待更新的 HomeBrew 软件包..."                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+  echo -e "开始下载：HomeBrew formula / cask（并行）..."                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
   
   # 筛选需要下载的 formula 软件包：如果缓存中已有完整的新版本则跳过
   packages_to_fetch_formulas=()
@@ -846,7 +846,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
           local_sha=$(shasum -a 256 "$cache_path" | awk '{print $1}')
           expected_sha=$(brew info --json=v2 "$pkg" | grep -o '"sha256":"[0-9a-f]\{64\}"' | head -n 1 | cut -d '"' -f 4)
           if [ -n "$expected_sha" ] && [ "$local_sha" = "$expected_sha" ]; then
-              echo "🔰 [跳过] 已缓存 最新版本 [formula] ：$pkg "                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+              echo "🔰 [跳过] 已缓存 最新版本 [formula] ：$pkg "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
               continue  # 略过重新下载
           fi
       fi
@@ -886,19 +886,19 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
   # 并行下载 formula （最多16个并发），每个任务完成后输出状态 （使用 --retry 自动校验缓存有效性）
   if [ ${#packages_to_fetch_formulas[@]} -gt 0 ]; then
     parallel --will-cite --line-buffer --unsafe -j16 \
-        "if brew fetch --formula --retry {} 2>&1 | tee -a '$LOG_FULL_LAST' '$LOG_FULL_FILE'; then echo -e '✅ 下载成功 [formula] ：{} '| tee -a '$LOG_FULL_LAST' '$LOG_FULL_FILE' ; else echo -e '❌ 下载失败 [formula] ：{} ' | tee -a '$LOG_FULL_LAST' '$LOG_FULL_FILE' ; fi" \
+        "if brew fetch --formula --retry {} 2>&1 | tee -a '$LOG_FULL_LAST' '$LOG_FULL_FILE'; then echo -e '✅  下载成功 [formula] ：{} '| tee -a '$LOG_FULL_LAST' '$LOG_FULL_FILE' ; else echo -e '❌  下载失败 [formula] ：{} ' | tee -a '$LOG_FULL_LAST' '$LOG_FULL_FILE' ; fi" \
         ::: "${packages_to_fetch_formulas[@]}" &
   fi
 
   # 并行下载 cask    （最多16个并发），每个任务完成后输出状态 （使用 --retry 自动校验缓存有效性）
   if [ ${#packages_to_fetch_casks[@]} -gt 0 ]; then
     parallel --will-cite --line-buffer --unsafe -j16 \
-        "if brew fetch --cask --retry {} 2>&1 | tee -a '$LOG_FULL_LAST' '$LOG_FULL_FILE'; then echo -e '✅ 下载成功 [cask] ：{} ' | tee -a '$LOG_FULL_LAST' '$LOG_FULL_FILE' ; else echo -e '❌ 下载失败 [cask] ：{} ' | tee -a '$LOG_FULL_LAST' '$LOG_FULL_FILE'; fi" \
+        "if brew fetch --cask --retry {} 2>&1 | tee -a '$LOG_FULL_LAST' '$LOG_FULL_FILE'; then echo -e '✅  下载成功 [cask] ：{} ' | tee -a '$LOG_FULL_LAST' '$LOG_FULL_FILE' ; else echo -e '❌  下载失败 [cask] ：{} ' | tee -a '$LOG_FULL_LAST' '$LOG_FULL_FILE'; fi" \
         ::: "${packages_to_fetch_casks[@]}" &
   fi
   
   wait  # 等待所有并行任务完成
-  echo -e "✅ 所有下载任务 已完成/已退出"                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+ #echo -e "✅ 所有下载任务 已完成/已退出"                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
   # exit 0        # 用于调试 ！！
 
@@ -907,7 +907,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
       echo -e ""                                                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
       printf "\033[1;34m[Install]\033[0m "
       printf "[Install] "                                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-      echo -e "开始安装：HomeBrew formula（串行）..."                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+      echo -e "开始更新：HomeBrew formula（串行）..."                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
       # 循环逐个处理每个过期的 Homebrew formula
       for formula in "${packages_brew_formulas[@]}"; do
@@ -926,11 +926,11 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
 
           # ---------- 根据最终状态输出结果 ----------
           if [ $final_exit -eq 0 ] ; then
-              echo -e "✅ 更新成功 [formula] ：$formula"                                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-              echo -e ""                                                                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+              echo -e "✅  更新成功 [formula] ：$formula"                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+              echo -e "--------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
           else  
-              echo -e "❌ 更新失败 [formula] ：$formula"                                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-              echo -e ""                                                                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+              echo -e "❌  更新失败 [formula] ：$formula"                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+              echo -e "--------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
           fi
       done
   else
@@ -945,7 +945,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
   if [ ${#packages_brew_casks[@]} -ne 0 ] ; then
     printf  "\033[1;34m[Install]\033[0m "
     printf  "[Install] "                                                                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "开始安装：HomeBrew cask（串行 ）..."                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "开始更新：HomeBrew cask（串行 ）..."                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     # 逐个安装 每个待更新的 cask app
     for cask in $brew_outdated_casks; do
         # 利用 brew info 提取 Cask 安装的 .app 应用包名称
@@ -989,10 +989,10 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
 
         # 根据最终状态输出成功或失败
         if [ $final_exit -eq 0 ]; then
-            echo "✅ 更新成功 [cask] : $cask."                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            echo "✅  更新成功 [cask] : $cask."                                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             echo -e ""                                                                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         else    
-            echo "❌ 更新失败 [cask] : $cask."                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            echo "❌  更新失败 [cask] : $cask."                                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             echo -e ""                                                                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         fi
     done
@@ -1007,15 +1007,15 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
  #brew upgrade --greedy --debug --force                                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE""  ###### 仅作为Debug使用！！！
 
 else    
-  printf  "\033[1;32m[OK]\033[0m   "    
-  printf  "[OK]   "                                                                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+  printf  "\033[1;34m[Download & Install]\033[0m "    
+  printf  "[Download & Install] "                                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
   echo -e "当前没有需要更新的 Homebrew 包 !!! "                                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
   echo -e ""                                                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 fi
 
 
 # 第 5 步： 清洁
-printf  "\033[1;36m[Clean]\033[0m "
+printf  "\033[1;34m[Clean]\033[0m "
 printf  "[Clean] "                                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "清理Homebrew残留 ..."                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 brew cleanup --prune=all 2>&1                                                           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -1023,6 +1023,10 @@ brew autoremove 2>&1                                                            
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
+echo -e "\033[1;32m[OK] Homebrew 更新已完成  ✅\033[0m"
+echo -e "[OK] [OK] Homebrew 更新已完成"                                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+
+echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 # ----------------------------------
 # 开始执行：Mas
@@ -1112,9 +1116,8 @@ for app in "${apps_to_restart[@]}"; do
   sleep 1  # 短暂延迟以确保应用启动
 done
 
-echo -e "\033[1;32mMas 更新完成，所有受影响的应用已重新启动。\033[0m"
-
-echo -e "Mas 更新完成，所有受影响的应用已重新启动"                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "\033[1;32m[OK] Mas 更新已完成，APP 已重启  ✅\033[0m"
+echo -e "[OK] Mas 更新已完成，APP 已重启"                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
@@ -1306,9 +1309,8 @@ if [ $status -ne 0 ]; then
   printf  "[ERROR] "                                                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
   echo -e "桌面布局 恢复失败，请手动恢复 ❌"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_ERROR_FILE"
 else    
-  printf  "\033[1;32m[OK]\033[1;32m "   
-  printf  "[OK]   "                                                                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-  echo -e "桌面布局 恢复已完成 ✅ "                                                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+  echo -e "\033[1;32m[OK] 桌面布局 恢复已完成 \033[1;32m✅"   
+  echo -e "[OK]   桌面布局 恢复已完成 ✅ "                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 fi  
     
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
