@@ -52,7 +52,10 @@
  - 建议使用 Lingon Pro（或类似软件），将usercmd_updatefull挂载为循环任务（比如每天夜间3点钟执行）
     https://lingon-x.macupdate.com/
 
- - 挂在命令：/usr/bin/open /命令的保存路径/usercmd_updatefull  #（比如：/usr/local/bin/usercmd_updatefull）
+ - 挂载命令：
+    /usr/bin/open /命令的保存路径/usercmd_updatefull  #（比如：/usr/local/bin/usercmd_updatefull）
+    或
+    /opt/homebrew/bin/bash /命令的保存路径/usercmd_updatefull  #（比如：/usr/local/bin/usercmd_updatefull）
 
 
 
@@ -918,7 +921,7 @@
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/org.wireshark*.plist
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/org.wireshark*.plist
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget org.wireshark*.pkg
-你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/wireshark/*.pkg *
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/wireshark*/*.pkg *
 
 
 # ---------------------------
@@ -957,12 +960,24 @@
 
 
 
+# ---------------------------
+# 免密执行：自动更新脚本
+# ---------------------------
+
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/local/bin/usercmd_updatefull
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/local/bin/usercmd_updatefull_NonMacUpdater
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/homebrew/bin/bash /usr/local/bin/usercmd_updatefull
+
+
+
 # --------------------------------------------------------
 # 系统密码 统缓时间 （缓存实效后，才需要二次输入密码）
 # --------------------------------------------------------
 
 Defaults timestamp_timeout=3            #  缓存   3 分钟
 # Defaults timestamp_timeout=120        #  缓存 120 分钟 (不建议)
+
+
 
 
 
