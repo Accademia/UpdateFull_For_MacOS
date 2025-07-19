@@ -171,7 +171,7 @@ run_command_with_show_progress() {
     echo -e "✓  执行命令: $CMD"         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOCAL_LOG_FILE"
 
     # 执行命令并实时处理输出
-    eval "$CMD" 2>&1         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOCAL_LOG_FILE" | while IFS= read -r line; do
+    eval "$CMD" 2>&1         | tee -a  "$LOCAL_LOG_FILE" | while IFS= read -r line; do
         # 检查是否为 'Scan did stop scanning' 的行
         if [[ "$line" =~ Scan\ did\ stop\ scanning\ \'[^\']+\'\ app\.\.\. ]]; then
             ((scanned++))
@@ -184,7 +184,7 @@ run_command_with_show_progress() {
 
     # 完成后换行（避免下次输出覆盖进度条）
     echo -e "" > /dev/tty
-    echo -e ""         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOCAL_LOG_FILE"
+    echo -e ""         | tee -a  "$LOCAL_LOG_FILE"
 
 }
 
@@ -1431,10 +1431,10 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         printf  "\033[1;34m[Install]\033[0m "
         printf  "[Install] "                                                                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
         echo -e "开始更新：HomeBrew cask（ 串行 ） ... "                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    
+
         # 逐个安装 每个待更新的 cask app
         for cask in $brew_outdated_casks; do
-    
+
             # ------- 预检查：root or normal ----------
             if [[ $(id -u) -eq 0 ]]; then
               # 1) 解析目标用户
@@ -1457,10 +1457,10 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
               app_line=$(  brew info --cask "$cask" 2>&1 | tee -a /dev/tty "$LOG_FULL_LAST" "$LOG_FULL_FILE"  | grep -m1 '\.app (App)' )
 
             fi
-    
+
             # 提取应用名。从 brew info 输出中找出包含“.app (App)”的行，并去掉后面的标记，取得应用程序包名
             app_name=$(echo -e "$app_line" | sed -e 's/\.app (App)//' -e 's/^[[:space:]]*//')
-    
+
             # 提取应用名
             if [[ -n "$app_line" ]]; then
               # 从 brew info 输出中找出包含“.app (App)”的行，并去掉后面的标记，取得应用程序包名
@@ -1474,10 +1474,10 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                   app_name=${app_name// Pro DC/}
               fi
             fi
-    
+
             # **初始化 was_running 标志**
             was_running=false
-    
+
             # 关闭阻碍更新的进程。（如果应用名不为空，检查应用是否已开启，如果已开启，尝试关闭应用）
             if [[ -n "$app_name" ]]; then
               # 如果该应用正在运行，先尝试退出
@@ -1494,12 +1494,12 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             else    
               echo -e "⚠️ 警告：无法从 brew info 提取 $cask 的应用名称，无法自动关闭应用，将直接升级"              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             fi  
-    
-    
+
+
             #exit 1                                                                                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"          # 用于调试 ！！
-    
+
             # ---------- 升级 cask 应用 ----------   
-    
+
             # 第一次尝试升级：通过 brew upgrade 升级 APP
             if [ "$(id -u)" -eq 0 ]; then
               # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
@@ -1511,10 +1511,10 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
               echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $cask 安装 ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
               brew upgrade --cask --greedy "$cask" 2>&1                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             fi
-    
+
             upgrade_exit=${PIPESTATUS[0]}           # 获取 brew upgrade 的退出码    
             final_exit=$upgrade_exit                # 先假定最终状态为 upgrade 的状态    
-    
+
             # 第二次尝试升级：通过 brew reinstall 升级 APP
             if [ $upgrade_exit -ne 0 ]; then    
 
@@ -1567,17 +1567,17 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
               final_exit=$reinstall_exit       # 将最终状态更新为 reinstall 的状态  
 
             fi  
-    
+
             # ---------- 重新启动 APP（如果在本次升级中被关闭） ----------   
-    
+
             # 如果之前关闭了应用，更新完成后重新打开 
             if [[ "$was_running" = true && -n "$app_name" ]]; then  
               echo -e "✓  重新启动此前关闭的应用：$app_name ... "                             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
               open -a "$app_name" 2>&1                                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             fi
-    
+
             # ---------- 本APP 的 升级结果 ----------  
-    
+
             # 根据最终状态输出结果（成功或失败），然后继续处理下一个 cask
             if [ $final_exit -eq 0 ]; then
               echo -e "✅  更新成功 [cask] : $cask "                                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -1586,7 +1586,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             fi
             echo -e "--------------------"                                                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         done
-    
+
         echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     else  
@@ -1981,7 +1981,7 @@ echo -e ""                                                                      
 ## 调用检查时间范围函数
 #check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 #
-## echo -e "获取已安装的应用列表 ... " | tee -a "$LOG_FULL_FILE"
+## echo -e "应用列表 ... " | tee -a "$LOG_FULL_FILE"
 ## TOTAL_APPS=$("/Applications/MacUpdater.app/Contents/Resources/macupdater_client" list | wc -l)
 ## echo -e "APP 数量（全部总计）: $TOTAL_APPS" | tee -a "$LOG_FULL_FILE"
 ## run_command_with_show_progress "\"$MACUPDATER_CLIENT\" scan" "SCAN"  "$LOG_MACUPDATER_FILE"
@@ -1989,7 +1989,7 @@ echo -e ""                                                                      
 ## -------- 获取已安装应用的总数 （扫描 -------- 
 #printf  "\033[1;34m[List]\033[0m "
 #printf  "[List] "                                                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-#echo -e "获取已安装的应用列表 ... "                                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+#echo -e "应用列表 ... "                                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 #
 #targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
 #
@@ -2052,13 +2052,14 @@ echo -e ""                                                                      
 #    
 #fi
 #
+#echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 #
 #
 ##  -------- 更新安装过期应用 （安装） -------- 
 #
 #printf  "\033[1;34m[Install]\033[0m "
 #printf  "[Install] "                                                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-#echo -e " 开始更新 APP ... "                                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+#echo -e " 开始更新 ... "                                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 #
 #
 ## 自动获取当前登录用户
