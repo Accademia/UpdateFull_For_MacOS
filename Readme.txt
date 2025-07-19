@@ -53,9 +53,12 @@
     https://lingon-x.macupdate.com/
 
  - 挂载命令：
-    /usr/bin/open /命令的保存路径/usercmd_updatefull  #（比如：/usr/local/bin/usercmd_updatefull）
-    或
-    /opt/homebrew/bin/bash /命令的保存路径/usercmd_updatefull  #（比如：/usr/local/bin/usercmd_updatefull）
+    + 方法 1 : /usr/bin/open /usr/local/bin/usercmd_updatefull                                （推荐，前台执行）
+    + 方法 2 : /opt/homebrew/bin/bash /usr/local/bin/usercmd_updatefull                       （后台执行）
+    + 方法 3 ：/usr/bin/sudo -n /opt/homebrew/bin/bash /usr/local/bin/usercmd_updatefull      （后台执行 + 以ROOT权限执行）
+
+    PS：
+    如果命令被存储到 /usr/local/bin 路径下 ！
 
 
 
