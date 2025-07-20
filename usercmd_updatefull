@@ -500,7 +500,7 @@ if [ "$architecture" = "arm64" ]; then
         if [ "$(id -u)" -eq 0 ]; then
             # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
             targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-            echo -e "✓  Root权限 降权至 普通权限(用户’$targetUser‘)后 , 再运行 Homebrew 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 Homebrew 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             # 以目标用户身份执行 Homebrew 命令
             sudo -H -u "$targetUser" bash -c 'brew update --force 2>&1'                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         else
@@ -664,7 +664,7 @@ if brew list --formula | grep -q "^mas\$"; then
     if [ "$(id -u)" -eq 0 ]; then
         # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
         targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-        echo -e "✓  Root权限 降权至 普通权限(用户’$targetUser‘)后 , 再运行 Mas 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 Mas 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 以目标用户身份执行 Homebrew 命令
         sudo -H -u "$targetUser" bash -c 'brew upgrade --greedy --force mas 2>&1'       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     else
@@ -685,7 +685,7 @@ else
     if [ "$(id -u)" -eq 0 ]; then
         # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
         targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-        echo -e "✓  Root权限 降权至 普通权限(用户’$targetUser‘)后 , 再运行 Mas 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 Mas 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 以目标用户身份执行 Homebrew 命令
         sudo -H -u "$targetUser" bash -c 'brew reinstall --force mas 2>&1'              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     else
@@ -785,7 +785,7 @@ if brew list --formula | grep -q "^topgrade\$"; then
     if [ "$(id -u)" -eq 0 ]; then
         # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
         targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-        echo -e "✓  Root权限 降权至 普通权限(用户’$targetUser‘)后 , 再运行 topgrade 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 topgrade 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 以目标用户身份执行 Homebrew 命令
         sudo -H -u "$targetUser" bash -c 'brew upgrade --greedy --force topgrade 2>&1'  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     else
@@ -808,7 +808,7 @@ else
     if [ "$(id -u)" -eq 0 ]; then
         # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
         targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-        echo -e "✓  Root权限 降权至 普通权限(用户’$targetUser‘)后 , 再运行 topgrade 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 topgrade 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 以目标用户身份执行 Homebrew 命令
         sudo -H -u "$targetUser" bash -c 'brew reinstall --force topgrade 2>&1'         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     else
@@ -853,7 +853,7 @@ if brew list --cask | grep -q "^macupdater\$"; then
     if [ "$(id -u)" -eq 0 ]; then
         # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
         targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-        echo -e "✓  Root权限 降权至 普通权限(用户’$targetUser‘)后 , 再运行 macupdater 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 macupdater 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 以目标用户身份执行 Homebrew 命令
         sudo -H -u "$targetUser" bash -c 'brew upgrade --greedy --cask macupdater 2>&1'  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     else
@@ -874,7 +874,7 @@ else
     if [ "$(id -u)" -eq 0 ]; then
         # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
         targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-        echo -e "✓  Root权限 降权至 普通权限(用户’$targetUser‘)后 , 再运行 macupdater 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 macupdater 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 以目标用户身份执行 Homebrew 命令
         sudo -H -u "$targetUser" bash -c 'brew reinstall --cask --force macupdater 2>&1'       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     else
@@ -948,7 +948,7 @@ echo -e ""                                                                      
 
 if [ "$(id -u)" -eq 0 ]; then
 
-    echo -e "✓  Root权限 降权至 普通权限(用户’$targetUser‘)后 , 再运行 获取桌面布局 所需的 \$targetUser 与 路径 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 获取桌面布局 所需的 \$targetUser 与 路径 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     # 获取目标普通用户（优先用 SUDO_USER，否则取当前控制台登录用户）
     targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
     targetHome=$(eval echo -e "~$targetUser")    # 目标用户的 $HOME
@@ -1073,7 +1073,7 @@ if [ "$(id -u)" -eq 0 ]; then
 
     # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
     targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-    echo -e "✓  Root权限 降权至 普通权限(用户’$targetUser‘)后 , 再运行 brew list ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 brew list ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     # 4️⃣ 所有项目（公式 + Cask）
     brew_formula_count=$(sudo -H -u "$targetUser" bash -lc 'brew list --formula -1 | wc -l' )
@@ -1107,7 +1107,7 @@ if [ "$(id -u)" -eq 0 ]; then
 
     # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
     targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-    echo -e "✓  Root权限 降权至 普通权限(用户’$targetUser‘)后 , 再运行 brew outdated ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 brew outdated ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     # ① 所有过期项目（公式 + Cask）
     brew_outdated=$(
@@ -1169,10 +1169,12 @@ for pkg in ${brew_outdated_casks}; do
     [[ -n "$pkg" ]] && packages_brew_casks+=("$pkg")
 done
 
-echo -e ""                                                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 # 如果有需要更新的 Homebrew 软件包，则执行下载
 if [ ${#packages_brew[@]} -ne 0 ]; then
+
+    echo -e ""                                                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
     # 第 2 步：并行下载（提高下载速度）
     printf "\033[1;34m[Download]\033[0m "
     printf "[Download] "                                                                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
@@ -1197,7 +1199,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                 targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
 
                 # 2. 日志提示
-                echo -e "✓  Root权限 降权至 普通权限(用户’$targetUser‘)后 , 再运行 $pkg 的 SHA256 查询 ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg 的 SHA256 查询 ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
                 # 3. 在目标用户登录环境中执行 brew info
                 expected_sha=$(
@@ -1248,7 +1250,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                 targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
 
                 # 2. 日志提示
-                echo -e "✓  Root权限 降权至 普通权限(用户’$targetUser‘)后 , 再运行 $pkg 的 SHA256 查询 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg 的 SHA256 查询 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
                 # 3. 在目标用户登录环境中执行 brew info
                 expected_sha=$(
@@ -1297,7 +1299,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
           if [ "$(id -u)" -eq 0 ]; then
               # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
               targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-              echo -e "✓  Root权限 降权至 普通权限(用户’$targetUser‘)后 , 再运行 parallel 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+              echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 parallel 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
               # 以目标用户身份执行 Homebrew 命令
               sudo -H -u "$targetUser" bash -c 'brew reinstall --force parallel 2>&1'         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
           else
@@ -1319,7 +1321,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
     
           # 友好提示一次（防止重复刷屏，可按需注释）
           printf '\033[1;34m[INFO]\033[0m '
-          echo -e "Root权限 降权至 普通权限(用户’$targetUser‘)后 , 再运行: $*" \
+          echo -e "Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行: $*" \
                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     
           # -n 非交互；-E 保留 LOG_* 环境变量；-H 修正 HOME
@@ -1375,7 +1377,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             if [ "$(id -u)" -eq 0 ]; then
                 # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
                 targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-                echo -e "✓  Root权限 降权至 普通权限(用户’$targetUser‘)后 , 再运行 $formula 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $formula 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 # 以目标用户身份执行 Homebrew 命令
                 sudo -H -u "$targetUser" bash -c "brew upgrade $formula 2>&1" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             else
@@ -1393,7 +1395,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                 if [ "$(id -u)" -eq 0 ]; then
                     # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
                     targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-                    echo -e "✓  Root权限 降权至 普通权限(用户’$targetUser‘)后 , 再运行 $formula 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $formula 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     # 以目标用户身份执行 Homebrew 命令
                     sudo -H -u "$targetUser" bash -c "brew reinstall --force $formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 else
@@ -1441,7 +1443,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
               targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"        # macOS 控制台用户 [oai_citation:4‡GitHub](https://github.com/orgs/Homebrew/discussions/2594?utm_source=chatgpt.com)
 
               # 2) 友好提示
-              echo -e "✓  Root权限 降权至 普通权限(用户’$targetUser‘)后 , 再运行 cask 信息查询 ... "       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+              echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 cask 信息查询 ... "       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
              # 3) 先执行 brew info --cask，获取输出全文备用
               info_output=$(sudo -H -u "$targetUser" /bin/bash -lc "brew info --cask \"$cask\"" 2>&1  | tee -a /dev/tty "$LOG_FULL_LAST" "$LOG_FULL_FILE")
@@ -1504,7 +1506,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             if [ "$(id -u)" -eq 0 ]; then
               # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
               targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-              echo -e "✓  Root权限 降权至 普通权限(用户’$targetUser‘)后 , 再运行 $cask 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+              echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $cask 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
               # 以目标用户身份执行 Homebrew 命令
               sudo -H -u "$targetUser" bash -c "brew upgrade --cask --greedy $cask 2>&1"         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             else
@@ -1522,7 +1524,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
               if [ "$(id -u)" -eq 0 ]; then
                   # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
                   targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-                  echo -e "✓  Root权限 降权至 普通权限(用户’$targetUser‘)后 , 再运行 $cask 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                  echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $cask 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                   # 以目标用户身份执行 Homebrew 命令
                   sudo -H -u "$targetUser" bash -c "brew reinstall --cask --force $cask 2>&1"       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
               else
@@ -1551,7 +1553,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                   if [ "$(id -u)" -eq 0 ]; then
                       # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
                       targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-                      echo -e "✓  Root权限 降权至 普通权限(用户’$targetUser‘)后 , 再运行 $cask 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                      echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $cask 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                       # 以目标用户身份执行 Homebrew 命令
                       sudo -H -u "$targetUser" bash -c "brew reinstall --cask --force $cask 2>&1"       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                   else
@@ -1603,10 +1605,14 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
 
 else    
 
-  printf  "\033[1;34m[Download & Install]\033[0m "    
-  printf  "[Download & Install] "                                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-  echo -e "当前没有需要更新的 Homebrew 包 !!! "                                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-  echo -e ""                                                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    echo -e "✓  无需下载：HomeBrew formula ... "                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✓  无需下载：HomeBrew cask ... "                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e ""                                                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
+    printf  "\033[1;34m[Download & Install]\033[0m "    
+    printf  "[Download & Install] "                                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "当前没有需要更新的 Homebrew 包 !!! "                                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e ""                                                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 fi
 
@@ -1621,12 +1627,12 @@ echo -e "清理 Homebrew 残留 ... "                                           
 if [ "$(id -u)" -eq 0 ]; then
     # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
     targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-    echo -e "✓  Root权限 降权至 普通权限(用户’$targetUser‘)后 , 再运行 rew cleanup 清理 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 rew cleanup 清理 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     # 以目标用户身份执行 Homebrew 命令
     sudo -H -u "$targetUser" bash -c 'brew cleanup --prune=all 2>&1'       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     sudo -H -u "$targetUser" bash -c 'brew autoremove 2>&1'       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 else
-    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 rew cleanup 清理 ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 brew cleanup 清理 ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     brew cleanup --prune=all 2>&1                                                           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     brew autoremove 2>&1                                                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 fi
@@ -1692,7 +1698,7 @@ fi
 # 如果是 root 运行，则切换到登录用户运行 mas list
 if [ "$(id -u)" -eq 0 ]; then
     targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
-    echo -e "✓  Root权限 降权至 普通权限(用户’$targetUser‘)后 , 再运行 mas list... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 mas list... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     uid=$(id -u "$currentUser")
     mas_app_count=$(launchctl asuser "$uid" sudo -u "$currentUser" /opt/homebrew/bin/mas list | wc -l)
 else
@@ -1709,7 +1715,7 @@ echo -e "✓  APP 数量（ Mac AppStore ）：$mas_app_count ✅ "        | tee
 while [ $mas_attempt -le $MAS_MAX_RETRIES ]; do
    #mas_output=$(mas outdated 2>&1)                                                     # 执行 mas 查询更新（捕获输出和错误）
     if [[ $(id -u) -eq 0 ]]; then
-        echo -e "✓  Root权限 降权至 普通权限(用户’$targetUser‘)后 , 再运行 mas outdated ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 mas outdated ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
         mas_output=$(sudo -H -u "$targetUser" /bin/bash -lc 'mas outdated' 2>/dev/null )
     else
@@ -1801,7 +1807,7 @@ if [ "$mas_success" = true ]; then
     echo -e "✓  待更新的APP，已无运行 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     if [[ $(id -u) -eq 0 ]]; then
-        echo -e "✓  Root权限 降权至 普通权限(用户’$targetUser‘)后 , 再运行 mas upgrade ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 mas upgrade ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
         mas_output=$(sudo -H -u "$targetUser" /bin/bash -lc 'mas upgrade' 2>/dev/null )
     else
@@ -1938,7 +1944,7 @@ check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 if [[ $(id -u) -eq 0 ]]; then
     #—— root 环境：切换到桌面用户执行 ——#
     targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
-    echo -e "✓  Root权限 降权至 普通权限(用户’$targetUser‘)后 , 再运行 topgrade 进行升级 ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 topgrade 进行升级 ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     topgrade_output=$(sudo -H -u "$targetUser"  /bin/bash -c 'topgrade --disable brew_formula --disable brew_cask --disable mas --disable system --disable macports --disable powershell --disable tldr --yes --cleanup' 2>&1)
     printf "%s\n" "$topgrade_output"        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -1997,24 +2003,31 @@ targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
 if [ "$(id -u)" -eq 0 ]; then
 
     # 获取目标普通用户（优先使用 SUDO_USER，其次获取当前登录控制台用户）
+    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 MacUpdater scan ...（当前用户是 root）" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    #sudo -H -u "$targetUser" bash -c  'macupdater_app_count=$("/Applications/MacUpdater.app/Contents/Resources/macupdater_client" list | wc -l) '
+    macupdater_app_count=$(sudo -H -u "$targetUser" /Applications/MacUpdater.app/Contents/Resources/macupdater_client list | wc -l)
 
-    echo -e "✓  Root权限 降权至 普通权限(用户’$targetUser‘)后 , 再运行 MacUpdater scan ...（当前用户是 root）" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        
-    sudo -H -u "$targetUser" bash -c  'macupdater_app_count=$("/Applications/MacUpdater.app/Contents/Resources/macupdater_client" list | wc -l) '
-    macupdater_app_count=$((macupdater_app_count*2)/2)
-    echo -e "✓  APP 数量（ MacUpdater ）: $macupdater_app_count"                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-    
 else
 
     echo -e "✓  当前用户'$USER'，为普通权限，直接运行 MacUpdater list ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     macupdater_app_count=$("/Applications/MacUpdater.app/Contents/Resources/macupdater_client" list | wc -l)
-    macupdater_app_count=$(((macupdater_app_count*2)/2))
-    echo -e "✓  APP 数量（ MacUpdater ）: $macupdater_app_count"                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    
+
 fi
+
+# 去除前导空格
+macupdater_app_count="${macupdater_app_count#"${macupdater_app_count%%[![:space:]]*}"}"
+# 去除后置空格
+macupdater_app_count="${macupdater_app_count%"${macupdater_app_count##*[![:space:]]}"}"
+# 可选：强制算术求值以确保它是整数（加 0，如果非数字则出错）
+macupdater_app_count=$((macupdater_app_count + 0))
+# 进度条所需
+TOTAL_APPS=$((macupdater_app_count + 0))
+# 显示MacUpdater监控的所有APP数量
+echo -e "✓  APP 数量（ MacUpdater ）: $macupdater_app_count （ $TOTAL_APPS ）"                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
+#exit 1          # 测试！
 
 # -------- 获取已安装应用的总数 （扫描 -------- 
 printf  "\033[1;34m[Scan]\033[0m "
@@ -2023,34 +2036,29 @@ echo -e "开始扫描 ... "                                                     
 
 targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
 
+
 # 检查是否以 root 身份运行
 if [ "$(id -u)" -eq 0 ]; then
 
     # 获取目标普通用户（优先使用 SUDO_USER，其次获取当前登录控制台用户）
-
-    echo -e "✓  Root权限 降权至 普通权限(用户’$targetUser‘)后 , 再运行 MacUpdater scan ...（当前用户是 root）" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 MacUpdater scan ...（当前用户是 root）" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    MACUPDATER_COMMAND="sudo -H -u $targetUser /Applications/MacUpdater.app/Contents/Resources/macupdater_client scan"
         
     #  开始执行 MacUpdater 扫描 
     #### sudo -H -u "$targetUser" bash -c '"/Applications/MacUpdater.app/Contents/Resources/macupdater_client" scan'
     #sudo -H -u "$targetUser" bash -c  'macupdater_app_scanlist=$("/Applications/MacUpdater.app/Contents/Resources/macupdater_client" scan | wc -l) '
     #echo -e "✓  macupdater_app_scanlist : $macupdater_app_scanlist"                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-
-    #  开始执行 MacUpdater 扫描 
-    MACUPDATER_COMMAND="sudo -H -u $targetUser /Applications/MacUpdater.app/Contents/Resources/macupdater_client scan"
-    run_command_with_show_progress "$MACUPDATER_COMMAND" "SCAN"  "$LOG_MACUPDATER_FILE"
     
 else
 
-    #  开始执行 MacUpdater 扫描 
-    #### "/Applications/MacUpdater.app/Contents/Resources/macupdater_client" scan
-    #MACUPDATER_SCAN_APPS=$("/Applications/MacUpdater.app/Contents/Resources/macupdater_client" scan | wc -l)
-    #echo -e "APP 数量（本机安装的APP）: $MACUPDATER_SCAN_APPS" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-
-    #  开始执行 MacUpdater 扫描 
+    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 MacUpdater scan ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     MACUPDATER_COMMAND="/Applications/MacUpdater.app/Contents/Resources/macupdater_client scan"
-    run_command_with_show_progress "$MACUPDATER_COMMAND" "SCAN"  "$LOG_MACUPDATER_FILE"
     
 fi
+
+
+#  开始执行 MacUpdater 扫描 
+run_command_with_show_progress "$MACUPDATER_COMMAND" "SCAN"  "$LOG_MACUPDATER_FILE"
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
@@ -2070,7 +2078,7 @@ if [ "$(id -u)" -eq 0 ]; then
 
     # 获取目标普通用户（优先使用 SUDO_USER，其次获取当前登录控制台用户）
     targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-    echo -e "✓  Root权限 降权至 普通权限(用户’$targetUser‘)后 , 再运行 MacUpdater update ...（当前用户是 root）" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 MacUpdater update ...（当前用户是 root）" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     macupdater_output=$(sudo -H -u "$targetUser" bash -c ' "/Applications/MacUpdater.app/Contents/Resources/macupdater_client" update --force-quit-running-apps --force-major-version-update' 2>&1)
     echo -e "$macupdater_output"                                                           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
