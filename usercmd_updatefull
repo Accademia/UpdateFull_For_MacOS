@@ -1735,13 +1735,19 @@ if [ "$(id -u)" -eq 0 ]; then
     targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
     echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 mas list... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     uid=$(id -u "$currentUser")
-    mas_app_count=$(launchctl asuser "$uid" sudo -u "$currentUser" /opt/homebrew/bin/mas list | wc -l)
     mas_installed_apps=$(launchctl asuser "$uid" sudo -u "$currentUser" /opt/homebrew/bin/mas list)
+    #mas_app_count=$(launchctl asuser "$uid" sudo -u "$currentUser" /opt/homebrew/bin/mas list | wc -l)
 else
     echo -e "✓  当前用户'$USER'，为普通权限，直接运行 mas list ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     # 非 root 直接运行 mas list
-    mas_app_count=$(/opt/homebrew/bin/mas list | wc -l)
     mas_installed_apps=$(/opt/homebrew/bin/mas list)
+    #mas_app_count=$(/opt/homebrew/bin/mas list | wc -l)
+fi
+
+if [ -z "$mas_installed_apps" ]; then
+    mas_app_count=0
+else
+    mas_app_count=$(echo "$mas_installed_apps" | wc -l)
 fi
 
 # 统计 App 数量并输出结果
