@@ -1736,14 +1736,16 @@ if [ "$(id -u)" -eq 0 ]; then
     echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 mas list... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     uid=$(id -u "$currentUser")
     mas_app_count=$(launchctl asuser "$uid" sudo -u "$currentUser" /opt/homebrew/bin/mas list | wc -l)
+    mas_installed_apps=$(launchctl asuser "$uid" sudo -u "$currentUser" /opt/homebrew/bin/mas list)
 else
     echo -e "✓  当前用户'$USER'，为普通权限，直接运行 mas list ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     # 非 root 直接运行 mas list
     mas_app_count=$(/opt/homebrew/bin/mas list | wc -l)
+    mas_installed_apps=$(/opt/homebrew/bin/mas list)
 fi
 
 # 统计 App 数量并输出结果
-mas_app_count=$(((mas_app_count*2)/2))
+mas_app_count=$((mas_app_count+0))
 echo -e "✓  APP 数量（ Mac AppStore ）：$mas_app_count ✅ "        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 
@@ -1790,11 +1792,11 @@ echo -e "MAS 下载 & 安装 ... "                                              
 # 根据扫描结果决定是否进行安装更新
 if [ "$mas_success" = true ]; then
     # 开始执行：Mas 更新（并捕获输出）
-    
     # 获取过时应用程序的ID
     app_ids=$(echo -e "$outdated_mas_apps" | awk '{print $1}'  | grep -E '^[0-9]+$')
     
     echo -e "✓  开始扫描，待更新的APP，是否正在运行 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    #echo -e "app_ids = $app_ids "      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  # 测试！
 
     # 存储需要关闭和重启的应用程序
     apps_to_restart=()
@@ -1802,6 +1804,7 @@ if [ "$mas_success" = true ]; then
     for id in $app_ids; do
         # 从已安装应用列表中提取应用名称，去掉ID和可能的版本号
         app_name=$(echo -e "$mas_installed_apps" | grep "^$id" | awk '{$1=""; print substr($0,2)}' | sed 's/ ([0-9].*)$//')
+        #echo -e "app_name = $app_name "     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" # 测试！
         if [ -n "$app_name" ]; then
             # 使用 osascript 检查应用是否正在运行
             if osascript -e "tell application \"System Events\" to (name of processes) contains \"$app_name\"" | grep -q "true"; then
@@ -1839,7 +1842,7 @@ if [ "$mas_success" = true ]; then
         fi
     done
     
-    echo -e "✓  待更新的APP，已无运行 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✓  待更新的 MAS APP，已无运行 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     if [[ $(id -u) -eq 0 ]]; then
         echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 mas upgrade ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
