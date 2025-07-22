@@ -63,23 +63,24 @@
 
 
 ===========================================
-需要哪些额外设置？（可选）
+出现Error的应对
 ===========================================
 
-默认TopGreade只会更新不带有自动更新的APP，需要对TopGrade配置文件进行修改。修改如下：
+如果出现如下错误：
 
-	topgrade --edit-config
+/opt/homebrew/etc/bash_completion.d/ipfs: line 5526: complete: nosort: invalid option name
+/opt/homebrew/etc/bash_completion.d/mycli: line 25: complete: nosort: invalid option name
+/opt/homebrew/etc/bash_completion.d/wg: line 99: complete: nosort: invalid option name
+/opt/homebrew/etc/bash_completion.d/wg-quick: line 43: complete: nosort: invalid option name
 
-    进入编辑器后，查找到
+则执行此脚本解决问题：
 
-    #greedy_cask = true  （ 请，删除掉注释符号# 使这行有效）
+uesrcmd_fix_nosort
 
-   
-注意：⚠️ 
-1. 上述这行 启用后，才能让TopGreade中调用homebrew更新时，更新所有APP，如果不开启，则Topgrade指更新不带自动更新的全部的Homebrew APP。
+在执行后，使用如下命令进行验证：   
 
-2. 你也可以不修改配制，因为本脚本中，已经关闭了topgrade针对Homebrew的更新！！！！！
-   
+grep -R "nosort" /opt/homebrew/etc/bash_completion.d
+
 
 
 ===========================================
@@ -1078,8 +1079,8 @@ rm -rf /opt/homebrew/Caskroom/microsoft-onedrive
 ===========================================
 
  - 本脚本，代码均来自AI，人工仅仅做极少量调整维护。参与编程的AI包括：
-   1. 【2025/Q3-？】编程者：OpenAI  ChatGPT O3—Pro + 深度研究   、  xAI Grok4
-   2. 【2025/Q1-Q2】编程者：xAI     Grok3
+   1. 【2025/Q3-？】编程者：OpenAI  ChatGPT O3—Pro + 深度研究 （主力）  、  xAI Grok4 （少量）
+   2. 【2025/Q1-Q2】编程者：xAI     Grok3 + DeeperSearch / Think
    3. 【2024/Q3-Q4】编程者：OpenAI  ChatGPT O1 
    
  - 本脚本经过长期测试。
