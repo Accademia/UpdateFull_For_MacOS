@@ -821,7 +821,7 @@ grep -R "nosort" /opt/homebrew/etc/bash_completion.d
 # ---------------------------
 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget com.tailscale*
-你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/tailscale/*.pkg *
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/tailscale*/*.pkg *
 
 
 # ---------------------------
