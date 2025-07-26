@@ -1184,6 +1184,7 @@ fi
 
 # 第 1 步：获取所有需要更新的 公式 和 包名称
 
+
 # 将需要更新的包分别存储
 packages_brew=($brew_outdated)
 #echo -e "brew_outdated = $brew_outdated"        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
@@ -1198,6 +1199,8 @@ for pkg in ${brew_outdated_casks}; do
     [[ -n "$pkg" ]] && packages_brew_casks+=("$pkg")
 done
 
+# 在获取 brew_outdated 列表并组装 packages_brew_formulas/casks 之后添加：
+updated_list=()   # 初始化数组，用于保存每个更新项的结果
 
 # 如果有需要更新的 Homebrew 软件包，则执行下载
 if [ ${#packages_brew[@]} -ne 0 ]; then
@@ -1260,6 +1263,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
 
     done
     
+
     # 筛选需要下载的 cask 软件包：如果缓存中已有完整的新版本则跳过
     packages_to_fetch_casks=()
     for pkg in "${packages_brew_casks[@]}"; do
@@ -1437,12 +1441,16 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
 
             # ---------- 根据最终状态输出结果 ----------
             if [ $final_exit -eq 0 ] ; then
-                echo -e "✅  更新成功 [formula] ：$formula" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                echo -e "--------------------"                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-            else  
+                echo -e "✅  更新成功 [formula] ：$formula"                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                method=$([ $upgrade_exit -ne 0 ] && echo "reinstall" || echo "upgrade")
+                updated_list+=("success|formula|$formula|$method")
+            else
                 echo -e "❌  更新失败 [formula] ：$formula"                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                echo -e "--------------------"                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                method=$([ $upgrade_exit -ne 0 ] && echo "reinstall" || echo "upgrade")
+                updated_list+=("failure|formula|$formula|$method")
             fi
+            echo -e "--------------------"                                                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
         done
 
     else
@@ -1608,14 +1616,16 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             fi
 
             # ---------- 本APP 的 升级结果 ----------  
-
-            # 根据最终状态输出结果（成功或失败），然后继续处理下一个 cask
             if [ $final_exit -eq 0 ]; then
-              echo -e "✅  更新成功 [cask] : $cask "                                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-            else    
-              echo -e "❌  更新失败 [cask] : $cask "                                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "✅  更新成功 [cask]   : $cask "                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                method=$([ $upgrade_exit -ne 0 ] && echo "reinstall" || echo "upgrade")
+                updated_list+=("success|cask|$cask|$method")
+            else
+                echo -e "❌  更新失败 [cask]   : $cask "                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                method=$([ $upgrade_exit -ne 0 ] && echo "reinstall" || echo "upgrade")
+                updated_list+=("failure|cask|$cask|$method")
             fi
-            echo -e "--------------------"                                                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         done
 
         echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -1668,6 +1678,55 @@ fi
 
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
+
+# 第 6 步： 显示结果
+printf "\033[1;34m[Final]\033[0m "
+printf "[Final] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "更新结果 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
+if [ ${#packages_brew[@]} -eq 0 ]; then
+    # 没有任何软件需要更新的情况
+    echo -e "✓  没有APP被更新 !!! " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+else
+    # 逐条输出更新结果
+    for entry in "${updated_list[@]}"; do
+        IFS='|' read -r status type name method <<< "$entry"
+        # 根据状态选择符号和文字
+        if [ "$status" = "success" ]; then
+            symbol="✅"
+            status_text="成功"
+        else
+            symbol="❌"
+            status_text="失败"
+        fi
+        # 根据类型调整对齐格式
+        if [ "$type" = "cask" ]; then
+            type_display="[cask]"
+            spacing="   "      # cask 比 formula 短3个字母，补3个空格对齐
+        else
+            type_display="[formula]"
+            spacing=""
+        fi
+        # 构造基础输出行（符号、结果、类型、名称）
+        line="$symbol  更新$status_text $type_display$spacing : $name"
+        # 若通过重装更新，则附加警告标记和具体命令
+        if [ "$status" = "success" ] && [ "$method" = "reinstall" ]; then
+            if [ "$type" = "cask" ]; then
+                warning_cmd="brew reinstall --cask --force $name"
+            else
+                warning_cmd="brew reinstall --force $name"
+            fi
+            line="$line   ( ⚠️ 更新方式 ：$warning_cmd )"
+        fi
+        # 输出该行到屏幕和日志
+        echo -e "$line" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    done
+fi
+
+
+echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
 
 # 检查是否以 root 身份运行
 if [ "$(id -u)" -eq 0 ]; then
