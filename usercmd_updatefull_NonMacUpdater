@@ -1929,13 +1929,12 @@ if [ "$mas_success" = true ]; then
     echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
     # 检查是否以 root 身份运行
-    if [ "$(id -u)" -eq 0 ]; then
-        echo -e "\033[1;32m[OK] Mac AppStore upgrade  运行已完成 ，APP 已重启 ✅ \033[1;32m"   
-        echo -e "[OK]   Mac AppStore upgrade  运行已完成已完成 ，APP 已重启  ✅ "                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/nul
-    else
-        echo -e "\033[1;32m[OK] Mac AppStore upgrade  运行已完成已完成 ，APP 已重启 ✅ \033[1;32m"   
-        echo -e "[OK]  Mac AppStore upgrade  运行已完成已完成 ，APP 已重启 ✅ "                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    fi
+    #if [ "$(id -u)" -eq 0 ]; then
+    #else
+    #fi
+
+    echo -e "\033[1;32m[OK] Mac AppStore upgrade  运行已完成已完成 ，APP 已重启 ✅ \033[1;32m"   
+    echo -e "[OK]  Mac AppStore upgrade  运行已完成已完成 ，APP 已重启 ✅ "                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 else
 
