@@ -1729,13 +1729,12 @@ echo -e ""                                                                      
 
 
 # 检查是否以 root 身份运行
-if [ "$(id -u)" -eq 0 ]; then
-    echo -e "\033[1;32m[OK] Homebrew upgrade  运行已完成  ✅ \033[1;32m"   
-    echo -e "[OK]   Homebrew upgrade  运行已完成  ✅ "                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/nul
-else
-    echo -e "\033[1;32m[OK] Homebrew upgrade  运行已完成  ✅ \033[1;32m"   
-    echo -e "[OK]  Homebrew upgrade  运行已完成  ✅ "                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-fi
+#if [ "$(id -u)" -eq 0 ]; then
+#else
+#fi
+
+echo -e "\033[1;32m[OK] Homebrew upgrade  运行已完成  ✅ \033[1;32m"   
+echo -e "[OK]  Homebrew upgrade  运行已完成  ✅ "                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -1984,13 +1983,12 @@ echo -e ""                                                                      
 targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
 
 # 检查是否以 root 身份运行
-if [ "$(id -u)" -eq 0 ]; then
-    echo -e "\033[1;32m[OK] MacPorts upgrade  运行已完成  ✅ \033[1;32m"   
-    echo -e "[OK]   MacPorts upgrade  运行已完成  ✅ "                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/nul
-else
-    echo -e "\033[1;32m[OK] MacPorts upgrade  运行已完成  ✅ \033[1;32m"   
-    echo -e "[OK]  MacPorts upgrade  运行已完成  ✅ "                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-fi
+#if [ "$(id -u)" -eq 0 ]; then
+#else
+#fi
+
+echo -e "\033[1;32m[OK] MacPorts upgrade  运行已完成  ✅ \033[1;32m"   
+echo -e "[OK]  MacPorts upgrade  运行已完成  ✅ "                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 echo -e ""                                                                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
@@ -2054,13 +2052,12 @@ echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"    # blank line for separa
 targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"  
 
 # 检查是否以 root 身份运行 (Check if running as root)
-if [ "$(id -u)" -eq 0 ]; then  
-    echo -e "\033[1;32m[OK] MacOS System Update  运行已完成  ✅ \033[1;32m"  
-    echo -e "[OK]   MacOS System Update  运行已完成  ✅ " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/nul  
-else  
-    echo -e "\033[1;32m[OK] MacOS System Update  运行已完成  ✅ \033[1;32m"  
-    echo -e "[OK]  MacOS System Update  运行已完成  ✅ " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null  
-fi  
+#if [ "$(id -u)" -eq 0 ]; then  
+#else  
+#fi  
+
+echo -e "\033[1;32m[OK] MacOS System Update  运行已完成  ✅ \033[1;32m"  
+echo -e "[OK]  MacOS System Update  运行已完成  ✅ " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null  
 
 echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
 echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
@@ -2112,13 +2109,12 @@ fi
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 # 检查是否以 root 身份运行
-if [ "$(id -u)" -eq 0 ]; then
-    echo -e "\033[1;32m[OK] TopGrade upgrade  运行已完成  ✅ \033[1;32m"   
-    echo -e "[OK]   TopGrade upgrade  运行已完成  ✅ "                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/nul
-else
-    echo -e "\033[1;32m[OK] TopGrade upgrade  运行已完成  ✅ \033[1;32m"   
-    echo -e "[OK]  TopGrade upgrade  运行已完成  ✅ "                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-fi
+#if [ "$(id -u)" -eq 0 ]; then
+#else
+#fi
+
+echo -e "\033[1;32m[OK] TopGrade upgrade  运行已完成  ✅ \033[1;32m"   
+echo -e "[OK]  TopGrade upgrade  运行已完成  ✅ "                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
@@ -2254,13 +2250,12 @@ fi
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 # 检查是否以 root 身份运行
-if [ "$(id -u)" -eq 0 ]; then
-    echo -e "\033[1;32m[OK] MacUpdater  运行已完成  ✅ \033[1;32m"   
-    echo -e "[OK]   MacUpdater  运行已完成  ✅ "                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/nul
-else
-    echo -e "\033[1;32m[OK] MacUpdater  运行已完成  ✅ \033[1;32m"   
-    echo -e "[OK]  MacUpdater  运行已完成  ✅ "                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-fi
+#if [ "$(id -u)" -eq 0 ]; then
+#else
+#fi
+
+echo -e "\033[1;32m[OK] MacUpdater  运行已完成  ✅ \033[1;32m"   
+echo -e "[OK]  MacUpdater  运行已完成  ✅ "                                             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
