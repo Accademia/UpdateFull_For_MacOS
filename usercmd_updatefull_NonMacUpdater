@@ -1141,7 +1141,6 @@ if [ "$(id -u)" -eq 0 ]; then
     # ① 所有过期项目（公式 + Cask）
     brew_outdated=$(
       sudo -H -u "$targetUser" bash -lc 'brew outdated --greedy' 2>&1 \
-      | tee -a /dev/tty "$LOG_FULL_LAST" "$LOG_FULL_FILE" \
       | awk '{print $1}'
     )
 
@@ -1164,7 +1163,6 @@ else
     # ① 所有过期项目（Formula + Cask）
     brew_outdated=$(
         brew outdated --greedy 2>&1 \
-        | tee -a /dev/tty "$LOG_FULL_LAST" "$LOG_FULL_FILE" \
         | awk '{print $1}'
     )
 
@@ -1184,7 +1182,6 @@ fi
 
 # 第 1 步：获取所有需要更新的 公式 和 包名称
 
-
 # 将需要更新的包分别存储
 packages_brew=($brew_outdated)
 #echo -e "brew_outdated = $brew_outdated"        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
@@ -1197,6 +1194,15 @@ done
 packages_brew_casks=()
 for pkg in ${brew_outdated_casks}; do
     [[ -n "$pkg" ]] && packages_brew_casks+=("$pkg")
+done
+
+# 在组装 packages_brew* 数组后添加：
+for pkg in "${packages_brew[@]}"; do
+    if printf '%s\n' "${packages_brew_casks[@]}" | grep -qx "$pkg"; then
+        echo -e "✅  检测到新版本 [cask]    : $pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    else
+        echo -e "✅  检测到新版本 [formula] : $pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    fi
 done
 
 # 在获取 brew_outdated 列表并组装 packages_brew_formulas/casks 之后添加：
