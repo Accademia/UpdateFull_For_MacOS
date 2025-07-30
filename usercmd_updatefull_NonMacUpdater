@@ -1968,7 +1968,10 @@ if [ "$mas_success" = true ]; then
     # （3）根据升级结果打印“更新成功”或“已最新”提示
     if echo "$mas_output" | grep -q "Installed"; then
         # 利用之前解析的应用名列表 app_names 作为更新成功的应用
-        echo -e "✅  更新成功    : $app_names" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        #echo -e "✅  更新成功    : $app_names" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        while IFS= read -r app_line; do
+            [[ -n "$app_line" ]] && echo -e "✅  更新成功    : $app_line" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        done <<< "$app_names"
     else
         echo -e "✓  应用已是最新版本，无需更新。" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     fi
