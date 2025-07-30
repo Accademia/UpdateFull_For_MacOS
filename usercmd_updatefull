@@ -1684,7 +1684,7 @@ else
 
     printf  "\033[1;34m[Download & Install]\033[0m "    
     printf  "[Download & Install] "                                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "下载 & 安装 ... "                                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "HomeBrew 下载 & 安装 ... "                                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     echo -e "✓  所有APP已经是 最新版本 ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     echo -e ""                                                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
@@ -2088,7 +2088,7 @@ check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 # 自动执行：SoftwareUpdate （并捕获输出）   
 printf "\033[1;34m[Scan]\033[0m "  
 printf "[Scan] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null  
-echo -e "扫描检测 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
+echo -e "MacOS 扫描检测 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
 
 # Run the update scan and capture output (stderr included), logging it as well
 softwareupdate_output=$(sudo softwareupdate --list --force --agree-to-license 2>&1)  
@@ -2100,18 +2100,18 @@ if echo "$softwareupdate_output" | grep -F -q "No new software available."; then
     # No updates available – skip download/install, output "no update needed"
     printf "\033[1;34m[Download & Install]\033[0m "  
     printf "[Download & Install] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null  
-    echo -e "下载 & 安装 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    echo -e "MacOS 下载 & 安装 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     echo -e "✓  当前没有需要安装的 MacOS 系统更新 !!!" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 else  
     # Updates are available – proceed with download (and prompt for install)
-    printf "\033[1;34m[Download & Install]\033[0m "  
-    printf "[Download & Install] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null  
-    echo -e "下载更新包（MacOS系统） ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
+    printf "\033[1;34m[Download]\033[0m "  
+    printf "[Download] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null  
+    echo -e "MacOS 下载更新包 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
     sudo softwareupdate --download --force --agree-to-license 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
 
-    printf "\033[1;34m[Download & Install]\033[0m "  
-    printf "[Download & Install] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null  
-    echo -e "安装更新 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
+    printf "\033[1;34m[Install]\033[0m "  
+    printf "[Install] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null  
+    echo -e "MacOS 安装更新 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
     #sudo softwareupdate --install --all --force --agree-to-license --verbose  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
     #macos_system_update_ec=${PIPESTATUS[0]}
     ## 分析更新结果并输出提示
