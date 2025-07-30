@@ -1918,7 +1918,7 @@ if [ "$mas_success" = true ]; then
         if [ -n "$app_name" ]; then
             # 使用 osascript 检查应用是否正在运行
             if osascript -e "tell application \"System Events\" to (name of processes) contains \"$app_name\"" | grep -q "true"; then
-                echo -e "检测到 $app_name 正在运行，正在尝试关闭 ... "                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+                echo -e "✓  检测到 $app_name 正在运行，正在尝试关闭 ... "                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
                 # 安全关闭应用程序
                 osascript -e "tell application \"$app_name\" to quit"
                 # 等待应用完全关闭（最多10秒）
@@ -1930,14 +1930,14 @@ if [ "$mas_success" = true ]; then
                 done
                 # 如果应用仍未关闭，尝试强制关闭
                 if osascript -e "tell application \"System Events\" to (name of processes) contains \"$app_name\"" | grep -q "true"; then
-                    echo -e "无法正常关闭 $app_name，正在尝试强制关闭 ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+                    echo -e "✘  无法正常关闭 $app_name，正在尝试强制关闭 ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
                     # 获取应用程序的PID
                     pid=$(pgrep -f "$app_name")
                     if [ -n "$pid" ]; then
                         kill -9 $pid
-                        echo -e "已强制关闭 $app_name (PID: $pid)"                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+                        echo -e "✓  已强制关闭 $app_name (PID: $pid)"                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
                     else
-                        echo -e "无法获取 $app_name 的PID，跳过强制关闭"                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+                        echo -e "✘  无法获取 $app_name 的PID，跳过强制关闭"                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
                     fi
                 fi
                 # 再次检查应用是否已关闭成功
