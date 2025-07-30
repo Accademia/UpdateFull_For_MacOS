@@ -1112,9 +1112,9 @@ fi
 brew_cask_count=$((( brew_cask_count * 2 ) /2 ))
 brew_formula_count=$((( brew_formula_count *2 ) /2 ))
 brew_app_count=$(( brew_formula_count + brew_cask_count ))
-echo -e "✓  APP 数量（ Homebrew formula ）：$brew_formula_count ✅ "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-echo -e "✓  APP 数量（ Homebrew Cask    ）：$brew_cask_count ✅ "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-echo -e "✓  APP 数量（ Homebrew         ）：$brew_app_count ✅ "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e "✅  APP 数量（ Homebrew formula ）：$brew_formula_count  "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e "✅  APP 数量（ Homebrew Cask    ）：$brew_cask_count  "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e "✅  APP 数量（ Homebrew         ）：$brew_app_count  "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 
 echo -e ""                                                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
@@ -1236,7 +1236,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         else
             cache_path=$(brew --cache --formula "$pkg")
         fi
-        echo -e "cache_path=$cache_path"
+        #echo -e "cache_path = $cache_path"                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         
         if [ -f "$cache_path" ]; then
             local_sha=$(shasum -a 256 "$cache_path" | awk '{print $1}')
@@ -1307,7 +1307,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         else
             cache_path=$(brew --cache --cask "$pkg")
         fi
-        echo -e "cache_path=$cache_path"
+        #echo -e "cache_path = $cache_path"                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
         if [ -f "$cache_path" ]; then
             local_sha=$(shasum -a 256 "$cache_path" | awk '{print $1}')
@@ -1844,7 +1844,7 @@ fi
 
 # 统计 App 数量并输出结果
 mas_app_count=$((mas_app_count+0))
-echo -e "✓  APP 数量（ Mac AppStore ）：$mas_app_count ✅ "                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e "✅  APP 数量（ Mac AppStore ）：$mas_app_count  "                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -1874,7 +1874,10 @@ while [ $mas_attempt -le $MAS_MAX_RETRIES ]; do
         echo -e "$mas_output"                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
         # 使用 sed 去掉应用ID和版本号，只保留应用名
         app_names=$(echo "$mas_output" | sed -E 's/^[0-9]+[[:space:]]+//; s/ *\([^)]*\)//g; s/ *->.*//g')
-        echo -e "✅  检测到新版本 : $app_names" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        #echo -e "✅  检测到新版本 : $app_names" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        while IFS= read -r app_line; do
+            [[ -n "$app_line" ]] && echo -e "✅  检测到新版本 : $app_line" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        done <<< "$app_names"
         mas_success=true
         break
     else
@@ -1939,17 +1942,17 @@ if [ "$mas_success" = true ]; then
                 fi
                 # 再次检查应用是否已关闭成功
                 if osascript -e "tell application \"System Events\" to (name of processes) contains \"$app_name\"" | grep -q "true"; then
-                    echo -e "✘  $app_name 无法关闭，跳过重启该应用。"                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    echo -e "✘  无法关闭 $app_name ，稍后 将跳过重启该应用。"                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 else
                     # 已成功关闭的应用加入重启列表
                     apps_to_restart+=("$app_name")
-                    echo -e "✓  $app_name 已关闭，稍后将重新启动。"                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    echo -e "✓  已关闭 $app_name ，稍后 将重新启动该应用。"                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 fi
             fi
         fi
     done
     
-    echo -e "✓  待更新的 MAS APP，已无运行 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✓  所有 待更新的 MAS APP，均已停止运行 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     if [[ $(id -u) -eq 0 ]]; then
         echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 mas upgrade ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
