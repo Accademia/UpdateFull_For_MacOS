@@ -1444,7 +1444,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             if [ "$(id -u)" -eq 0 ]; then
                 # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
                 targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-                echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $formula 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $formula 升级 (brew upgrade) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 # 以目标用户身份执行 Homebrew 命令
                 sudo -H -u "$targetUser" bash -c "brew upgrade $formula 2>&1" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             else
@@ -1462,7 +1462,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                 if [ "$(id -u)" -eq 0 ]; then
                     # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
                     targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-                    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $formula 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $formula 重装 (brew reinstall --force)  ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     # 以目标用户身份执行 Homebrew 命令
                     sudo -H -u "$targetUser" bash -c "brew reinstall --force $formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 else
@@ -1577,7 +1577,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             if [ "$(id -u)" -eq 0 ]; then
               # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
               targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-              echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $cask 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+              echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $cask 升级 (brew upgrade) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
               # 以目标用户身份执行 Homebrew 命令
               sudo -H -u "$targetUser" bash -c "brew upgrade --cask --greedy $cask 2>&1"         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             else
@@ -1595,7 +1595,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
               if [ "$(id -u)" -eq 0 ]; then
                   # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
                   targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-                  echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $cask 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                  echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $cask 重装 (brew reinstall --force) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                   # 以目标用户身份执行 Homebrew 命令
                   sudo -H -u "$targetUser" bash -c "brew reinstall --cask --force $cask 2>&1"       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
               else
@@ -1624,7 +1624,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                   if [ "$(id -u)" -eq 0 ]; then
                       # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
                       targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-                      echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $cask 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                      echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $cask 重装 (brew reinstall --force) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                       # 以目标用户身份执行 Homebrew 命令
                       sudo -H -u "$targetUser" bash -c "brew reinstall --cask --force $cask 2>&1"       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                   else
@@ -2105,7 +2105,7 @@ if echo "$softwareupdate_output" | grep -F -q "No new software available."; then
 else  
     # Updates are available – proceed with download (and prompt for install)
     printf "\033[1;34m[Download]\033[0m "  
-    printf "[Install] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null  
+    printf "[Download] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null  
     echo -e "MacOS 下载更新包 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
     sudo softwareupdate --download --force --agree-to-license 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
 
