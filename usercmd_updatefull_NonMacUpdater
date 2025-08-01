@@ -1470,6 +1470,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                     echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $formula 重装 (brew reinstall) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     brew reinstall "$formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 fi
+
                 reinstall_exit=${PIPESTATUS[0]}  # 取 brew reinstall 的退出码
                 final_exit=$reinstall_exit
 
@@ -1480,22 +1481,31 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                     if [ "$(id -u)" -eq 0 ]; then
                         # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
                         targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-                        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $formula 重装 (brew reinstall --force)  ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $formula 强制重装 (brew reinstall --force)  ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                         # 以目标用户身份执行 Homebrew 命令
                         sudo -H -u "$targetUser" bash -c "brew reinstall --force $formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     else
-                        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $formula 重装 (brew reinstall --force) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $formula 强制重装 (brew reinstall --force) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                         brew reinstall --force "$formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     fi
-                    reinstall_exit=${PIPESTATUS[0]}  # 取 brew reinstall 的退出码
-                    final_exit=$reinstall_exit
+                    reinstall_force_exit=${PIPESTATUS[0]}  # 取 brew reinstall 的退出码
+                    final_exit=$reinstall_force_exit
                 fi
             fi
 
             # ---------- 根据最终状态输出结果 ----------
             if [ $final_exit -eq 0 ] ; then
                 echo -e "✅  更新成功 [formula] ：$formula"                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                method=$([ $upgrade_exit -ne 0 ] && echo "reinstall" || echo "upgrade")
+                #method=$([ $upgrade_exit -ne 0 ] && echo "reinstall" || echo "upgrade")
+                if [ $upgrade_exit -ne 0 ]; then
+                    if [ $reinstall_exit -eq 0 ]; then
+                        method="reinstall"
+                    else
+                        method="reinstall_force"
+                    fi
+                else
+                    method="upgrade"
+                fi                
                 updated_list+=("success|formula|$formula|$method")
             else
                 echo -e "❌  更新失败 [formula] ：$formula"                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -1516,6 +1526,9 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
 
     fi
 
+    upgrade_exit=false
+    reinstall_exit=false
+    reinstall_force_exit=false
 
     # 第 4 步：串行安装（Homebrew cask）
     if [ ${#packages_brew_casks[@]} -ne 0 ] ; then
@@ -1600,7 +1613,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
               # 以目标用户身份执行 Homebrew 命令
               sudo -H -u "$targetUser" bash -c "brew upgrade --cask --greedy $cask 2>&1"         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             else
-              echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $cask 升级 (cask : brew upgrade --cask --greedy) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+              echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $cask 升级 (brew upgrade --cask --greedy) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
               brew upgrade --cask --greedy "$cask" 2>&1                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             fi
 
@@ -1625,39 +1638,40 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
              #echo -e "⚠️ upgrade 升级失败，$cask ，尝试使用 reinstall 覆盖安装 ... "     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
              #brew reinstall --cask --force "$cask" 2>&1                                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
-              # 第三次尝试升级：再次尝试关闭阻碍更新的进程，并通过 brew reinstall --force 升级 APP
               reinstall_exit=${PIPESTATUS[0]}    # 获取 brew reinstall 的退出码  
-              if [ $reinstall_exit -ne 0 ]; then
-                  # 若重装失败且检测到应用仍在运行，强制关闭后再重试一次
-                  if pgrep -ix "$app_name" > /dev/null; then
-                      echo -e "⚠️ 检测到 $app_name ( PID = $pid ) 仍在运行，尝试强制关闭，然后再次尝试 reinstall 覆盖安装 ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                      pid=$(pgrep -f "$app_name")
-                      if [ -n "$pid" ]; then
-                          kill -9 "$pid"
-                      fi
-                  else
-                      echo -e "✓  $app_name 仍未发现其运行，再次尝试 reinstall 覆盖安装 !!! "          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                  fi
-
-                  # 检查是否以 root 身份运行
-                  if [ "$(id -u)" -eq 0 ]; then
-                      echo -e "upgrade 失败，尝试强制重装 (brew reinstall --cask --force $cask) ... "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                      # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
-                      targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-                      echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $cask 强制重装 (brew reinstall --cask --force) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                      # 以目标用户身份执行 Homebrew 命令
-                      sudo -H -u "$targetUser" bash -c "brew reinstall --cask --force $cask 2>&1"       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                  else
-                      echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $cask 强制重装 (brew reinstall --cask --force) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-                      brew reinstall --cask --force "$cask" 2>&1                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                  fi
-
-                  #brew reinstall --cask --force "$cask" 2>&1                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-
-                  reinstall_exit=${PIPESTATUS[0]}
-              fi
-
               final_exit=$reinstall_exit       # 将最终状态更新为 reinstall 的状态  
+
+              # 第三次尝试升级：再次尝试关闭阻碍更新的进程，并通过 brew reinstall --force 升级 APP
+              if [ $reinstall_exit -ne 0 ]; then
+                    # 若重装失败且检测到应用仍在运行，强制关闭后再重试一次
+                    if pgrep -ix "$app_name" > /dev/null; then
+                        echo -e "⚠️ 检测到 $app_name ( PID = $pid ) 仍在运行，尝试强制关闭，然后再次尝试 reinstall 覆盖安装 ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        pid=$(pgrep -f "$app_name")
+                        if [ -n "$pid" ]; then
+                            kill -9 "$pid"
+                        fi
+                    else
+                        echo -e "✓  $app_name 仍未发现其运行，再次尝试 reinstall 覆盖安装 !!! "          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    fi
+    
+                    # 检查是否以 root 身份运行
+                    if [ "$(id -u)" -eq 0 ]; then
+                        echo -e "upgrade 失败，尝试强制重装 (brew reinstall --cask --force $cask) ... "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
+                        targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
+                        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $cask 强制重装 (brew reinstall --cask --force) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        # 以目标用户身份执行 Homebrew 命令
+                        sudo -H -u "$targetUser" bash -c "brew reinstall --cask --force $cask 2>&1"       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    else
+                        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $cask 强制重装 (brew reinstall --cask --force) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+                        brew reinstall --cask --force "$cask" 2>&1                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    fi
+    
+                    #brew reinstall --cask --force "$cask" 2>&1                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    
+                    reinstall_force_exit=${PIPESTATUS[0]}
+                    final_exit=$reinstall_force_exit       # 将最终状态更新为 reinstall 的状态  
+              fi
 
             fi  
 
@@ -1672,7 +1686,16 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             # ---------- 本APP 的 升级结果 ----------  
             if [ $final_exit -eq 0 ]; then
                 echo -e "✅  更新成功 [cask]   : $cask "                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                method=$([ $upgrade_exit -ne 0 ] && echo "reinstall" || echo "upgrade")
+                #method=$([ $upgrade_exit -ne 0 ] && echo "reinstall" || echo "upgrade")
+                if [ $upgrade_exit -ne 0 ]; then
+                    if [ $reinstall_exit -eq 0 ]; then
+                        method="reinstall"
+                    else
+                        method="reinstall_force"
+                    fi
+                else
+                    method="upgrade"
+                fi                
                 updated_list+=("success|cask|$cask|$method")
             else
                 echo -e "❌  更新失败 [cask]   : $cask "                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -1766,13 +1789,25 @@ else
         # 构造基础输出行（符号、结果、类型、名称）
         line="$symbol  更新$status_text $type_display$spacing : $name"
         # 若通过重装更新，则附加警告标记和具体命令
-        if [ "$status" = "success" ] && [ "$method" = "reinstall" ]; then
-            if [ "$type" = "cask" ]; then
+        #if [ "$status" = "success" ] && [ "$method" = "reinstall" ]; then
+        #    if [ "$type" = "cask" ]; then
+        #        warning_cmd="brew reinstall --cask --force $name"
+        #    else
+        #        warning_cmd="brew reinstall --force $name"
+        #    fi
+        #    line="$line   ( ⚠️ 更新方式 ：$warning_cmd )"
+        #fi
+        if [ "$status" = "success" ]; then
+            if [ "$method" = "reinstall_force" ]; then
+                # 强制重装成功的情况
                 warning_cmd="brew reinstall --cask --force $name"
-            else
-                warning_cmd="brew reinstall --force $name"
+                [ "$type" != "cask" ] && warning_cmd="brew reinstall --force $name"
+            elif [ "$method" = "reinstall" ]; then
+                # 普通重装成功的情况
+                warning_cmd="brew reinstall --cask $name"
+                [ "$type" != "cask" ] && warning_cmd="brew reinstall $name"
             fi
-            line="$line   ( ⚠️ 更新方式 ：$warning_cmd )"
+            [ -n "$warning_cmd" ] && line="$line   ( ⚠️ 更新方式 ：$warning_cmd )"
         fi
         # 输出该行到屏幕和日志
         echo -e "$line" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
