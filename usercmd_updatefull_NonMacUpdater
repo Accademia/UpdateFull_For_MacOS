@@ -1130,7 +1130,7 @@ if [ "$(id -u)" -eq 0 ]; then
 
     # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
     targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 brew outdated ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 brew outdated --greedy ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     # ① 所有过期项目（公式 + Cask）
     brew_outdated=$(
@@ -1152,7 +1152,7 @@ if [ "$(id -u)" -eq 0 ]; then
 
 else
 
-    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 brew outdated ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 brew outdated --greedy ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
     # ① 所有过期项目（Formula + Cask）
     brew_outdated=$(
