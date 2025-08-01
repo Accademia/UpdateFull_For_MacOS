@@ -1744,12 +1744,12 @@ echo -e "Homebrew 清理残留 ... "                                            
 if [ "$(id -u)" -eq 0 ]; then
     # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
     targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 rew cleanup 清理 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 brew cleanup ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     # 以目标用户身份执行 Homebrew 命令
     sudo -H -u "$targetUser" bash -c 'brew cleanup --prune=all 2>&1'       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     sudo -H -u "$targetUser" bash -c 'brew autoremove 2>&1'       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 else
-    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 brew cleanup 清理 ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 brew cleanup ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     brew cleanup --prune=all 2>&1                                                           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     brew autoremove 2>&1                                                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 fi
