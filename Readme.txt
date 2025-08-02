@@ -303,6 +303,17 @@ grep -R "nosort" /opt/homebrew/etc/bash_completion.d
 
 
 # ---------------------------
+# 免密更新 BasicTeX
+# ---------------------------
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list org.tug.mactex.basictex*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove org.tug.mactex.basictex*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/org.tug.mactex.basictex*.plist
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/org.tug.mactex.basictex*.plist
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget org.tug.mactex.basictex*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/basictex/*/mactex-basictex-*.pkg *
+
+
+# ---------------------------
 # 免密更新 BlueHarvest
 # --------------------------- 
 
