@@ -844,6 +844,13 @@ grep -R "nosort" /opt/homebrew/etc/bash_completion.d
 
 
 # ---------------------------
+# 免密更新 TeX
+# ---------------------------
+
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /Library/TeX/texbin/tlmgr update*
+
+
+# ---------------------------
 # 免密更新 TimemaChineeEditor
 # ---------------------------
 
