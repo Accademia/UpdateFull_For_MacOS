@@ -1585,8 +1585,13 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                         else
                             brew_method="upgrade"
                         fi     
-                        updated_list+=("success|formula|$formula|$brew_method")
-                        echo -e "--------------------"                                                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        #updated_list+=("success|formula|$formula|$brew_method")
+                        if [ $brew_final_exit -eq 0 ] ; then
+                            updated_list+=("success|formula|$formula|$brew_method")
+                        else
+                            updated_list+=("failure|formula|$formula|$brew_method")
+                        fi
+                        echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                         rm -f "$brew_tmpfile"
                         continue   # 进入下一个 formula 处理
                     else
@@ -1650,11 +1655,16 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                 brew_method="upgrade"
             fi    
 
-            updated_list+=("success|cask|$formula|$brew_method")
+            #updated_list+=("success|cask|$formula|$brew_method")
+            
+            if [ $brew_final_exit -eq 0 ] ; then
+                updated_list+=("success|cask|$cask|$brew_method")
+            else
+                updated_list+=("failure|cask|$cask|$brew_method")
+            fi
 
-            echo -e "--------------------"                                                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-
-            rm -f "$brew_tmpfile"  # 清理临时文件
+            echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            rm -f "$brew_tmpfile"
 
         done
 
@@ -2384,12 +2394,12 @@ printf "[Scan] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "MacOS 扫描检测 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
 
 # Run the update scan and capture output (stderr included), logging it as well
-softwareupdate_output=$(sudo softwareupdate --list --force --agree-to-license 2>&1)  
-echo -e "$softwareupdate_output" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
+MacOSSystemUpdate_output=$(sudo softwareupdate --list --force --agree-to-license 2>&1)  
+echo -e "$MacOSSystemUpdate_output" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
 echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
 
 # Check scan output for "No new software available."
-if echo "$softwareupdate_output" | grep -F -q "No new software available."; then  
+if echo "$MacOSSystemUpdate_output" | grep -F -q "No new software available."; then  
     # No updates available – skip download/install, output "no update needed"
     printf "\033[1;34m[Download & Install]\033[0m "  
     printf "[Download & Install] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null  
