@@ -330,13 +330,16 @@ attempt_quit_app() {
         echo -e "✘  无法正常退出 '$brew_process_name' ，正在尝试 强制退出 !!!  "
         if [[ $(id -u) -eq 0 ]]; then
             # 以普通用户权限发送 kill 信号
-            echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 pkill 退出 '$brew_process_name' 进程 ... "   
+            echo -e "...  （已完成30秒等待）Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 pkill 强制退出 '$brew_process_name' 进程 ，以便执行 后续更新 ... "   
             local targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
             sudo -u "$targetUser" /usr/bin/pkill -x "$brew_process_name"
         else
-            echo -e "✓  当前用户'$USER'，为普通权限，直接运行 pkill 退出 '$brew_process_name' 进程 ... "     
+            echo -e "...  （已完成30秒等待）当前用户'$USER'，为普通权限，直接运行 pkill 强制退出 '$brew_process_name' 进程 ，以便执行 后续更新 ... "     
             /usr/bin/pkill -x "$brew_process_name"
         fi
+    else
+        echo -e "✓  已完成退出!!!! 进程 '$brew_process_name' 没有阻塞退出，没有启动30秒等待 !!!  "
+
     fi
 
 }
