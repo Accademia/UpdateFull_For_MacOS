@@ -1659,11 +1659,10 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             fi    
 
             #updated_list+=("success|cask|$formula|$brew_method")
-            
             if [ $brew_final_exit -eq 0 ] ; then
-                updated_list+=("success|cask|$cask|$brew_method")
+                updated_list+=("success|formula|$formula|$brew_method")
             else
-                updated_list+=("failure|cask|$cask|$brew_method")
+                updated_list+=("failure|formula|$formula|$brew_method")
             fi
 
             echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -1945,7 +1944,13 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             else
                 brew_method="upgrade"
             fi                
-            updated_list+=("success|cask|$cask|$brew_method")
+
+            #updated_list+=("success|cask|$cask|$brew_method")
+            if [ $brew_final_exit -eq 0 ] ; then
+                updated_list+=("success|cask|$cask|$brew_method")
+            else
+                updated_list+=("failure|cask|$cask|$brew_method")
+            fi
 
             echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
