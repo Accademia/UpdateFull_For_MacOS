@@ -762,6 +762,7 @@ grep -R "nosort" /opt/homebrew/etc/bash_completion.d
 # ---------------------------
 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/powershell/*.pkg *
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/local/bin/pwsh -NoProfile -NonInteractive -Command 'Get-InstalledModule | ForEach-Object { try { Update-Module -Name * -Force -ErrorAction Stop } catch { Write-Output * } }' *
 
 
 # ---------------------------
