@@ -2247,7 +2247,7 @@ if [ "$mas_success" = true ]; then
                 done
                 # 如果应用仍未关闭，尝试强制关闭
                 if osascript -e "tell application \"System Events\" to (name of processes) contains \"$mas_app_name\"" | grep -q "true"; then
-                    echo -e "✘  无法正常关闭 $mas_app_name，正在尝试强制关闭 ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+                    echo -e "✘  无法正常关闭 $mas_app_name ，正在尝试强制关闭 ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
                     # 获取应用程序的PID
                     mas_pid=$(pgrep -f "$mas_app_name")
                     if [ -n "$mas_pid" ]; then
@@ -2269,7 +2269,7 @@ if [ "$mas_success" = true ]; then
         fi
     done
     
-    echo -e "✓  所有 待更新的 MAS APP，均已停止运行 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✓  所有 待更新的 MAS APP ，均已停止运行 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     if [[ $(id -u) -eq 0 ]]; then
         echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 mas upgrade ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
