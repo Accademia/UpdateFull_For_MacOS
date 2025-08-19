@@ -1543,11 +1543,11 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             if [ "$(id -u)" -eq 0 ]; then
                 # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
                 targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-                echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $formula 升级 (brew upgrade) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+                echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $formula 升级 ( brew upgrade $formula ) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
                 # 以目标用户身份执行 Homebrew 命令
                 sudo -H -u "$targetUser" bash -c "brew upgrade $formula 2>&1" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_tmpfile"
             else
-                echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $formula 升级 (brew upgrade) ... "                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+                echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $formula 升级 ( brew upgrade $formula ) ... "                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
                 brew upgrade "$formula" 2>&1                                                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_tmpfile" 
             fi
 
@@ -1566,11 +1566,11 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                     if [ "$(id -u)" -eq 0 ]; then
                         # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
                         targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-                        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $formula 重装 (brew link --overwrite)  ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $formula 重装 ( brew link --overwrite $formula )  ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                         # 以目标用户身份执行 Homebrew 命令
                         sudo -H -u "$targetUser" bash -c "brew link --overwrite $formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     else
-                        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $formula 重装 (brew link --overwrite) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $formula 重装 ( brew link --overwrite $formula ) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                         brew link --overwrite "$formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     fi
 
@@ -1605,16 +1605,16 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                 fi
 
                 # 第三次尝试升级：通过 brew reinstall  升级 formula APP
-                echo -e "upgrade 失败，尝试 重装 (brew reinstall $formula) ... "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "upgrade 失败，尝试 重装 ( brew reinstall $formula ) ... "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 # 检查是否以 root 身份运行
                 if [ "$(id -u)" -eq 0 ]; then
                     # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
                     targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-                    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $formula 重装 (brew reinstall)  ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $formula 重装 ( brew reinstall $formula )  ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     # 以目标用户身份执行 Homebrew 命令
                     sudo -H -u "$targetUser" bash -c "brew reinstall $formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 else
-                    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $formula 重装 (brew reinstall) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $formula 重装 ( brew reinstall $formula ) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     brew reinstall "$formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 fi
 
@@ -1623,16 +1623,16 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
 
                 # 第四次尝试升级：通过 brew reinstall --force 升级 formula APP
                 if [ $brew_reinstall_exit -ne 0 ]; then
-                    echo -e "reinstall 失败，尝试 强制重装 (brew reinstall --force $formula) ... "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    echo -e "reinstall 失败，尝试 强制重装 ( brew reinstall --force $formula ) ... "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     # 检查是否以 root 身份运行
                     if [ "$(id -u)" -eq 0 ]; then
                         # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
                         targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-                        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $formula 强制重装 (brew reinstall --force)  ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $formula 强制重装 ( brew reinstall --force $formula )  ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                         # 以目标用户身份执行 Homebrew 命令
                         sudo -H -u "$targetUser" bash -c "brew reinstall --force $formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     else
-                        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $formula 强制重装 (brew reinstall --force) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $formula 强制重装 ( brew reinstall --force $formula ) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                         brew reinstall --force "$formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     fi
                     brew_reinstall_force_exit=${PIPESTATUS[0]}  # 取 brew reinstall 的退出码
@@ -1725,11 +1725,11 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             if [ "$(id -u)" -eq 0 ]; then
               # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
               targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-              echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $cask 升级 (brew upgrade --cask --greedy) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+              echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $cask 升级 ( brew upgrade --cask --greedy $cask ) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
               # 以目标用户身份执行 Homebrew 命令
               sudo -H -u "$targetUser" bash -c "brew upgrade --cask --greedy $cask 2>&1"         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_tmpfile"
             else
-              echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $cask 升级 (brew upgrade --cask --greedy) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+              echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $cask 升级 ( brew upgrade --cask --greedy $cask ) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
               brew upgrade --cask --greedy "$cask" 2>&1                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_tmpfile"
             fi
 
@@ -1742,16 +1742,16 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                 # 注意：⚠️ cask不需要 重新链接 ！
 
                 # 第二次尝试升级：通过 brew reinstall 升级 APP  
-                echo -e "upgrade 失败，尝试重装 (brew reinstall --cask $cask) ... "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "upgrade 失败，尝试重装 ( brew reinstall --cask $cask ) ... "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 # 检查是否以 root 身份运行
                 if [ "$(id -u)" -eq 0 ]; then
                     # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
                     targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-                    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $cask 重装 (brew reinstall --cask) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $cask 重装 ( brew reinstall --cask $cask ) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     # 以目标用户身份执行 Homebrew 命令
                     sudo -H -u "$targetUser" bash -c "brew reinstall --cask  $cask 2>&1"       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 else
-                    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $cask 重装 (brew reinstall --cask) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+                    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $cask 重装 ( brew reinstall --cask $cask ) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
                     brew reinstall --cask "$cask" 2>&1                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 fi
    
@@ -1906,14 +1906,14 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
        
                       # 检查是否以 root 身份运行
                       if [ "$(id -u)" -eq 0 ]; then
-                          echo -e "upgrade 失败，尝试 强制覆盖安装 (brew reinstall --cask --force $cask) ... "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                          echo -e "upgrade 失败，尝试 强制覆盖安装 ( brew reinstall --cask --force $cask ) ... "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                           # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
                           targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-                          echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $cask 强制覆盖安装 (brew reinstall --cask --force) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                          echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $cask 强制覆盖安装 ( brew reinstall --cask --force $cask ) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                           # 以目标用户身份执行 Homebrew 命令
                           sudo -H -u "$targetUser" bash -c "brew reinstall --cask --force $cask 2>&1"       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                       else
-                          echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $cask 强制覆盖安装 (brew reinstall --cask --force) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+                          echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $cask 强制覆盖安装 ( brew reinstall --cask --force $cask ) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
                           brew reinstall --cask --force "$cask" 2>&1                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                       fi
        
