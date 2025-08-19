@@ -280,7 +280,7 @@ attempt_quit_app() {
 
     # 情况 B：既缺 Bundle ID 又缺进程名 → 无可用信息，退出
     if [[ -z "$brew_app_id" && -z "$brew_process_name" ]]; then
-        echo "⚠️  无法退出应用：缺少 应用ID（ brew_app_id = $brew_app_id ）或 进程名（ brew_process_name = $brew_process_name ）"
+        echo "⚠️  无法退出应用：缺少 应用ID ( brew_app_id = $brew_app_id ) 或 进程名 ( brew_process_name = $brew_process_name ) ... "
         return 1
     fi
 
@@ -1579,7 +1579,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
 
                     # ---------- 根据最终状态输出结果 ----------
                     if [ $brew_relink_exit -eq 0 ]; then
-                        echo "✅  更新成功 [formula] ：$formula (已更新 & 符号链接) " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        echo "✅  更新成功 [formula] ：$formula ( 已更新 & 符号链接 ) " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                         # 记录成功状态（将$formula加入成功列表），并跳过后续的重装尝试
                         if [ $brew_upgrade_exit -ne 0 ]; then
                             if [ $brew_relink_exit -eq 0 ]; then
@@ -1598,7 +1598,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                         rm -f "$brew_tmpfile"
                         continue   # 进入下一个 formula 处理
                     else
-                        echo -e "⚠️  符号链接 失败 [formula] $formula ，继续尝试 重新安装（brew reinstall）"                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        echo -e "⚠️  符号链接 失败 [formula] $formula ，继续尝试 重新安装 ( brew reinstall $formula ) ... "                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     fi
 
                     # 若强制链接仍失败，下面会继续执行重装逻辑
@@ -1642,9 +1642,9 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
 
             # ---------- 根据最终状态输出结果 ----------
             if [ $brew_final_exit -eq 0 ] ; then
-                echo -e "✅  更新成功 [formula] ：$formula"                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "✅  更新成功 [formula] ：$formula "                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             else
-                echo -e "❌  更新失败 [formula] ：$formula"                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "❌  更新失败 [formula] ：$formula "                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             fi
 
             #brew_method=$([ $brew_upgrade_exit -ne 0 ] && echo "reinstall" || echo "upgrade")
