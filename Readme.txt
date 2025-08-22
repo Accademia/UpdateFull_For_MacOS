@@ -360,6 +360,7 @@ grep -R "nosort" /opt/homebrew/etc/bash_completion.d
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/com.cloudflare.*.plist
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /Applications/Cloudflare\ WARP.app/Contents/Resources/uninstall.sh
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/cloudflare-warp/*/Cloudflare_WARP*.pkg *
+leixu ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget com.cloudflare.*
 
 
 # ---------------------------
