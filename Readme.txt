@@ -1098,7 +1098,8 @@ rm -rf /opt/homebrew/Caskroom/microsoft-onedrive
 ===========================================
 
  - 本脚本，代码均来自AI，人工仅仅做极少量调整维护。参与编程的AI包括：
-   1. 【2025/Q3-？】编程者：OpenAI  ChatGPT O3—Pro + 深度研究 （主力）  、  xAI Grok4 （少量）
+   1. 【2025/Q3-？】编程者：OpenAI  ChatGPT 5 Pro  
+   1. 【2025/Q2-Q3】编程者：OpenAI  ChatGPT O3—Pro + 深度研究 （主力）  、  xAI Grok4 （少量）
    2. 【2025/Q1-Q2】编程者：xAI     Grok3 + DeeperSearch / Think
    3. 【2024/Q3-Q4】编程者：OpenAI  ChatGPT O1 
    
