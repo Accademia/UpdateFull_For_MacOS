@@ -1212,85 +1212,64 @@ echo -e "✅  APP 数量（ Homebrew         ）：$brew_app_count  "  | tee -a 
 
 echo -e ""                                                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
+
 printf  "\033[1;34m[Scan]\033[0m "
-printf  "[Scan] "                                                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "Homebrew 扫描更新 ... "                                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+printf  "[Scan] "                                                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "Homebrew 扫描更新 ... "                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
-# 检查是否以 root 身份运行
 if [ "$(id -u)" -eq 0 ]; then
-
-    # 以目标用户身份执行 Homebrew 命令
-
-    # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
-    targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 brew outdated --greedy ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-
-    # ① 所有过期项目（公式 + Cask）
-    brew_outdated=$(
-      sudo -H -u "$targetUser" bash -lc 'brew outdated --greedy' 2>&1 \
-      | awk '{print $1}'
-    )
-
-    # ② 仅过期的公式 (formula)
-    brew_outdated_formulas=$(
-      sudo -H -u "$targetUser" bash -lc 'brew outdated --formula --greedy' 2>&1 \
-      | awk '{print $1}'
-    )
-
-    # ③ 仅过期的 Cask
-    packages_brew_casks=$(
-      sudo -H -u "$targetUser" bash -lc 'brew outdated --cask --greedy' 2>&1 \
-      | awk '{print $1}'
-    )
-
+  targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
+  echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 brew outdated --greedy ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+  brew_outdated=$(
+    sudo -H -u "$targetUser" bash -lc 'brew outdated --greedy' 2>/dev/null | awk '{print $1}'
+  )
+  brew_outdated_formulas=$(
+    sudo -H -u "$targetUser" bash -lc 'brew outdated --formula --greedy' 2>/dev/null | awk '{print $1}'
+  )
+  brew_outdated_casks=$(
+    sudo -H -u "$targetUser" bash -lc 'brew outdated --cask --greedy' 2>/dev/null | awk '{print $1}'
+  )
 else
-
-    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 brew outdated --greedy ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-
-    # ① 所有过期项目（Formula + Cask）
-    brew_outdated=$(
-        brew outdated --greedy 2>&1 \
-        | awk '{print $1}'
-    )
-
-    # ② 仅过期的 Formula
-    brew_outdated_formulas=$(
-        brew outdated --formula --greedy 2>&1 \
-        | awk '{print $1}'
-    )
-
-    # ③ 仅过期的 Cask
-    packages_brew_casks=$(
-        brew outdated --cask --greedy 2>&1 \
-        | awk '{print $1}'
-    )
-
+  echo -e "✓  当前用户'$USER'，为普通权限，直接运行 brew outdated --greedy ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+  brew_outdated=$(
+    brew outdated --greedy 2>/dev/null | awk '{print $1}'
+  )
+  brew_outdated_formulas=$(
+    brew outdated --formula --greedy 2>/dev/null | awk '{print $1}'
+  )
+  brew_outdated_casks=$(
+    brew outdated --cask --greedy 2>/dev/null | awk '{print $1}'
+  )
 fi
 
-# 第 1 步：获取所有需要更新的 公式 和 包名称
-
-# 将需要更新的包分别存储
-packages_brew=($brew_outdated)
-#echo -e "brew_outdated = $brew_outdated"        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+# 兼容 bash 3.2：逐行构建数组（避免 read -a 只读到第一行）
+packages_brew=()
+while IFS= read -r pkg; do
+  [[ -n "$pkg" ]] && packages_brew+=("$pkg")
+done <<< "$brew_outdated"
 
 packages_brew_formulas=()
-for pkg in ${brew_outdated_formulas}; do
-    [[ -n "$pkg" ]] && packages_brew_formulas+=("$pkg")
-done
+while IFS= read -r pkg; do
+  [[ -n "$pkg" ]] && packages_brew_formulas+=("$pkg")
+done <<< "$brew_outdated_formulas"
 
 packages_brew_casks=()
-for pkg in ${packages_brew_casks}; do
-    [[ -n "$pkg" ]] && packages_brew_casks+=("$pkg")
+while IFS= read -r pkg; do
+  [[ -n "$pkg" ]] && packages_brew_casks+=("$pkg")
+done <<< "$brew_outdated_casks"
+
+# 分类打印（先判定 cask，再判定 formula）
+for pkg in "${packages_brew[@]}"; do
+  if printf '%s\n' "${packages_brew_casks[@]}"     | grep -qxF -- "$pkg"; then
+    echo -e "✅  检测到新版本 [cask]    : $pkg"   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+  elif printf '%s\n' "${packages_brew_formulas[@]}" | grep -qxF -- "$pkg"; then
+    echo -e "✅  检测到新版本 [formula] : $pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+  else
+    echo -e "✅  检测到新版本 [unknown] : $pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+  fi
 done
 
-# 在组装 packages_brew* 数组后添加：
-for pkg in "${packages_brew[@]}"; do
-    if printf '%s\n' "${packages_brew_casks[@]}" | grep -qx "$pkg"; then
-        echo -e "✅  检测到新版本 [cask]    : $pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    else
-        echo -e "✅  检测到新版本 [formula] : $pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    fi
-done
+
 
 # 在获取 brew_outdated 列表并组装 packages_brew_formulas/casks 之后添加：
 updated_list=()   # 初始化数组，用于保存每个更新项的结果
@@ -1561,7 +1540,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
 
             brew_formula_upgrade_exit=${PIPESTATUS[0]}        # 取 brew upgrade 的退出码
             brew_formula_final_exit=$brew_formula_upgrade_exit             # 先假定最终状态 = 升级状态
-            brew_formula_relink_exit=flase
+            brew_formula_relink_exit=false
 
             # ---------- 若升级失败则尝试重装 ----------
             if [ $brew_formula_upgrade_exit -ne 0 ] ; then
@@ -1710,7 +1689,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         #brew_cask_apps_to_restart=()
 
         # 逐个安装 每个待更新的 cask app
-        for pkg_brew_cask in $packages_brew_casks; do
+        for pkg_brew_cask in "${packages_brew_casks[@]}"; do
 
             # 初始化每个 cask 应用的状态变量
             brew_cask_app_name=""
