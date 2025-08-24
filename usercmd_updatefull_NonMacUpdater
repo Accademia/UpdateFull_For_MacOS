@@ -76,7 +76,7 @@ check_time_range() {
     current_time=$(date '+%H:%M')
 
     # 检查当前时间是否在范围内
-    if [[ "$current_time" > "$start_time" && "$current_time" < "$stop_time" ]]; then
+    if [[ ( "$current_time" > "$start_time" || "$current_time" == "$start_time" ) && "$current_time" < "$stop_time" ]]; then
         printf "\033[1;31m[STOP]\033[0m  "
         printf "[STOP] "                                                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  > /dev/null 
         echo -e "任务退出（$(date '+%Y-%m-%d %H:%M:%S')）：为避免与预设 定时任务 冲突"      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_ERROR_FILE" 
@@ -342,6 +342,17 @@ attempt_quit_app() {
 
     fi
 
+}
+
+
+
+# ************************* #
+# 自定义函数：统一的错误输出（带着色与日志追加）
+# ************************* #
+print_error() {
+  printf "\033[1;31m[ERROR]\033[0m  "
+  printf "[ERROR] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+  echo -e "$*" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 }
 
 
@@ -649,7 +660,7 @@ if [ "$architecture" = "arm64" ]; then
         echo -e ""                                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
         if [[ $brew_newpath == /opt/homebrew/* ]]; then
-            printf  "\033[1;32m[OK]\033[0m $1"
+            printf  "\033[1;32m[OK]\033[0m "
             printf  "[OK]   "                                                           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
             echo -e "验证结果：当前 Homebrew 为 ARM 版本。"                             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
            #echo -e ""                                                                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
@@ -769,10 +780,10 @@ if brew list --formula | grep -q "^mas\$"; then
         targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
         echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 Mas 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 以目标用户身份执行 Homebrew 命令
-        sudo -H -u "$targetUser" bash -c 'brew upgrade --greedy --force mas 2>&1'       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        sudo -H -u "$targetUser" bash -c 'brew upgrade mas 2>&1'       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     else
         echo -e "✓  当前用户'$USER'，为普通权限，直接运行 Mas 自更新 ... "            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-        brew upgrade --greedy --force mas 2>&1                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        brew upgrade mas 2>&1                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     fi
 
 else
@@ -1697,6 +1708,9 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         # 逐个安装 每个待更新的 cask app
         for cask in $brew_outdated_casks; do
 
+            # 新增：为 cask 升级输出创建临时文件，避免变量未定义导致 tee 报错
+            brew_cask_tmpfile=$(mktemp)
+
             # 初始化每个 cask 应用的状态变量
             brew_app_name=""
             brew_exec_name=""
@@ -2610,7 +2624,7 @@ echo -e ""                                                                      
 # 开始执行： MacUpdater
 # ----------------------------------
 
-#MacUpdater_ENABLE="ture"
+#MacUpdater_ENABLE="true"
 #export MacUpdater_NO_INTERACTIVE=1
 #
 #echo -e "\033[1;32m-----------------------------------------------\033[0m" 
@@ -2817,7 +2831,7 @@ echo -e "✅  APP 数量（ Homebrew formula   ） ：$brew_formula_count  "    
 echo -e "✅  APP 数量（ Homebrew Cask      ） ：$brew_cask_count  "                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 echo -e "✅  APP 数量（ Mac AppStore       ） ：$mas_app_count   "                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
-if [ "$MacUpdater_ENABLE" != "ture" ]; then  
+if [ "$MacUpdater_ENABLE" != "true" ]; then  
     echo -e "✅  APP 数量（ MAS + HomebrewCask ） ：$gui_app_count "                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 else
     echo -e "✅  APP 数量（ MacUpdater         ） ：$macupdater_app_count  （ $gui_app_count = MAS + HomebrewCask ）"                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
