@@ -2043,6 +2043,8 @@ else
     # 逐条输出更新结果
     for entry in "${updated_list[@]}"; do
         IFS='|' read -r status type name brew_method <<< "$entry"
+        # 每次循环重置，避免上一条的 reinstall 提示“串味”
+        brew_warning_cmd=""
         # 根据状态选择符号和文字
         if [ "$status" = "success" ]; then
             symbol="✅"
@@ -2065,14 +2067,14 @@ else
         if [ "$status" = "success" ]; then
             if [ "$brew_method" = "reinstall_force" ]; then
                 # 强制重装成功的情况
-                warning_cmd="brew reinstall --cask --force $name"
-                [ "$type" != "cask" ] && warning_cmd="brew reinstall --force $name"
+                brew_warning_cmd="brew reinstall --cask --force $name"
+                [ "$type" != "cask" ] && brew_warning_cmd="brew reinstall --force $name"
             elif [ "$brew_method" = "reinstall" ]; then
                 # 普通重装成功的情况
-                warning_cmd="brew reinstall --cask $name"
-                [ "$type" != "cask" ] && warning_cmd="brew reinstall $name"
+                brew_warning_cmd="brew reinstall --cask $name"
+                [ "$type" != "cask" ] && brew_warning_cmd="brew reinstall $name"
             fi
-            [ -n "$warning_cmd" ] && line="$line   ( ⚠️ 更新方式 ：$warning_cmd )"
+            [ -n "$brew_warning_cmd" ] && line="$line   ( ⚠️ 更新方式 ：$brew_warning_cmd )"
         fi
         # 输出该行到屏幕和日志
         echo -e "$line" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
