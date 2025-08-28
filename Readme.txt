@@ -103,12 +103,23 @@ grep -R "nosort" /opt/homebrew/etc/bash_completion.d
 
 
 
+
+# ----------------------------
+# 免密备份 控制台（LaunchPad）
+# ----------------------------
+
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/cp -rf /System/Volumes/Data/private/var/folders/*/0/com.apple.dock.launchpad * 
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/chmod  -R 755 ./com.apple.dock.launchpad
+
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/cp -rf */com.apple.dock.launchpad /System/Volumes/Data/private/var/folders/*/0
+
+
 # ----------------------------
 # 免密更新 MacOS Update
 # ----------------------------
 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/softwareupdate* 
-
+#你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/softwareupdate --install --all --force --verbose*
 
 
 # ----------------------------
@@ -289,6 +300,15 @@ grep -R "nosort" /opt/homebrew/etc/bash_completion.d
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove net.freemacsoft.AppCleaner*
 
 
+
+# ---------------------------
+# 免密更新 AutoMounterHelper
+# ---------------------------
+
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list nz.co.pixeleyes.AutoMounterHelper
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove nz.co.pixeleyes.AutoMounterHelper
+
+
 # ---------------------------
 # 免密更新 Background Music
 # ---------------------------
@@ -411,12 +431,32 @@ grep -R "nosort" /opt/homebrew/etc/bash_completion.d
 
 
 # ---------------------------
+# 免密更新 Fsmonitor
+# ---------------------------
+
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list com.tristan.fseventstool
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove com.tristan.fseventstool
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/com.tristan.fseventstool.plist
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/com.tristan.fseventstool.plist
+
+
+# ---------------------------
 # 免密更新 ForkLift
 # ---------------------------
 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list com.binarynights.ForkLift*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove com.binarynights.ForkLift*
 
+
+# ---------------------------
+# 免密更新 FxFactory
+# ---------------------------
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list com.fxfactory.FxFactory*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove com.fxfactory.FxFactory*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/com.fxfactory.FxFactory.*.plist
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/com.fxfactory.FxFactory.*.plist
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/fxfactory/*/*FxFactory*.pkg *
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget com.fxfactory.pkg
 
 # ---------------------------
 # 免密更新 Garmin Basecamp 
@@ -763,7 +803,7 @@ grep -R "nosort" /opt/homebrew/etc/bash_completion.d
 # ---------------------------
 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/powershell/*.pkg *
-你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/local/bin/pwsh -NoProfile -NonInteractive -Command 'Get-InstalledModule | ForEach-Object { try { Update-Module -Name * -Force -ErrorAction Stop } catch { Write-Output * } }' *
+#你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/local/bin/pwsh -NoProfile -NonInteractive -Command 'Get-InstalledModule | ForEach-Object { try { Update-Module -Name * } catch { Write-Output * } }' *
 
 
 # ---------------------------
@@ -787,13 +827,23 @@ grep -R "nosort" /opt/homebrew/etc/bash_completion.d
 
 
 # ---------------------------
+# 免密更新 Signal
+# ---------------------------
+
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/cp -pR /Applications/Signal.app /opt/homebrew/Caskroom/signal/*/Signal.app
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/chown -R -- * /opt/homebrew/Caskroom/signal/*
+
+
+# ---------------------------
 # 免密更新 Stash
 # ---------------------------
 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list ws.stash.app.mac.*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove ws.stash.app.mac.*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/PrivilegedHelperTools/ws.stash.app.mac.*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/PrivilegedHelperTools/ws.stash.app.mac.daemon.helper
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl load -w /Library/LaunchDaemons/ws.stash.app.mac.*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl print system/ws.stash.app.mac.*
 
 
 # ---------------------------
@@ -821,7 +871,7 @@ grep -R "nosort" /opt/homebrew/etc/bash_completion.d
 
 
 # ---------------------------
-# 免密更新 Synology 
+# 免密更新 Synology
 # ---------------------------
 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list com.synology.*
@@ -829,13 +879,13 @@ grep -R "nosort" /opt/homebrew/etc/bash_completion.d
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/synology*/*/*Synology*.pkg *
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget com.synology.*
 
+
 # ---------------------------
 # 免密更新 Tailscale
 # ---------------------------
 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget com.tailscale*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/tailscale*/*.pkg *
-
 
 # ---------------------------
 # 免密更新 TextSniper 
@@ -983,6 +1033,7 @@ grep -R "nosort" /opt/homebrew/etc/bash_completion.d
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/zerotierone*/*/zerotierone*.pkg *
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget com.zerotier.pkg.ZeroTierOne
 
+
 # ---------------------------
 # 免密更新 Zoom
 # ---------------------------
@@ -996,6 +1047,10 @@ grep -R "nosort" /opt/homebrew/etc/bash_completion.d
 
 
 
+
+
+
+
 # ---------------------------
 # 免密执行：自动更新脚本
 # ---------------------------
@@ -1003,15 +1058,6 @@ grep -R "nosort" /opt/homebrew/etc/bash_completion.d
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/local/bin/usercmd_updatefull
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/local/bin/usercmd_updatefull_NonMacUpdater
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/homebrew/bin/bash /usr/local/bin/usercmd_updatefull
-
-
-
-# --------------------------------------------------------
-# 系统密码 统缓时间 （缓存实效后，才需要二次输入密码）
-# --------------------------------------------------------
-
-Defaults timestamp_timeout=3            #  缓存   3 分钟
-# Defaults timestamp_timeout=120        #  缓存 120 分钟 (不建议)
 
 
 
