@@ -360,6 +360,7 @@ grep -R "nosort" /opt/homebrew/etc/bash_completion.d
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/com.cloudflare.*.plist
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /Applications/Cloudflare\ WARP.app/Contents/Resources/uninstall.sh
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/cloudflare-warp/*/Cloudflare_WARP*.pkg *
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget com.cloudflare.*
 
 
 # ---------------------------
@@ -820,13 +821,13 @@ grep -R "nosort" /opt/homebrew/etc/bash_completion.d
 
 
 # ---------------------------
-# 免密更新 Synology Drive
+# 免密更新 Synology 
 # ---------------------------
 
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list com.synology.*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove com.synology.*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/synology*/*/*Synology*.pkg *
-
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget com.synology.*
 
 # ---------------------------
 # 免密更新 Tailscale
@@ -968,7 +969,19 @@ grep -R "nosort" /opt/homebrew/etc/bash_completion.d
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/com.zerotier.*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/com.zerotier.*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/zerotier*/*/ZeroTier*.pkg *
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget com.zerotier.pkg.ZeroTier
 
+
+# ---------------------------
+# 免密更新 ZeroTier-One
+# ---------------------------
+
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl list com.zerotierone.*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/launchctl remove com.zerotierone.*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/com.zerotierone.*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/com.zerotierone.*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/installer -pkg /opt/homebrew/Caskroom/zerotierone*/*/zerotierone*.pkg *
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget com.zerotier.pkg.ZeroTierOne
 
 # ---------------------------
 # 免密更新 Zoom
@@ -1098,8 +1111,7 @@ rm -rf /opt/homebrew/Caskroom/microsoft-onedrive
 ===========================================
 
  - 本脚本，代码均来自AI，人工仅仅做极少量调整维护。参与编程的AI包括：
-   1. 【2025/Q3-？】编程者：OpenAI  ChatGPT 5 Pro / Agent
-   1. 【2025/Q2-Q3】编程者：OpenAI  ChatGPT O3—Pro + 深度研究 （主力）  、  xAI Grok4 （少量）
+   1. 【2025/Q3-？】编程者：OpenAI  ChatGPT O3—Pro + 深度研究 （主力）  、  xAI Grok4 （少量）
    2. 【2025/Q1-Q2】编程者：xAI     Grok3 + DeeperSearch / Think
    3. 【2024/Q3-Q4】编程者：OpenAI  ChatGPT O1 
    

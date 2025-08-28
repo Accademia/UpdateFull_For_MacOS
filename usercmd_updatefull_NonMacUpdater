@@ -1223,85 +1223,64 @@ echo -e "✅  APP 数量（ Homebrew         ）：$brew_app_count  "  | tee -a 
 
 echo -e ""                                                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
+
 printf  "\033[1;34m[Scan]\033[0m "
-printf  "[Scan] "                                                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "Homebrew 扫描更新 ... "                                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+printf  "[Scan] "                                                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "Homebrew 扫描更新 ... "                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
-# 检查是否以 root 身份运行
 if [ "$(id -u)" -eq 0 ]; then
-
-    # 以目标用户身份执行 Homebrew 命令
-
-    # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
-    targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 brew outdated --greedy ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-
-    # ① 所有过期项目（公式 + Cask）
-    brew_outdated=$(
-      sudo -H -u "$targetUser" bash -lc 'brew outdated --greedy' 2>&1 \
-      | awk '{print $1}'
-    )
-
-    # ② 仅过期的公式 (formula)
-    brew_outdated_formulas=$(
-      sudo -H -u "$targetUser" bash -lc 'brew outdated --formula --greedy' 2>&1 \
-      | awk '{print $1}'
-    )
-
-    # ③ 仅过期的 Cask
-    brew_outdated_casks=$(
-      sudo -H -u "$targetUser" bash -lc 'brew outdated --cask --greedy' 2>&1 \
-      | awk '{print $1}'
-    )
-
+  targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
+  echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 brew outdated --greedy ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+  brew_outdated=$(
+    sudo -H -u "$targetUser" bash -lc 'brew outdated --greedy' 2>/dev/null | awk '{print $1}'
+  )
+  brew_outdated_formulas=$(
+    sudo -H -u "$targetUser" bash -lc 'brew outdated --formula --greedy' 2>/dev/null | awk '{print $1}'
+  )
+  brew_outdated_casks=$(
+    sudo -H -u "$targetUser" bash -lc 'brew outdated --cask --greedy' 2>/dev/null | awk '{print $1}'
+  )
 else
-
-    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 brew outdated --greedy ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-
-    # ① 所有过期项目（Formula + Cask）
-    brew_outdated=$(
-        brew outdated --greedy 2>&1 \
-        | awk '{print $1}'
-    )
-
-    # ② 仅过期的 Formula
-    brew_outdated_formulas=$(
-        brew outdated --formula --greedy 2>&1 \
-        | awk '{print $1}'
-    )
-
-    # ③ 仅过期的 Cask
-    brew_outdated_casks=$(
-        brew outdated --cask --greedy 2>&1 \
-        | awk '{print $1}'
-    )
-
+  echo -e "✓  当前用户'$USER'，为普通权限，直接运行 brew outdated --greedy ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+  brew_outdated=$(
+    brew outdated --greedy 2>/dev/null | awk '{print $1}'
+  )
+  brew_outdated_formulas=$(
+    brew outdated --formula --greedy 2>/dev/null | awk '{print $1}'
+  )
+  brew_outdated_casks=$(
+    brew outdated --cask --greedy 2>/dev/null | awk '{print $1}'
+  )
 fi
 
-# 第 1 步：获取所有需要更新的 公式 和 包名称
-
-# 将需要更新的包分别存储
-packages_brew=($brew_outdated)
-#echo -e "brew_outdated = $brew_outdated"        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+# 兼容 bash 3.2：逐行构建数组（避免 read -a 只读到第一行）
+packages_brew=()
+while IFS= read -r pkg; do
+  [[ -n "$pkg" ]] && packages_brew+=("$pkg")
+done <<< "$brew_outdated"
 
 packages_brew_formulas=()
-for pkg in ${brew_outdated_formulas}; do
-    [[ -n "$pkg" ]] && packages_brew_formulas+=("$pkg")
-done
+while IFS= read -r pkg; do
+  [[ -n "$pkg" ]] && packages_brew_formulas+=("$pkg")
+done <<< "$brew_outdated_formulas"
 
 packages_brew_casks=()
-for pkg in ${brew_outdated_casks}; do
-    [[ -n "$pkg" ]] && packages_brew_casks+=("$pkg")
+while IFS= read -r pkg; do
+  [[ -n "$pkg" ]] && packages_brew_casks+=("$pkg")
+done <<< "$brew_outdated_casks"
+
+# 分类打印（先判定 cask，再判定 formula）
+for pkg in "${packages_brew[@]}"; do
+  if printf '%s\n' "${packages_brew_casks[@]}"     | grep -qxF -- "$pkg"; then
+    echo -e "✅  检测到新版本 [cask]    : $pkg"   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+  elif printf '%s\n' "${packages_brew_formulas[@]}" | grep -qxF -- "$pkg"; then
+    echo -e "✅  检测到新版本 [formula] : $pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+  else
+    echo -e "✅  检测到新版本 [unknown] : $pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+  fi
 done
 
-# 在组装 packages_brew* 数组后添加：
-for pkg in "${packages_brew[@]}"; do
-    if printf '%s\n' "${packages_brew_casks[@]}" | grep -qx "$pkg"; then
-        echo -e "✅  检测到新版本 [cask]    : $pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    else
-        echo -e "✅  检测到新版本 [formula] : $pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    fi
-done
+
 
 # 在获取 brew_outdated 列表并组装 packages_brew_formulas/casks 之后添加：
 updated_list=()   # 初始化数组，用于保存每个更新项的结果
@@ -1537,6 +1516,14 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
     #brew doctor  2>&1                                                                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     #exit 1                                                                                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"          # 用于调试 ！！
 
+
+
+
+
+    brew_formula_upgrade_exit=false
+    brew_formula_reinstall_exit=false
+    brew_formula_reinstall_force_exit=false
+
     # 第 3 步：串行安装（Homebrew formula）
     if [ ${#packages_brew_formulas[@]} -ne 0 ] ; then
         echo -e ""                                                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -1545,139 +1532,141 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         echo -e "开始更新：HomeBrew formula（ 串行 ） ... "                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
         # 循环逐个处理每个过期的 Homebrew formula
-        for formula in "${packages_brew_formulas[@]}"; do
+        for pkg_brew_formula in "${packages_brew_formulas[@]}"; do
 
-            brew_tmpfile=$(mktemp)
+            brew_formula_tmpfile=$(mktemp)
 
             # ---------- 尝试升级 ----------
             # 检查是否以 root 身份运行
             if [ "$(id -u)" -eq 0 ]; then
                 # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
                 targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-                echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $formula 升级 ( brew upgrade $formula ) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+                echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_formula 升级 ( brew upgrade $pkg_brew_formula --verbose --debug ) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
                 # 以目标用户身份执行 Homebrew 命令
-                sudo -H -u "$targetUser" bash -c "brew upgrade $formula 2>&1" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_tmpfile"
+                sudo -H -u "$targetUser" bash -c "brew upgrade $pkg_brew_formula 2>&1" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_formula_tmpfile"
             else
-                echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $formula 升级 ( brew upgrade $formula ) ... "                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-                brew upgrade "$formula" 2>&1                                                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_tmpfile" 
+                echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $pkg_brew_formula 升级 ( brew upgrade $pkg_brew_formula --verbose --debug ) ... "                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+                brew upgrade "$pkg_brew_formula" 2>&1                                                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_formula_tmpfile" 
             fi
 
-            brew_upgrade_exit=${PIPESTATUS[0]}        # 取 brew upgrade 的退出码
-            brew_final_exit=$brew_upgrade_exit             # 先假定最终状态 = 升级状态
-            brew_relink_exit=flase
+            brew_formula_upgrade_exit=${PIPESTATUS[0]}        # 取 brew upgrade 的退出码
+            brew_formula_final_exit=$brew_formula_upgrade_exit             # 先假定最终状态 = 升级状态
+            brew_formula_relink_exit=false
 
             # ---------- 若升级失败则尝试重装 ----------
-            if [ $brew_upgrade_exit -ne 0 ] ; then
+            if [ $brew_formula_upgrade_exit -ne 0 ] ; then
 
                 # 第二次尝试升级：通过 brew link 修复 formula APP 链接 （检查输出中是否包含符号链接冲突提示）
-                if grep -q "not symlinked" "$brew_tmpfile" || grep -q "Could not symlink" "$brew_tmpfile"; then
+                if grep -q "not symlinked" "$brew_formula_tmpfile" || grep -q "Could not symlink" "$brew_formula_tmpfile"; then
 
-                    echo "⚠️ 检测到 $formula 升级后，符号链接冲突，尝试执行 'brew link --overwrite $formula' ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    echo "⚠️ 检测到 $pkg_brew_formula 升级后，符号链接冲突，尝试执行 'brew link --overwrite $pkg_brew_formula' ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     # 检查是否以 root 身份运行
                     if [ "$(id -u)" -eq 0 ]; then
                         # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
                         targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-                        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $formula 重装 ( brew link --overwrite $formula )  ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_formula 重装 ( brew link --overwrite $pkg_brew_formula )  ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                         # 以目标用户身份执行 Homebrew 命令
-                        sudo -H -u "$targetUser" bash -c "brew link --overwrite $formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        sudo -H -u "$targetUser" bash -c "brew link --overwrite $pkg_brew_formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     else
-                        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $formula 重装 ( brew link --overwrite $formula ) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                        brew link --overwrite "$formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $pkg_brew_formula 重装 ( brew link --overwrite $pkg_brew_formula ) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        brew link --overwrite "$pkg_brew_formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     fi
 
-                    #brew link --overwrite "$formula" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                    brew_relink_exit=${PIPESTATUS[0]} 
+                    #brew link --overwrite "$pkg_brew_formula" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    brew_formula_relink_exit=${PIPESTATUS[0]} 
 
                     # ---------- 根据最终状态输出结果 ----------
-                    if [ $brew_relink_exit -eq 0 ]; then
-                        echo "✅  更新成功 [formula] ：$formula ( 已更新 & 符号链接 ) " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                        # 记录成功状态（将$formula加入成功列表），并跳过后续的重装尝试
-                        if [ $brew_upgrade_exit -ne 0 ]; then
-                            if [ $brew_relink_exit -eq 0 ]; then
-                                brew_method="relink"
+                    if [ $brew_formula_relink_exit -eq 0 ]; then
+                        echo "✅  更新成功 [formula] ：$pkg_brew_formula ( 已更新 & 符号链接 ) " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        # 记录成功状态（将$pkg_brew_formula加入成功列表），并跳过后续的重装尝试
+                        if [ $brew_formula_upgrade_exit -ne 0 ]; then
+                            if [ $brew_formula_relink_exit -eq 0 ]; then
+                                brew_formula_method="relink"
                             fi
                         else
-                            brew_method="upgrade"
+                            brew_formula_method="upgrade"
                         fi     
-                        #updated_list+=("success|formula|$formula|$brew_method")
-                        if [ $brew_final_exit -eq 0 ] ; then
-                            updated_list+=("success|formula|$formula|$brew_method")
+                        #updated_list+=("success|formula|$pkg_brew_formula|$brew_formula_method")
+                        if [ $brew_formula_final_exit -eq 0 ] ; then
+                            updated_list+=("success|formula|$pkg_brew_formula|$brew_formula_method")
                         else
-                            updated_list+=("failure|formula|$formula|$brew_method")
+                            updated_list+=("failure|formula|$pkg_brew_formula|$brew_formula_method")
                         fi
                         echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                        rm -f "$brew_tmpfile"
+                        rm -f "$brew_formula_tmpfile"
                         continue   # 进入下一个 formula 处理
                     else
-                        echo -e "⚠️  符号链接 失败 [formula] $formula ，继续尝试 重新安装 ( brew reinstall $formula ) ... "                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        echo -e "⚠️  符号链接 失败 [formula] $pkg_brew_formula ，继续尝试 重新安装 ( brew reinstall $pkg_brew_formula --verbose --debug ) ... "                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     fi
 
                     # 若强制链接仍失败，下面会继续执行重装逻辑
                 fi
 
                 # 第三次尝试升级：通过 brew reinstall  升级 formula APP
-                echo -e "upgrade 失败，尝试 重装 ( brew reinstall $formula ) ... "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "upgrade 失败，尝试 重装 ( brew reinstall $pkg_brew_formula --verbose --debug ) ... "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 # 检查是否以 root 身份运行
                 if [ "$(id -u)" -eq 0 ]; then
                     # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
                     targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-                    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $formula 重装 ( brew reinstall $formula )  ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_formula 重装 ( brew reinstall $pkg_brew_formula --verbose --debug )  ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     # 以目标用户身份执行 Homebrew 命令
-                    sudo -H -u "$targetUser" bash -c "brew reinstall $formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    sudo -H -u "$targetUser" bash -c "brew reinstall $pkg_brew_formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 else
-                    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $formula 重装 ( brew reinstall $formula ) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                    brew reinstall "$formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $pkg_brew_formula 重装 ( brew reinstall $pkg_brew_formula --verbose --debug ) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    brew reinstall "$pkg_brew_formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 fi
 
-                brew_reinstall_exit=${PIPESTATUS[0]}  # 取 brew reinstall 的退出码
-                brew_final_exit=$brew_reinstall_exit
+                brew_formula_reinstall_exit=${PIPESTATUS[0]}  # 取 brew reinstall 的退出码
+                brew_formula_final_exit=$brew_formula_reinstall_exit
 
                 # 第四次尝试升级：通过 brew reinstall --force 升级 formula APP
-                if [ $brew_reinstall_exit -ne 0 ]; then
-                    echo -e "reinstall 失败，尝试 强制重装 ( brew reinstall --force $formula ) ... "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                if [ $brew_formula_reinstall_exit -ne 0 ]; then
+                    echo -e "reinstall 失败，尝试 强制重装 ( brew reinstall --force $pkg_brew_formula --verbose --debug ) ... "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     # 检查是否以 root 身份运行
                     if [ "$(id -u)" -eq 0 ]; then
                         # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
                         targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-                        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $formula 强制重装 ( brew reinstall --force $formula )  ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_formula 强制重装 ( brew reinstall --force $pkg_brew_formula --verbose --debug )  ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                         # 以目标用户身份执行 Homebrew 命令
-                        sudo -H -u "$targetUser" bash -c "brew reinstall --force $formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        sudo -H -u "$targetUser" bash -c "brew reinstall --force $pkg_brew_formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     else
-                        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $formula 强制重装 ( brew reinstall --force $formula ) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                        brew reinstall --force "$formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $pkg_brew_formula 强制重装 ( brew reinstall --force $pkg_brew_formula --verbose --debug ) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        brew reinstall --force "$pkg_brew_formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     fi
-                    brew_reinstall_force_exit=${PIPESTATUS[0]}  # 取 brew reinstall 的退出码
-                    brew_final_exit=$brew_reinstall_force_exit
+                    brew_formula_reinstall_force_exit=${PIPESTATUS[0]}  # 取 brew reinstall 的退出码
+                    brew_formula_final_exit=$brew_formula_reinstall_force_exit
                 fi
             fi
 
             # ---------- 根据最终状态输出结果 ----------
-            if [ $brew_final_exit -eq 0 ] ; then
-                echo -e "✅  更新成功 [formula] ：$formula "                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            if [ $brew_formula_final_exit -eq 0 ] ; then
+                echo -e "✅  更新成功 [formula] ：$pkg_brew_formula "                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             else
-                echo -e "❌  更新失败 [formula] ：$formula "                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "❌  更新失败 [formula] ：$pkg_brew_formula "                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             fi
 
-            #brew_method=$([ $brew_upgrade_exit -ne 0 ] && echo "reinstall" || echo "upgrade")
-            if [ $brew_upgrade_exit -ne 0 ]; then
-                if [ $brew_reinstall_exit -eq 0 ]; then
-                    brew_method="reinstall"
-                else
-                    brew_method="reinstall_force"
+            #brew_formula_method=$([ $brew_formula_upgrade_exit -ne 0 ] && echo "reinstall" || echo "upgrade")
+            if [ $brew_formula_upgrade_exit -ne 0 ]; then
+                if [ $brew_formula_reinstall_exit -eq 0 ]; then
+                    brew_formula_method="reinstall"
+                    brew_formula_reinstall_exit=0
+                elif [ $brew_formula_reinstall_force_exit -eq 0 ]; then
+                    brew_formula_method="reinstall_force"
+                    brew_formula_reinstall_exit=0
                 fi
             else
-                brew_method="upgrade"
+                brew_formula_method="upgrade"
             fi    
 
-            #updated_list+=("success|cask|$formula|$brew_method")
-            if [ $brew_final_exit -eq 0 ] ; then
-                updated_list+=("success|formula|$formula|$brew_method")
+            #updated_list+=("success|cask|$pkg_brew_formula|$brew_formula_method")
+            if [ $brew_formula_final_exit -eq 0 ] ; then
+                updated_list+=("success|formula|$pkg_brew_formula|$brew_formula_method")
             else
-                updated_list+=("failure|formula|$formula|$brew_method")
+                updated_list+=("failure|formula|$pkg_brew_formula|$brew_formula_method")
             fi
 
             echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-            rm -f "$brew_tmpfile"
+            rm -f "$brew_formula_tmpfile"
 
         done
 
@@ -1691,9 +1680,14 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
 
     fi
 
-    brew_upgrade_exit=false
-    brew_reinstall_exit=false
-    brew_reinstall_force_exit=false
+
+
+
+
+
+    brew_cask_upgrade_exit=false
+    brew_cask_reinstall_exit=false
+    brew_cask_reinstall_force_exit=false
 
     # 第 4 步：串行安装（Homebrew cask）
     if [ ${#packages_brew_casks[@]} -ne 0 ] ; then
@@ -1703,31 +1697,31 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         echo -e "开始更新：HomeBrew cask（ 串行 ） ... "                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
         # 存储需要关闭和重启的应用程序
-        brew_apps_to_restart=()
+        #brew_cask_apps_to_restart=()
 
         # 逐个安装 每个待更新的 cask app
-        for cask in $brew_outdated_casks; do
+        for pkg_brew_cask in "${packages_brew_casks[@]}"; do
 
             # 新增：为 cask 升级输出创建临时文件，避免变量未定义导致 tee 报错
             brew_cask_tmpfile=$(mktemp)
 
             # 初始化每个 cask 应用的状态变量
-            brew_app_name=""
-            brew_exec_name=""
-            brew_process_name=""
-            brew_app_id=""
-            brew_was_running=false
+            brew_cask_app_name=""
+            brew_cask_exec_name=""
+            brew_cask_process_name=""
+            brew_cask_app_id=""
+            brew_cask_was_running=false
 
             # ------- 判断当前用户权限：Root 或 普通用户 -------
             if [[ $(id -u) -eq 0 ]]; then
                 # 1) 如果是 root，降权至目标普通用户执行 brew info
                 targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
                 echo -e "✓  Root权限降权至普通权限 ($targetUser) 后，查询 cask 信息..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                brew_info_output=$(sudo -H -u "$targetUser" /bin/bash -lc "brew info --cask \"$cask\"" 2>&1 | tee -a /dev/tty "$LOG_FULL_LAST" "$LOG_FULL_FILE")
+                brew_cask_info_output=$(sudo -H -u "$targetUser" /bin/bash -lc "brew info --cask \"$pkg_brew_cask\"" 2>&1 | tee -a /dev/tty "$LOG_FULL_LAST" "$LOG_FULL_FILE")
             else
                 # 2) 如果已是普通用户，直接执行 brew info
                 echo -e "✓  当前用户 '$USER' 为普通权限，直接查询 cask 信息..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                brew_info_output=$(brew info --cask "$cask" 2>&1 | tee -a /dev/tty "$LOG_FULL_LAST" "$LOG_FULL_FILE")
+                brew_cask_info_output=$(brew info --cask "$pkg_brew_cask" 2>&1 | tee -a /dev/tty "$LOG_FULL_LAST" "$LOG_FULL_FILE")
             fi
 
 
@@ -1739,202 +1733,202 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             if [ "$(id -u)" -eq 0 ]; then
               # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
               targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-              echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $cask 升级 ( brew upgrade --cask --greedy $cask ) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+              echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_cask 升级 ( brew upgrade --cask --greedy $pkg_brew_cask --verbose --debug ) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
               # 以目标用户身份执行 Homebrew 命令
-              sudo -H -u "$targetUser" bash -c "brew upgrade --cask --greedy $cask 2>&1"         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_tmpfile"
+              sudo -H -u "$targetUser" bash -c "brew upgrade --cask --greedy $pkg_brew_cask 2>&1"         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_cask_tmpfile"
             else
-              echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $cask 升级 ( brew upgrade --cask --greedy $cask ) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-              brew upgrade --cask --greedy "$cask" 2>&1                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_tmpfile"
+              echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $pkg_brew_cask 升级 ( brew upgrade --cask --greedy $pkg_brew_cask --verbose --debug ) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+              brew upgrade --cask --greedy "$pkg_brew_cask" 2>&1                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_cask_tmpfile"
             fi
 
-            brew_upgrade_exit=${PIPESTATUS[0]}        # 取 brew upgrade 的退出码
-            brew_final_exit=$brew_upgrade_exit             # 先假定最终状态 = 升级状态
+            brew_cask_upgrade_exit=${PIPESTATUS[0]}        # 取 brew upgrade 的退出码
+            brew_cask_final_exit=$brew_cask_upgrade_exit             # 先假定最终状态 = 升级状态
 
             # ---------- 若升级失败则尝试重装 ----------
-            if [ $brew_upgrade_exit -ne 0 ] ; then
+            if [ $brew_cask_upgrade_exit -ne 0 ] ; then
 
                 # 注意：⚠️ cask不需要 重新链接 ！
 
                 # 第二次尝试升级：通过 brew reinstall 升级 APP  
-                echo -e "upgrade 失败，尝试重装 ( brew reinstall --cask $cask ) ... "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "upgrade 失败，尝试重装 ( brew reinstall --cask $pkg_brew_cask --verbose --debug ) ... "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 # 检查是否以 root 身份运行
                 if [ "$(id -u)" -eq 0 ]; then
                     # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
                     targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-                    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $cask 重装 ( brew reinstall --cask $cask ) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_cask 重装 ( brew reinstall --cask $pkg_brew_cask --verbose --debug ) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     # 以目标用户身份执行 Homebrew 命令
-                    sudo -H -u "$targetUser" bash -c "brew reinstall --cask  $cask 2>&1"       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    sudo -H -u "$targetUser" bash -c "brew reinstall --cask  $pkg_brew_cask 2>&1"       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 else
-                    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $cask 重装 ( brew reinstall --cask $cask ) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-                    brew reinstall --cask "$cask" 2>&1                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $pkg_brew_cask 重装 ( brew reinstall --cask $pkg_brew_cask --verbose --debug ) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+                    brew reinstall --cask "$pkg_brew_cask" 2>&1                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 fi
    
-                brew_reinstall_exit=${PIPESTATUS[0]}    # 获取 brew reinstall 的退出码  
-                brew_final_exit=$brew_reinstall_exit       # 将最终状态更新为 reinstall 的状态  
+                brew_cask_reinstall_exit=${PIPESTATUS[0]}    # 获取 brew reinstall 的退出码  
+                brew_cask_final_exit=$brew_cask_reinstall_exit       # 将最终状态更新为 reinstall 的状态  
 
 
 
                 # 如果第二次尝试仍然失败。尝试关闭线程，然后开始尝试 第三次更升级，通过 brew reinstall --force 强制升级 APP。  
-                if [ $brew_reinstall_exit -ne 0 ]; then
+                if [ $brew_cask_reinstall_exit -ne 0 ]; then
 
                     # 尝试从输出中提取应用的 .app 行（如果存在）
-                    brew_app_line=$(echo "$brew_info_output" | grep -m1 '\.app (App)')
-                    if [[ -n "$brew_app_line" ]]; then
+                    brew_cask_app_line=$(echo "$brew_cask_info_output" | grep -m1 '\.app (App)')
+                    if [[ -n "$brew_cask_app_line" ]]; then
                         # 提取应用程序包名（去掉“.app (App)”标记和多余空格）
-                        brew_app_name=$(echo "$brew_app_line" | sed -e 's/\.app (App)//' -e 's/^[[:space:]]*//')
+                        brew_cask_app_name=$(echo "$brew_cask_app_line" | sed -e 's/\.app (App)//' -e 's/^[[:space:]]*//')
                     fi
 
-                    if [[ -n "$brew_app_name" ]]; then
-                            echo -e "✓  检测到应用名称 = '$brew_app_name.app' ，通过命令 ( brew info $cask ) 输出的 Artifacts 字段。应用名称用来，关闭进程。已防止阻碍后续更新 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    if [[ -n "$brew_cask_app_name" ]]; then
+                            echo -e "✓  检测到应用名称 = '$brew_cask_app_name.app' ，通过命令 ( brew info $pkg_brew_cask ) 输出的 Artifacts 字段。应用名称用来，关闭进程。已防止阻碍后续更新 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     fi
 
                     # 如果未找到 .app 信息且检测到 .pkg 安装包，则解析 .pkg 获取应用名称和进程名
-                    if [[ -z "$brew_app_line" && $(echo "$brew_info_output" | grep -c '\.pkg (Pkg)') -gt 0 ]]; then
+                    if [[ -z "$brew_cask_app_line" && $(echo "$brew_cask_info_output" | grep -c '\.pkg (Pkg)') -gt 0 ]]; then
 
-                        echo -e "✘  未能从 brew info $cask 中，提取到安装后的 应用名称（*.app） ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        echo -e "✘  未能从 brew info $pkg_brew_cask 中，提取到安装后的 应用名称（*.app） ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
                         # 提取即将安装的版本号（优先从 brew info 第一行获取）
-                        brew_new_version="$(echo "$brew_info_output" | awk -F'[: ]+' 'NR==1{print $3}')"
-                        if [[ -z "$brew_new_version" ]]; then
-                            brew_new_version="$(brew info --cask --json=v2 "$cask" 2>/dev/null | grep -m1 '"version"' | sed -E 's/.*"version": *"([^"]+)".*/\1/')"
+                        brew_cask_new_version="$(echo "$brew_cask_info_output" | awk -F'[: ]+' 'NR==1{print $3}')"
+                        if [[ -z "$brew_cask_new_version" ]]; then
+                            brew_cask_new_version="$(brew info --cask --json=v2 "$pkg_brew_cask" 2>/dev/null | grep -m1 '"version"' | sed -E 's/.*"version": *"([^"]+)".*/\1/')"
                         fi
                         # 构造 .pkg 文件路径（Homebrew Cask 默认安装路径）
-                        brew_pkg_line="$(echo "$brew_info_output" | grep -m1 '\.pkg (Pkg)')"
-                        brew_pkg_file_name="$(echo "$brew_pkg_line" | awk '{print $1}')"
-                        brew_pkg_path="/opt/homebrew/Caskroom/$cask/$brew_new_version/$brew_pkg_file_name"
+                        brew_cask_pkg_line="$(echo "$brew_cask_info_output" | grep -m1 '\.pkg (Pkg)')"
+                        brew_cask_pkg_file_name="$(echo "$brew_cask_pkg_line" | awk '{print $1}')"
+                        brew_cask_pkg_path="/opt/homebrew/Caskroom/$pkg_brew_cask/$brew_cask_new_version/$brew_cask_pkg_file_name"
 
-                        echo -e "✓  准备通过 解压缩 $brew_pkg_file_name.pkg 安装包，寻找安装包内的 *.app 文件（安装后的的APP名称） ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                        echo -e "✓  解析到 pkg 安装包 的 本地路径：$brew_pkg_path ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        echo -e "✓  准备通过 解压缩 $brew_cask_pkg_file_name.pkg 安装包，寻找安装包内的 *.app 文件（安装后的的APP名称） ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        echo -e "✓  解析到 pkg 安装包 的 本地路径：$brew_cask_pkg_path ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
-                        if [[ -f "$brew_pkg_path" ]]; then
+                        if [[ -f "$brew_cask_pkg_path" ]]; then
                             # 创建临时目录并展开 .pkg 文件
-                            brew_tmp_dir="$("/usr/bin/mktemp" -d)"
-                            /usr/sbin/pkgutil --expand "$brew_pkg_path" "$brew_tmp_dir"
+                            brew_cask_tmp_dir="$("/usr/bin/mktemp" -d)"
+                            /usr/sbin/pkgutil --expand "$brew_cask_pkg_path" "$brew_cask_tmp_dir"
                             # 利用 lsbom 列出安装清单中的 .app 路径列表
-                            brew_app_paths="$(find "$brew_tmp_dir" -name '*.bom' -exec /usr/bin/lsbom -f {} \; | sed -n 's#^\(.*\.app\)/Contents/.*#\1#p' | sort -u)"
+                            brew_cask_app_paths="$(find "$brew_cask_tmp_dir" -name '*.bom' -exec /usr/bin/lsbom -f {} \; | sed -n 's#^\(.*\.app\)/Contents/.*#\1#p' | sort -u)"
                             # 遍历 .pkg 安装包含的应用路径（使用 while 逐行读取，支持路径中含空格）
                             while IFS= read -r app_rel_path; do
                                 full_app_path="/$app_rel_path"   # .pkg 安装路径是系统根目录起始
                                 if [[ -d "$full_app_path" ]]; then
                                     # 读取应用的 Info.plist 获取可执行文件名和 Bundle ID
-                                    brew_exec_name="$(/usr/bin/defaults read "$full_app_path/Contents/Info.plist" CFBundleExecutable 2>/dev/null)"
-                                    brew_bundle_id="$(/usr/bin/defaults read "$full_app_path/Contents/Info.plist" CFBundleIdentifier 2>/dev/null)"
-                                    if [[ -n "$brew_exec_name" ]]; then
-                                        brew_app_name="$full_app_path"    # 保存应用程序路径
-                                        brew_process_name="$brew_exec_name"    # 对应进程名（用于 pkill/killall）
-                                        brew_app_id="$brew_bundle_id"          # 应用 Bundle ID（用于 AppleScript 定位）
-                                        echo -e "✓  检测到 .pkg 将安装应用：$full_app_path，进程名：$brew_process_name" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                                    brew_cask_exec_name="$(/usr/bin/defaults read "$full_app_path/Contents/Info.plist" CFBundleExecutable 2>/dev/null)"
+                                    brew_cask_bundle_id="$(/usr/bin/defaults read "$full_app_path/Contents/Info.plist" CFBundleIdentifier 2>/dev/null)"
+                                    if [[ -n "$brew_cask_exec_name" ]]; then
+                                        brew_cask_app_name="$full_app_path"    # 保存应用程序路径
+                                        brew_cask_process_name="$brew_cask_exec_name"    # 对应进程名（用于 pkill/killall）
+                                        brew_cask_app_id="$brew_cask_bundle_id"          # 应用 Bundle ID（用于 AppleScript 定位）
+                                        echo -e "✓  检测到 .pkg 将安装应用：$full_app_path，进程名：$brew_cask_process_name" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                                         # 如检测到该进程正在运行则尝试关闭
-                                        #if pgrep -ix "$brew_process_name" > /dev/null; then
-                                        #    echo -e "✓  检测到 $brew_process_name 正在运行，正在尝试退出 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                                        #    ( /usr/bin/osascript -e "tell application id \"$brew_app_id\" to quit" || /usr/bin/pkill -x "$brew_process_name" ) 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                                        #if pgrep -ix "$brew_cask_process_name" > /dev/null; then
+                                        #    echo -e "✓  检测到 $brew_cask_process_name 正在运行，正在尝试退出 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                                        #    ( /usr/bin/osascript -e "tell application id \"$brew_cask_app_id\" to quit" || /usr/bin/pkill -x "$brew_cask_process_name" ) 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                                         #    sleep 5   # 等待进程退出完成
-                                        #    brew_was_running=true
+                                        #    brew_cask_was_running=true
                                         #fi
                                         # 检测到目标应用正在运行则尝试关闭（优雅退出 + 超时强杀）
-                                        if pgrep -ix "$brew_process_name" > /dev/null; then
-                                            echo -e "✓  检测到 '$brew_process_name' (pkg) 正在运行，正在尝试退出 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                                            attempt_quit_app "$brew_app_id" "$brew_process_name" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                                            brew_was_running=true   # 标记应用本来是运行状态（供后续决定是否重启）
+                                        if pgrep -ix "$brew_cask_process_name" > /dev/null; then
+                                            echo -e "✓  检测到 '$brew_cask_process_name' (pkg) 正在运行，正在尝试退出 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                                            attempt_quit_app "$brew_cask_app_id" "$brew_cask_process_name" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                                            brew_cask_was_running=true   # 标记应用本来是运行状态（供后续决定是否重启）
                                         fi
 
                                         break   # 已找到目标应用，退出循环
                                     fi
                                 fi
-                            done <<< "$brew_app_paths"
+                            done <<< "$brew_cask_app_paths"
                             # 清理临时文件
-                            /bin/rm -rf "$brew_tmp_dir"
+                            /bin/rm -rf "$brew_cask_tmp_dir"
                         fi
                         # 有的时候，由于pkg内部还会套多个pkg，故对pkg第一次解压缩后，可能拿不到.app文件名。此时就会获取不到应用名称。
                         # 对于这种情况，建议直接使用 brew info 的 Name 字段作为候选
                         # 如果仍未从 .pkg 中提取到应用名，则使用 brew info 的 Name 字段作为候选
-                        if [[ -z "$brew_exec_name" ]]; then
-                            echo -e "✘  未能从 $cask 的 pkg 安装包 $brew_pkg_line 中，提取到安装后的 应用名称（*.app）..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        if [[ -z "$brew_cask_exec_name" ]]; then
+                            echo -e "✘  未能从 $pkg_brew_cask 的 pkg 安装包 $brew_cask_pkg_line 中，提取到安装后的 应用名称（*.app）..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                             echo -e "✘  由于 pkg 内嵌套多个 pkg 。此时就会 获取不到 应用名称 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                            brew_name_line="$(echo "$brew_info_output" | awk '/^==> Name$/{getline; print}')"
-                            echo -e "✓  使用 brew info $cask 的 Name 字段 $brew_name_line ，作为安装后的 应用名称（$brew_name_line.app），查询并关闭 相应进程 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                            brew_app_name="$brew_name_line"
-                            [[ "$brew_app_name" =~ Pro\ DC$ ]] && brew_app_name="${brew_app_name// Pro DC/}"   # 去除特殊后缀（如 "Pro DC"）
-                            brew_process_name="$brew_app_name"
+                            brew_cask_name_line="$(echo "$brew_cask_info_output" | awk '/^==> Name$/{getline; print}')"
+                            echo -e "✓  使用 brew info $pkg_brew_cask 的 Name 字段 $brew_cask_name_line ，作为安装后的 应用名称（$brew_cask_name_line.app），查询并关闭 相应进程 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                            brew_cask_app_name="$brew_cask_name_line"
+                            [[ "$brew_cask_app_name" =~ Pro\ DC$ ]] && brew_cask_app_name="${brew_cask_app_name// Pro DC/}"   # 去除特殊后缀（如 "Pro DC"）
+                            brew_cask_process_name="$brew_cask_app_name"
                         fi
                     fi
 
                     # 根据提取的应用名/进程名，尝试关闭正在运行的应用以便升级
 
-                    # 如 brew_app_id 为空（非 .pkg 安装），尝试查找已安装的 .app 路径并读取 Info.plist 获取 Bundle ID 和 可执行文件名
-                    if [[ -n "$brew_app_name" && -z "$brew_app_id" ]]; then
+                    # 如 brew_cask_app_id 为空（非 .pkg 安装），尝试查找已安装的 .app 路径并读取 Info.plist 获取 Bundle ID 和 可执行文件名
+                    if [[ -n "$brew_cask_app_name" && -z "$brew_cask_app_id" ]]; then
                         # 搜索常见安装路径 /Applications 和 ~/Applications 下的 .app
-                        if [[ -d "/Applications/$brew_app_name.app" ]]; then
-                            full_app_path="/Applications/$brew_app_name.app"
-                        elif [[ -d "$HOME/Applications/$brew_app_name.app" ]]; then
-                            full_app_path="$HOME/Applications/$brew_app_name.app"
+                        if [[ -d "/Applications/$brew_cask_app_name.app" ]]; then
+                            full_app_path="/Applications/$brew_cask_app_name.app"
+                        elif [[ -d "$HOME/Applications/$brew_cask_app_name.app" ]]; then
+                            full_app_path="$HOME/Applications/$brew_cask_app_name.app"
                         else
                             # 若上述路径未找到，检查 Homebrew Caskroom 目录
-                            if [[ -d "/opt/homebrew/Caskroom/$cask" ]]; then
-                                full_app_path=$(find "/opt/homebrew/Caskroom/$cask" -maxdepth 4 -type d -name "$brew_app_name.app" -print -quit)
+                            if [[ -d "/opt/homebrew/Caskroom/$pkg_brew_cask" ]]; then
+                                full_app_path=$(find "/opt/homebrew/Caskroom/$pkg_brew_cask" -maxdepth 4 -type d -name "$brew_cask_app_name.app" -print -quit)
                             fi
-                            if [[ -z "$full_app_path" && -d "/usr/local/Caskroom/$cask" ]]; then
-                                full_app_path=$(find "/usr/local/Caskroom/$cask" -maxdepth 4 -type d -name "$brew_app_name.app" -print -quit)
+                            if [[ -z "$full_app_path" && -d "/usr/local/Caskroom/$pkg_brew_cask" ]]; then
+                                full_app_path=$(find "/usr/local/Caskroom/$pkg_brew_cask" -maxdepth 4 -type d -name "$brew_cask_app_name.app" -print -quit)
                             fi
                         fi
 
                         # 如果找到已安装的 .app，读取其 Info.plist 获取进程名和 Bundle ID
                         if [[ -n "$full_app_path" && -d "$full_app_path" ]]; then
-                            brew_exec_name=$(/usr/bin/defaults read "$full_app_path/Contents/Info.plist" CFBundleExecutable 2>/dev/null)
-                            brew_bundle_id=$(/usr/bin/defaults read "$full_app_path/Contents/Info.plist" CFBundleIdentifier 2>/dev/null)
-                            if [[ -n "$brew_exec_name" ]]; then
-                                brew_process_name="$brew_exec_name"
-                                brew_app_id="$brew_bundle_id"
-                                echo -e "✓  当前APP的，应用名：'$brew_app_name' ; 路径名：'$full_app_path' ; 进程名：'$brew_process_name' " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                            brew_cask_exec_name=$(/usr/bin/defaults read "$full_app_path/Contents/Info.plist" CFBundleExecutable 2>/dev/null)
+                            brew_cask_bundle_id=$(/usr/bin/defaults read "$full_app_path/Contents/Info.plist" CFBundleIdentifier 2>/dev/null)
+                            if [[ -n "$brew_cask_exec_name" ]]; then
+                                brew_cask_process_name="$brew_cask_exec_name"
+                                brew_cask_app_id="$brew_cask_bundle_id"
+                                echo -e "✓  当前APP的，应用名：'$brew_cask_app_name' ; 路径名：'$full_app_path' ; 进程名：'$brew_cask_process_name' " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                             fi
                         fi
                     fi
 
                     # 如仍未设置进程名（非 .pkg 安装且未找到 Info），则使用应用名称作为进程名
-                    [[ -z "$brew_process_name" ]] && brew_process_name="$brew_app_name"
+                    [[ -z "$brew_cask_process_name" ]] && brew_cask_process_name="$brew_cask_app_name"
 
-                    if pgrep -ix "$brew_process_name" > /dev/null; then
-                        echo -e "✓  检测到 $brew_process_name (app) 正在运行。开始尝试退出 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                        attempt_quit_app "$brew_app_id" "$brew_process_name" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                        brew_was_running=true   # 标记应用原本处于运行状态（更新后需重启）
-                        echo -e "✓  退出 '$brew_process_name' 进程 已完成 ... " 
+                    if pgrep -ix "$brew_cask_process_name" > /dev/null; then
+                        echo -e "✓  检测到 $brew_cask_process_name (app) 正在运行。开始尝试退出 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        attempt_quit_app "$brew_cask_app_id" "$brew_cask_process_name" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        brew_cask_was_running=true   # 标记应用原本处于运行状态（更新后需重启）
+                        echo -e "✓  退出 '$brew_cask_process_name' 进程 已完成 ... " 
                     else
-                        echo -e "✓  直接升级！！！ $brew_app_name 未运行" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        echo -e "✓  直接升级！！！ $brew_cask_app_name 未运行" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     fi
 
                 fi
 
 
                 # 第三次尝试升级：再次尝试关闭阻碍更新的进程，并通过 brew reinstall --force 升级 APP
-                if [ $brew_reinstall_exit -ne 0 ]; then
+                if [ $brew_cask_reinstall_exit -ne 0 ]; then
                       # 若重装失败且检测到应用仍在运行，强制关闭后再重试一次
-                      if pgrep -ix "$brew_app_name" > /dev/null; then
-                          brew_pid=$(pgrep -f "$brew_app_name")
-                          echo -e "⚠️ 检测到 $brew_app_name ( PID = $brew_pid ) 仍在运行，尝试强制关闭，然后再次尝试 reinstall 覆盖安装 ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                          if [ -n "$brew_pid" ]; then
-                              kill -9 "$brew_pid"
+                      if pgrep -ix "$brew_cask_app_name" > /dev/null; then
+                          brew_cask_pid=$(pgrep -f "$brew_cask_app_name")
+                          echo -e "⚠️ 检测到 $brew_cask_app_name ( PID = $brew_cask_pid ) 仍在运行，尝试强制关闭，然后再次尝试 reinstall 覆盖安装 ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                          if [ -n "$brew_cask_pid" ]; then
+                              kill -9 "$brew_cask_pid"
                           fi
                       else
-                          echo -e "✓  $brew_app_name 未发现其运行，准备尝试 reinstall --force 强制覆盖安装 !!! "          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                          echo -e "✓  $brew_cask_app_name 未发现其运行，准备尝试 reinstall --force 强制覆盖安装 !!! "          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                       fi
        
                       # 检查是否以 root 身份运行
                       if [ "$(id -u)" -eq 0 ]; then
-                          echo -e "upgrade 失败，尝试 强制覆盖安装 ( brew reinstall --cask --force $cask ) ... "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                          echo -e "upgrade 失败，尝试 强制覆盖安装 ( brew reinstall --cask --force $pkg_brew_cask --verbose --debug ) ... "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                           # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
                           targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-                          echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $cask 强制覆盖安装 ( brew reinstall --cask --force $cask ) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                          echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_cask 强制覆盖安装 ( brew reinstall --cask --force $pkg_brew_cask --verbose --debug ) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                           # 以目标用户身份执行 Homebrew 命令
-                          sudo -H -u "$targetUser" bash -c "brew reinstall --cask --force $cask 2>&1"       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                          sudo -H -u "$targetUser" bash -c "brew reinstall --cask --force $pkg_brew_cask 2>&1"       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                       else
-                          echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $cask 强制覆盖安装 ( brew reinstall --cask --force $cask ) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-                          brew reinstall --cask --force "$cask" 2>&1                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                          echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $pkg_brew_cask 强制覆盖安装 ( brew reinstall --cask --force $pkg_brew_cask --verbose --debug ) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+                          brew reinstall --cask --force "$pkg_brew_cask" 2>&1                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                       fi
        
-                      #brew reinstall --cask --force "$cask" 2>&1                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                      #brew reinstall --cask --force "$pkg_brew_cask" 2>&1                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
        
-                      brew_reinstall_force_exit=${PIPESTATUS[0]}
-                      brew_final_exit=$brew_reinstall_force_exit       # 将最终状态更新为 reinstall 的状态  
+                      brew_cask_reinstall_force_exit=${PIPESTATUS[0]}
+                      brew_cask_final_exit=$brew_cask_reinstall_force_exit       # 将最终状态更新为 reinstall 的状态  
                 fi
 
             fi  
@@ -1942,39 +1936,41 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             # ---------- 重新启动 APP（如果在本次升级中被关闭） ----------   
 
             # 如果之前关闭了应用，更新完成后重新打开 
-            if [[ "$brew_was_running" = true && -n "$brew_app_name" ]]; then  
-              echo -e "✓  重新启动此前关闭的应用：$brew_app_name ... "                             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-              open -a "'$brew_app_name.app'" 2>&1                                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            if [[ "$brew_cask_was_running" = true && -n "$brew_cask_app_name" ]]; then  
+              echo -e "✓  重新启动此前关闭的应用：$brew_cask_app_name ... "                             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+              open -a "'$brew_cask_app_name.app'" 2>&1                                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             fi
 
             # ---------- 本APP 的 升级结果 ----------  
-            if [ $brew_final_exit -eq 0 ]; then
-                echo -e "✅  更新成功 [cask]   : $cask "                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            if [ $brew_cask_final_exit -eq 0 ]; then
+                echo -e "✅  更新成功 [cask]   : $pkg_brew_cask "                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             else
-                echo -e "❌  更新失败 [cask]   : $cask "                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "❌  更新失败 [cask]   : $pkg_brew_cask "                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             fi
 
-            #brew_method=$([ $brew_upgrade_exit -ne 0 ] && echo "reinstall" || echo "upgrade")
-            if [ $brew_upgrade_exit -ne 0 ]; then
-                if [ $brew_reinstall_exit -eq 0 ]; then
-                    brew_method="reinstall"
-                else
-                    brew_method="reinstall_force"
+            #brew_cask_method=$([ $brew_cask_upgrade_exit -ne 0 ] && echo "reinstall" || echo "upgrade")
+            if [ $brew_cask_upgrade_exit -ne 0 ]; then
+                if [ $brew_cask_reinstall_exit -eq 0 ]; then
+                    brew_cask_method="reinstall"
+                    brew_cask_reinstall_exit=0
+                elif [ $brew_cask_reinstall_force_exit -eq 0 ]; then
+                    brew_cask_method="reinstall_force"
+                    brew_cask_reinstall_exit=0
                 fi
             else
-                brew_method="upgrade"
+                brew_cask_method="upgrade"
             fi                
 
-            #updated_list+=("success|cask|$cask|$brew_method")
-            if [ $brew_final_exit -eq 0 ] ; then
-                updated_list+=("success|cask|$cask|$brew_method")
+            #updated_list+=("success|cask|$pkg_brew_cask|$brew_cask_method")
+            if [ $brew_cask_final_exit -eq 0 ] ; then
+                updated_list+=("success|cask|$pkg_brew_cask|$brew_cask_method")
             else
-                updated_list+=("failure|cask|$cask|$brew_method")
+                updated_list+=("failure|cask|$pkg_brew_cask|$brew_cask_method")
             fi
 
             echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
-            rm -f "$brew_tmpfile"  # 清理临时文件
+            rm -f "$brew_cask_tmpfile"  # 清理临时文件
 
         done
 
@@ -1989,6 +1985,9 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     fi    
+
+
+
 
  #  brew upgrade --greedy --debug --force                                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE""  ###### 仅作为Debug使用！！！
 
