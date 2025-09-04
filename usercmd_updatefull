@@ -1603,7 +1603,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                 fi
 
                 # 第三次尝试升级：通过 brew reinstall  升级 formula APP
-                echo -e "upgrade 失败，尝试 重装 ( brew reinstall $pkg_brew_formula --verbose --debug ) ... "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "⚠️ upgrade 失败，尝试 重装 ( brew reinstall $pkg_brew_formula --verbose --debug ) ... "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 # 检查是否以 root 身份运行
                 if [ "$(id -u)" -eq 0 ]; then
                     # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
@@ -1621,7 +1621,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
 
                 # 第四次尝试升级：通过 brew reinstall --force 升级 formula APP
                 if [ $brew_formula_reinstall_exit -ne 0 ]; then
-                    echo -e "reinstall 失败，尝试 强制重装 ( brew reinstall --force $pkg_brew_formula --verbose --debug ) ... "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    echo -e "⚠️ reinstall 失败，尝试 强制重装 ( brew reinstall --force $pkg_brew_formula --verbose --debug ) ... "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     # 检查是否以 root 身份运行
                     if [ "$(id -u)" -eq 0 ]; then
                         # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
@@ -1750,7 +1750,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                 # 注意：⚠️ cask不需要 重新链接 ！
 
                 # 第二次尝试升级：通过 brew reinstall 升级 APP  
-                echo -e "upgrade 失败，尝试重装 ( brew reinstall --cask $pkg_brew_cask --verbose --debug ) ... "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "⚠️ upgrade 失败，尝试重装 ( brew reinstall --cask $pkg_brew_cask --verbose --debug ) ... "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 # 检查是否以 root 身份运行
                 if [ "$(id -u)" -eq 0 ]; then
                     # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
@@ -1914,7 +1914,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
        
                       # 检查是否以 root 身份运行
                       if [ "$(id -u)" -eq 0 ]; then
-                          echo -e "upgrade 失败，尝试 强制覆盖安装 ( brew reinstall --cask --force $pkg_brew_cask --verbose --debug ) ... "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                          echo -e "⚠️ upgrade 失败，尝试 强制覆盖安装 ( brew reinstall --cask --force $pkg_brew_cask --verbose --debug ) ... "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                           # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
                           targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
                           echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_cask 强制覆盖安装 ( brew reinstall --cask --force $pkg_brew_cask --verbose --debug ) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
