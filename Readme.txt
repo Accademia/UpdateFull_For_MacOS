@@ -788,6 +788,7 @@ grep -R "nosort" /opt/homebrew/etc/bash_completion.d
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -rf /Library/Extensions/ufsd_*.kext
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchDaemons/com.paragon-software.*.plist
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f -- /Library/LaunchAgents/com.paragon-software.*.plist
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/pkgutil --forget com.paragon-software.pkg.*
 
 
 # ---------------------------
