@@ -21,6 +21,9 @@ LOG_PATH="$ICLOUD_PATH/LOG/$COMPUTER_NAME"                                  # LO
 
 mkdir -p "$LOG_PATH"                                                        # 创建目录   # 注意：这里是保存到iCloud，也可以设置别的保存路径
 
+# 用于标记需要手动运行安装器的 cask
+MANUAL_INSTALL_CASKS=("paragon-ntfs" "paragon-extfs")
+
 # ================================================================================================
 # 参数设置：用户可修改 （End）
 # ================================================================================================
@@ -346,7 +349,6 @@ attempt_quit_app() {
 
 
 
-
 # ************************* #
 # 自定义函数：统一的错误输出（带着色与日志追加）
 # ************************* #
@@ -355,6 +357,7 @@ print_error() {
   printf "[ERROR] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
   echo -e "$*" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 }
+
 
 
 
@@ -1931,6 +1934,36 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                       brew_cask_final_exit=$brew_cask_reinstall_force_exit       # 将最终状态更新为 reinstall 的状态  
                 fi
 
+
+                # 第四次尝试升级 ：对于需要手动更新的app，单独处理 （ 如：paragon-ntfs、paragon-extfs ）
+                if [[ " ${MANUAL_INSTALL_CASKS[*]} " == *" $pkg_brew_cask "* ]]; then
+                  echo -e "⚠️  $pkg_brew_cask 需要手动安装，尝试运行其安装器..."
+
+                  # 根据 Homebrew 前缀确定 Caskroom 路径（Intel 在 /usr/local/Caskroom）
+                  caskroom_base=$(brew --prefix)/Caskroom
+
+                  # 查找 FSInstaller.app 的最新版本路径
+                  manual_installer_app=$(find "$caskroom_base/$pkg_brew_cask" -maxdepth 3 -type d -name "FSInstaller.app" | sort -r | head -n 1)
+
+                  if [[ -n "$manual_installer_app" ]]; then
+                    # 为避免 Gatekeeper 静默阻止，先移除隔离标记
+                    if [[ $(id -u) -eq 0 ]]; then
+                      targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+                      sudo -u "$targetUser" xattr -dr com.apple.quarantine "$manual_installer_app"
+                      # 以图形界面方式启动安装器并等待安装器退出
+                      sudo -u "$targetUser" open -n -W "$manual_installer_app"
+                    else
+                      xattr -dr com.apple.quarantine "$manual_installer_app"
+                      open -n -W "$manual_installer_app"
+                    fi
+                  else
+                    echo -e "❌ 未找到 $pkg_brew_cask 的安装器，请手动在 Finder 中运行 FSInstaller.app"
+                  fi
+
+                  # 安装器执行完后，系统会提示“来自 Paragon Software 的系统软件已被阻止”时
+                  # 需要用户前往系统设置 → 隐私与安全性 → 允许，并根据提示重启。
+                fi
+
             fi  
 
             # ---------- 重新启动 APP（如果在本次升级中被关闭） ----------   
@@ -1938,7 +1971,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             # 如果之前关闭了应用，更新完成后重新打开 
             if [[ "$brew_cask_was_running" = true && -n "$brew_cask_app_name" ]]; then  
               echo -e "✓  重新启动此前关闭的应用：$brew_cask_app_name ... "                             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-              open -a "'$brew_cask_app_name.app'" 2>&1                                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+              open -a "$brew_cask_app_name.app" 2>&1                                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             fi
 
             # ---------- 本APP 的 升级结果 ----------  
@@ -2312,7 +2345,7 @@ if [ "$mas_success" = true ]; then
     # 重新启动之前关闭的应用程序
     for mas_app in "${mas_apps_to_restart[@]}"; do
         echo -e "✓ 正在重新启动 $mas_app ... "                                                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-        open -a "$mas_app"                                                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+        open -a "$mas_app"  2>&1                                                                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
         sleep 1  # 短暂延迟以确保应用启动
     done
 
