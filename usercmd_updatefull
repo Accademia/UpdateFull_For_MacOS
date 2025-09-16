@@ -834,7 +834,7 @@ echo -e ""                                                                      
 # 调用检查时间范围函数
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
-if port version  > /dev/null 2>&1 ; then
+if command -v port >/dev/null 2>&1; then
 
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
     echo -e "\033[1;36m 更新 MacPorts 工具 ...\033[0m"
@@ -858,7 +858,33 @@ else
 
     echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
-    curl -LO https://distfiles.macports.org/MacPorts/MacPorts-2.8.1-10.15-Catalina.pkg && sudo /usr/sbin/installer -pkg MacPorts-2.8.1-10.15-Catalina.pkg -target /
+    #curl -LO https://distfiles.macports.org/MacPorts/MacPorts-2.8.1-10.15-Catalina.pkg && sudo /usr/sbin/installer -pkg MacPorts-2.8.1-10.15-Catalina.pkg -target /
+
+    # 1. 获取主版本号
+    macos_version=$(sw_vers -productVersion)
+    major_version=${macos_version%%.*}
+
+    # 2. 从许可文件解析 codename 并剔除数字
+    license_file="/System/Library/CoreServices/Setup Assistant.app/Contents/Resources/en.lproj/OSXSoftwareLicense.rtf"
+    raw_codename=$(awk -F 'macOS ' '/SOFTWARE LICENSE AGREEMENT FOR macOS/ {print $NF}' "$license_file" |
+                   sed -E 's/[[:punct:]]*$//' | sed -E 's/[0-9].*$//' |
+                   tr '[:upper:]' '[:lower:]' | xargs)
+    codename_camel=$(echo "$raw_codename" | awk '{for(i=1;i<=NF;i++){printf toupper(substr($i,1,1)) substr($i,2)}}')
+
+    # 3. 获取 MacPorts 最新版本
+    latest_version=$(curl -s https://api.github.com/repos/macports/macports-base/releases/latest |
+                     sed -n 's/.*\"tag_name\": \"v\\([0-9.]*\\)\".*/\\1/p')
+    [ -z "$latest_version" ] && latest_version="2.11.5"
+
+    # 4. 拼接并下载安装包
+    pkg_name="MacPorts-${latest_version}-${major_version}-${codename_camel}.pkg"
+    pkg_url="https://github.com/macports/macports-base/releases/download/v${latest_version}/${pkg_name}"
+    echo "准备安装 MacPorts，下载地址：$pkg_url"
+
+    curl -L -o /tmp/macports.pkg "$pkg_url"
+    sudo /usr/sbin/installer -pkg /tmp/macports.pkg -target /
+    rm -f /tmp/macports.pkg
+
 
     echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
