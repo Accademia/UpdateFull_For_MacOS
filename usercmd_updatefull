@@ -352,11 +352,145 @@ attempt_quit_app() {
 # ************************* #
 # 自定义函数：统一的错误输出（带着色与日志追加）
 # ************************* #
+
 print_error() {
   printf "\033[1;31m[ERROR]\033[0m  "
   printf "[ERROR] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
   echo -e "$*" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 }
+
+
+
+
+
+# =========================
+# Xcode Command Line Tools
+# =========================
+
+check_clt_receipt() {
+    /usr/sbin/pkgutil --pkg-info=com.apple.pkg.CLTools_Executables >/dev/null 2>&1 \
+    || /usr/sbin/pkgutil --pkg-info=com.apple.pkg.DeveloperToolsCLI >/dev/null 2>&1
+}
+
+_auto_find_clt_label() {
+    /usr/sbin/softwareupdate --list 2>&1 \
+    | /usr/bin/grep -Eo 'Label: .*Command Line Tools.*' \
+    | /usr/bin/sed 's/^Label: //; q'
+}
+
+auto_install_clt() {
+    local TMPFLAG="/tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress"
+    local LOGA="$LOG_FULL_LAST" LOGB="$LOG_FULL_FILE"
+
+    echo -e "⚙️  Command Line Tools 收据缺失，尝试自动安装 ..." | tee -a "$LOGA" "$LOGB"
+
+    sudo /bin/rm -f "$TMPFLAG" 2>/dev/null || true
+    sudo /usr/bin/touch "$TMPFLAG"
+
+    local LABEL; LABEL="$(_auto_find_clt_label)"
+
+    if [ -z "$LABEL" ] && [ -d /Library/Developer/CommandLineTools ] && ! check_clt_receipt; then
+        echo -e "↻ 未找到标签，疑似残留安装；清理并重试一次 ..." | tee -a "$LOGA" "$LOGB"
+        sudo /bin/rm -rf /Library/Developer/CommandLineTools
+        sudo /bin/rm -f "$TMPFLAG" 2>/dev/null || true
+        sudo /usr/bin/touch "$TMPFLAG"
+        LABEL="$(_auto_find_clt_label)"
+    fi
+
+    if [ -n "$LABEL" ]; then
+        echo -e "⚙️  安装: $LABEL" | tee -a "$LOGA" "$LOGB"
+        if sudo /usr/sbin/softwareupdate --install "$LABEL" --agree-to-license --verbose 2>&1 | tee -a "$LOGA" "$LOGB"; then
+            sudo /bin/rm -f "$TMPFLAG" 2>/dev/null || true
+            return 0
+        fi
+    fi
+
+    sudo /bin/rm -f "$TMPFLAG" 2>/dev/null || true
+    echo -e "❌ 未找到 Command Line Tools 更新标签。请手动执行：xcode-select --install" \
+        | tee -a "$LOGA" "$LOGB" "$LOG_ERROR_FILE"
+    return 1
+}
+
+ensure_clt_or_skip_macports() {
+    if check_clt_receipt; then
+        return 0
+    fi
+    if auto_install_clt && check_clt_receipt; then
+        return 0
+    fi
+    echo -e "⏭️  跳过 MacPorts：尚未检测到有效的 Command Line Tools 收据。" \
+        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_ERROR_FILE"
+    return 1
+}
+
+
+
+# =========================
+# MacPorts 辅助函数
+# =========================
+
+# 判断是否需要迁移：当 Darwin 主版本、CPU 架构或 MacPorts base 版本变化时迁移
+get_darwin_major() { /usr/bin/uname -r | /usr/bin/awk -F. '{print $1}'; }
+get_arch() { /usr/bin/uname -m; }
+get_macports_base_ver() { /opt/local/bin/port version 2>/dev/null | /usr/bin/awk '{print $2}'; }
+
+MP_STATE_DIR="$HOME/.local/state/usercmd"
+MP_MIGRATE_TOKEN_FILE="$MP_STATE_DIR/macports.migrate.token"
+
+macports_should_migrate() {
+    /bin/mkdir -p "$MP_STATE_DIR" 2>/dev/null || true
+    local cur_token="$(get_darwin_major)-$(get_arch)-$(get_macports_base_ver)"
+    [ ! -f "$MP_MIGRATE_TOKEN_FILE" ] && { echo "$cur_token" > "$MP_STATE_DIR/.need_migrate.tmp"; return 0; }
+    local old_token; old_token="$(/bin/cat "$MP_MIGRATE_TOKEN_FILE" 2>/dev/null || echo "")"
+    if [ "$old_token" != "$cur_token" ]; then
+        echo "$cur_token" > "$MP_STATE_DIR/.need_migrate.tmp"
+        return 0
+    fi
+    return 1
+}
+
+macports_mark_migrated() {
+    [ -f "$MP_STATE_DIR/.need_migrate.tmp" ] && /bin/mv -f "$MP_STATE_DIR/.need_migrate.tmp" "$MP_MIGRATE_TOKEN_FILE"
+}
+
+# 静默升级过期端口并生成摘要
+macports_upgrade_outdated_quiet() {
+    printf  "\033[1;34m[Download & Install]\033[0m " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    printf  "[Download & Install] "                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "MacPorts 下载安装 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "【升级摘要】" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
+    sudo /opt/local/bin/port upgrade outdated -N --no-rev-upgrade 2>&1 \
+      | /usr/bin/grep -E '^--->  (Upgrading|Installing|Activating|Deactivating) |^Error:' \
+      | /usr/bin/sed -E \
+        -e 's/^--->[[:space:]]+Upgrading[[:space:]]+([^[:space:]]+)[[:space:]]+@([^[:space:]]+)[[:space:]]+to[[:space:]]+@([^[:space:]]+).*/• \1  \2  →  \3/' \
+        -e 's/^--->[[:space:]]+Installing/• Installing/' \
+        -e 's/^--->[[:space:]]+Activating/• Activating/' \
+        -e 's/^--->[[:space:]]+Deactivating/• Deactivating/' \
+      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+}
+
+macports_rev_upgrade_quiet() {
+    # 显示扫描与结果，不落独立文件，只写主日志
+    sudo /opt/local/bin/port rev-upgrade 2>&1 \
+      | /usr/bin/grep -E '^--->  Scanning binaries for linking errors|^--->  No broken (files|ports) found\.|^Found [0-9]+ broken|^--->  Rebuilding ' \
+      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+}
+
+
+__get_migrate_log_file() {
+    local base=""
+    [ -n "${LOG_UPDATE_MACUPDATER:-}" ] && base="$LOG_UPDATE_MACUPDATER"
+    [ -z "$base" ] && [ -n "${UPDATE_MACUPDATER_LOG:-}" ] && base="$UPDATE_MACUPDATER_LOG"
+    [ -z "$base" ] && [ -f "$HOME/Update_MacUpdater.log" ] && base="$HOME/Update_MacUpdater.log"
+    [ -z "$base" ] && [ -n "${LOG_FULL_LAST:-}" ] && base="$LOG_FULL_LAST"
+    [ -z "$base" ] && [ -n "${LOG_FULL_FILE:-}" ] && base="$LOG_FULL_FILE"
+    [ -z "$base" ] && base="$HOME/Update_MacUpdater.log"
+    local dir="${base%/*}"; [ "$dir" = "$base" ] && dir="$HOME"
+    echo "${dir}/Migrate_MacPorts.log"
+}
+
+
 
 
 
@@ -834,68 +968,54 @@ echo -e ""                                                                      
 # 调用检查时间范围函数
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
-if command -v port >/dev/null 2>&1; then
+if command -v /opt/local/bin/port >/dev/null 2>&1; then
 
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
     echo -e "\033[1;36m 更新 MacPorts 工具 ...\033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    echo -e "----------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "更新 MacPorts 工具  "                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "----------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "----------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "更新 MacPorts 工具  "       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "----------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e ""                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
-    echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-
-    sudo port selfupdate 2>&1                                                           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    # 保证 CLT 收据存在，否则跳过 MacPorts 更新
+    if ensure_clt_or_skip_macports; then
+        sudo /opt/local/bin/port selfupdate 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    fi
 
 else
-
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
     echo -e "\033[1;36m MacPorts 未安装，开始安装 ...\033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    echo -e "----------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "MacPorts 未安装，开始安装  "                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "----------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-
-    echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-
-    #curl -LO https://distfiles.macports.org/MacPorts/MacPorts-2.8.1-10.15-Catalina.pkg && sudo /usr/sbin/installer -pkg MacPorts-2.8.1-10.15-Catalina.pkg -target /
-
-    # 1. 获取主版本号
-    macos_version=$(sw_vers -productVersion)
-    major_version=${macos_version%%.*}
-
-    # 2. 从许可文件解析 codename 并剔除数字
-    license_file="/System/Library/CoreServices/Setup Assistant.app/Contents/Resources/en.lproj/OSXSoftwareLicense.rtf"
-    raw_codename=$(awk -F 'macOS ' '/SOFTWARE LICENSE AGREEMENT FOR macOS/ {print $NF}' "$license_file" |
-                   sed -E 's/[[:punct:]]*$//' | sed -E 's/[0-9].*$//' |
-                   tr '[:upper:]' '[:lower:]' | xargs)
-    codename_camel=$(echo "$raw_codename" | awk '{for(i=1;i<=NF;i++){printf toupper(substr($i,1,1)) substr($i,2)}}')
-
-    # 3. 获取 MacPorts 最新版本
-    latest_version=$(curl -s https://api.github.com/repos/macports/macports-base/releases/latest |
-                     sed -n 's/.*\"tag_name\": \"v\\([0-9.]*\\)\".*/\\1/p')
-    [ -z "$latest_version" ] && latest_version="2.11.5"
-
-    # 4. 拼接并下载安装包
-    pkg_name="MacPorts-${latest_version}-${major_version}-${codename_camel}.pkg"
-    pkg_url="https://github.com/macports/macports-base/releases/download/v${latest_version}/${pkg_name}"
-    echo "准备安装 MacPorts，下载地址：$pkg_url"
-
-    curl -L -o /tmp/macports.pkg "$pkg_url"
-    sudo /usr/sbin/installer -pkg /tmp/macports.pkg -target /
-    rm -f /tmp/macports.pkg
+    echo -e "----------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "MacPorts 未安装，开始安装  "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "----------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 
-    echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    if ensure_clt_or_skip_macports; then
+        macos_version=$(sw_vers -productVersion)
+        major_version=${macos_version%%.*}
 
-    if [ $? -eq 0 ]; then
-        echo -e "✅ MacPorts 安装成功。"                                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-        echo -e ""                                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-    else
-        echo -e "❌ MacPorts 安装失败。"                                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+        license_file="/System/Library/CoreServices/Setup Assistant.app/Contents/Resources/en.lproj/OSXSoftwareLicense.rtf"
+        raw_codename=$(awk -F 'macOS ' '/SOFTWARE LICENSE AGREEMENT FOR macOS/ {print $NF}' "$license_file" \
+                        | sed -E 's/[[:punct:]]*$//' | sed -E 's/[0-9].*$//' | tr '[:upper:]' '[:lower:]' | xargs)
+        codename_camel=$(echo "$raw_codename" | awk '{for(i=1;i<=NF;i++){printf toupper(substr($i,1,1)) substr($i,2)}}')
+
+        latest_version=$(curl -s https://api.github.com/repos/macports/macports-base/releases/latest \
+                         | sed -n 's/.*\"tag_name\": \"v\\([0-9.]*\\)\".*/\\1/p')
+        [ -z "$latest_version" ] && latest_version="2.11.5"
+
+        pkg_name="MacPorts-${latest_version}-${major_version}-${codename_camel}.pkg"
+        pkg_url="https://github.com/macports/macports-base/releases/download/v${latest_version}/${pkg_name}"
+        echo "准备安装 MacPorts，下载地址：$pkg_url"
+
+        curl -L -o /tmp/macports.pkg "$pkg_url" && \
+        sudo /usr/sbin/installer -pkg /tmp/macports.pkg -target / && \
+        /bin/rm -f /tmp/macports.pkg
     fi
 
 fi
+
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
@@ -2406,49 +2526,77 @@ echo -e ""                                                                      
 export MacPorts_NO_INTERACTIVE=1
 
 
-echo -e "\033[1;32m-----------------------------------------------\033[0m"  
-echo -e "\033[1;32m 运行 MacPorts ...                             \033[0m"  
-echo -e "\033[1;32m-----------------------------------------------\033[0m"  
+echo -e "\033[1;32m-----------------------------------------------\033[0m"
+echo -e "\033[1;32m 运行 MacPorts ...                             \033[0m"
+echo -e "\033[1;32m-----------------------------------------------\033[0m"
 
-echo -e "----------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "运行 MacPorts"                                                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "----------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "----------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "运行 MacPorts"                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "----------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
-echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-
-# 等待3秒，开始执行
-#sleep 3  
-
-# 调用检查时间范围函数
+# 拒绝执行时间窗口
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
-printf  "\033[1;34m[Scan] \033[0m"
-printf  "[Scan] "                                                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "Port 扫描更新 ... "                                                             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+# （1）仅在确实发生“重大变化”时执行一次 migrate
+# 若 CLT 未就绪，跳过
 
-sudo port outdated -N 2>&1                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+if ! ensure_clt_or_skip_macports; then
+    echo -e "⏭️  MacPorts 步骤被跳过（缺少 CLT）" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+else
+    printf "\033[1;34m[Migrate]\033[0m "
+    printf "[Migrate] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null 
+    echo "MacPorts 扫描迁移 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
+    if macports_should_migrate; then
+        MIGRATE_LOG="$(__get_migrate_log_file)"
+        /bin/mkdir -p "${MIGRATE_LOG%/*}" 2>/dev/null || true
+        if yes | sudo /opt/local/bin/port -q migrate 2>&1 \
+            | /usr/bin/tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$MIGRATE_LOG" > /dev/null; then
+            macports_mark_migrated
+            echo -e "✓ 迁移完成" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        else
+            echo -e "❌ 迁移失败（请检查日志）" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_ERROR_FILE"
+        fi
+    else
+        echo -e "✓ 无需迁移（已处于当前 Darwin/架构/base）" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    fi
 
-echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    echo "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
-printf  "\033[1;34m[Download & Install]\033[0m "
-printf  "[Download & Install] "                                                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "Port 下载安装 ... "                                                           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    printf "\033[1;34m[Scan]\033[0m "
+    printf "[Scan] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null 
+    echo "MacPorts 扫描更新 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    outdated_list="$(sudo /opt/local/bin/port -q outdated -N 2>/dev/null || true)"
+    if [ -z "$outdated_list" ]; then
+        echo -e "✓ 未检测到过期端口" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        # 仍然运行一次 rev-upgrade 摘要
+        macports_rev_upgrade_quiet
+    else
+        echo -e "【过期端口】" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo "$outdated_list" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
-# 执行：MacPorts （并捕获输出）
-sudo port upgrade outdated -N 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        # （3）升级：终端只打印摘要…完整构建日志写文件
+        macports_upgrade_outdated_quiet
 
-echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+        # （4）清理（不依赖当前目录）
+        printf "\033[1;34m[Clean]\033[0m "
+        printf "[Clean] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo "MacPorts 清理残留 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        sudo /opt/local/bin/port -q reclaim …
 
-targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+        # （5）链接自检（摘要）
+        macports_rev_upgrade_quiet
 
-# 检查是否以 root 身份运行
-#if [ "$(id -u)" -eq 0 ]; then
-#else
-#fi
+    fi
 
-echo -e "\033[1;32m[OK] MacPorts upgrade  运行已完成  ✅ \033[1;32m"   
-echo -e "[OK]  MacPorts upgrade  运行已完成  ✅ "                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    
+    echo -e "\033[1;32m[OK] MacPorts upgrade  运行已完成  ✅\033[0m"
+    echo -e "[OK]  MacPorts upgrade  运行已完成  ✅"                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+fi
+
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 echo -e ""                                                                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
