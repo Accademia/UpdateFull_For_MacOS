@@ -71,16 +71,16 @@
 --------------------------------
 
 如果出现如下错误：
-
+```
 /opt/homebrew/etc/bash_completion.d/ipfs: line 5526: complete: nosort: invalid option name
 /opt/homebrew/etc/bash_completion.d/mycli: line 25: complete: nosort: invalid option name
 /opt/homebrew/etc/bash_completion.d/wg: line 99: complete: nosort: invalid option name
 /opt/homebrew/etc/bash_completion.d/wg-quick: line 43: complete: nosort: invalid option name
-
+```
 则执行此脚本解决问题：
-
+```
 uesrcmd_fix_nosort
-
+```
 在执行后，使用如下命令进行验证：   
 
 grep -R "nosort" /opt/homebrew/etc/bash_completion.d
@@ -178,23 +178,25 @@ grep -R "nosort" /opt/homebrew/etc/bash_completion.d
 
 如何检测visudo是否生效
 --------------------------------
-
+```
 sudo -l
+```
 
 .
 
 如何查看visudo配置文件
 --------------------------------
-
+```
 sudo cat /etc/sudoers
-
+```
 
 .
 
 如何编辑visudo配置文件 
 --------------------------------
-
+```
 sudo visudo
+```
 注意，退出保存时，新配置回立刻生效，无需手动reload 
 
 
@@ -217,8 +219,9 @@ paragon-ntfs
 --------------------------------
 
 在编辑visudoers时，一定 一定 一定 一定 不要修改(删除) 如下配置！！！
+```
 root            ALL = (ALL) ALL
-
+```
 不然不可能要要面临重装系统！
 
 
@@ -228,47 +231,49 @@ root            ALL = (ALL) ALL
 --------------------------------
 
 如果想 全自动 “强制升级” 已安装的 “所有Homebrew cask软件” ，可以使用如下命令：
-
+```
 brew tap buo/cask-upgrade
 brew cu -a -y -f
-
+```
 
 如果想 全自动 “强制重装” 已安装的 “所有Homebrew软件” ，可以使用如下命令：
-
+```
 # 重装所有 命令行软件
 brew list --formula | xargs brew reinstall --force
 或（遇到Error也不间断执行，错误记录在txt文件当中）
 brew list --formula | xargs -I {} sh -c 'brew reinstall --force --debug --verbose {} || echo "Error reinstalling {}" >> reinstall_formula_errors.txt'
 
-
 # 重装所有 图形软件
 brew list --cask    | xargs brew reinstall --force --cask --debug --verbose
-或（遇到Error也不间断执行，错误记录在txt文件当中）
+# 或（遇到Error也不间断执行，错误记录在txt文件当中）
 brew list --cask | xargs -I {} sh -c 'brew reinstall --force --cask --debug --verbose {} || echo "Error reinstalling {}" >> reinstall_cask_errors.txt'
-
+```
 
 
 # 如果发生中断，请使用如下命令继续执行
+```
 brew list --formula | sed -n '/软件的homebrew英文名称/,$p' | xargs brew reinstall --force --debug --verbose
 brew list --cask    | sed -n '/软件的homebrew英文名称/,$p' | xargs brew reinstall --force --debug --verbose --cask
-
+```
 或（遇到Error也不间断执行，错误记录在txt文件当中）
+```
 brew list --cask | sed -n '/软件的homebrew英文名称/,$p' | xargs -I {} sh -c 'brew reinstall --force --debug --verbose --cask {} || echo "Error reinstalling {}" >> reinstall_cask_errors.txt'
-
+```
 
 
 # 如果想快速将APP与homebrew解绑，而不删除app，请使用如下命令
-
+```
 rm -rf /opt/homebrew/Caskroom/应用名.app
 brew clwanup
-
+```
 如：
+```
 rm -rf /opt/homebrew/Caskroom/microsoft-excel
 rm -rf /opt/homebrew/Caskroom/microsoft-outlook
 rm -rf /opt/homebrew/Caskroom/microsoft-powerpoint
 rm -rf /opt/homebrew/Caskroom/microsoft-onenote
 rm -rf /opt/homebrew/Caskroom/microsoft-onedrive
-
+```
 .
 
 声明：
