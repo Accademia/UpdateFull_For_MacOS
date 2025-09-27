@@ -2582,11 +2582,16 @@ else
 
         # （4）清理（不依赖当前目录）
         printf "\033[1;34m[Clean]\033[0m "
-        printf "[Clean] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        printf "[Clean] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
         echo "MacPorts 清理残留 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        sudo /opt/local/bin/port -q reclaim …
+        sudo /opt/local/bin/port -q reclaim
+
+        echo "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
         # （5）链接自检（摘要）
+        printf "\033[1;34m[Verify]\033[0m "
+        printf "[Verify] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+        echo "MacPorts 验证结果 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         macports_rev_upgrade_quiet
 
     fi
@@ -2861,10 +2866,11 @@ echo -e ""                                                                      
 #printf  "[List] "                                                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 #echo -e "MacUpdater 应用列表 ... "                                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 #
-#targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
 #
 ## 检查是否以 root 身份运行
 #if [ "$(id -u)" -eq 0 ]; then
+#
+#    targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
 #
 #    # 获取目标普通用户（优先使用 SUDO_USER，其次获取当前登录控制台用户）
 #    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 MacUpdater scan ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -2898,10 +2904,11 @@ echo -e ""                                                                      
 #printf  "[Scan] "                                                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 #echo -e "MacUpdater 扫描更新 ... "                                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 #
-#targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
 #
 ## 检查是否以 root 身份运行
 #if [ "$(id -u)" -eq 0 ]; then
+#
+#    targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
 #
 #    # 获取目标普通用户（优先使用 SUDO_USER，其次获取当前登录控制台用户）
 #    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 MacUpdater scan ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -2931,12 +2938,13 @@ echo -e ""                                                                      
 #printf  "[Install] "                                                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 #echo -e "MacUpdater 开始更新 ... "                                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 #
-## 自动获取当前登录用户
-#currentUser=$(stat -f%Su /dev/console)
-#targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
 #
 ## 检查是否以 root 身份运行
 #if [ "$(id -u)" -eq 0 ]; then
+#
+#    # 自动获取当前登录用户
+#    currentUser=$(stat -f%Su /dev/console)
+#    targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
 #
 #    # 获取目标普通用户（优先使用 SUDO_USER，其次获取当前登录控制台用户）
 #    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 MacUpdater update ...（当前用户是 root）" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
