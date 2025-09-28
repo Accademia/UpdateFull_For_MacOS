@@ -10,8 +10,10 @@
 最终效果：
 --------------------------------
 
-<img width="680" height="8856" alt="longshot20250928174955-1" src="https://github.com/user-attachments/assets/ce357124-78b5-40b7-bc39-bed087b2875b" />
-
+<details>
+  <summary>展开查看完整长图</summary>
+  <img src="[./assets/final-long.png](https://github.com/user-attachments/assets/ce357124-78b5-40b7-bc39-bed087b2875b)" alt="完整流程" width="820">
+</details>
 
 
 .
