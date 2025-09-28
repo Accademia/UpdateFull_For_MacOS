@@ -1,19 +1,16 @@
 
 功能与目的：
 --------------------------------
- 一键更新macos下所有APP，包括：
-  + 第三方APP
-  + App Store内的APP
-  + 通过Homebrew安装的APP
-  + 从Linux移植到Mac的APP
-在更新后，自动还原LaunchPad（启动台）布局
+ 一键更新macos下所有APP
 
 
 .
-。
+
 
 最终效果：
 --------------------------------
+
+<img width="1212" height="8856" alt="longshot20250928174955-1" src="https://github.com/user-attachments/assets/ce357124-78b5-40b7-bc39-bed087b2875b" />
 
 
 
@@ -28,7 +25,7 @@
 	- MacPorts	：更新 MacPorts下载（Linux移植）的APP
 	- TopGreade	：更新 复查上述在线安装的APP
 	- MacUpdater	：更新 下载后离线安装的APP
-
+在更新后，自动还原LaunchPad（启动台）布局
 
 .
 
