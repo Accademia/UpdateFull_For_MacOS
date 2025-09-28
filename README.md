@@ -12,7 +12,7 @@
 .
 
 
-执行效果：
+最终效果：
 --------------------------------
 
 
@@ -174,11 +174,11 @@ grep -R "nosort" /opt/homebrew/etc/bash_completion.d
 # 建议通过 generate_homebrew_sudoers.py 自动生成这部分配置规则 （因为平均每个软件有300条规则）
 # 请看 Github项目： Generate_Homebrew_Sudoers （自动生成Homebrew APP升级所需的visudo免密配置）
 
-Generate_Homebrew_Sudoers ： https://github.com/Accademia/Generate_Homebrew_Sudoers
 
 
 ```
 
+Generate_Homebrew_Sudoers ： https://github.com/Accademia/Generate_Homebrew_Sudoers
 
 
 
