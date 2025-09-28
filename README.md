@@ -12,6 +12,14 @@
 .
 
 
+执行效果：
+--------------------------------
+
+
+
+.
+
+
 可以更新哪些程序？
 --------------------------------
  - 本脚本会，调用以下个程序，完成自动化更新
@@ -43,9 +51,10 @@
 日志保存在哪？
 --------------------------------
  - 每次执行完成后，会自动打开日志目录（如果不希望自动打开，可以注释掉脚本最后一段中Open命令开头的代码）
- - 日志路径：icloud云盘 -> LOG -> 当前计算机名称 ->
- - 启动台LaunchPad的备份路径：icloud云盘 -> BACKUP -> 当前计算机名称 -> 当前用户名称 -> DesktopLayout
+ - 日志路径：icloud云盘 -> LOG -> 产品名-芯片型号-序列号 ->
+ - 启动台LaunchPad的备份路径：icloud云盘 -> BACKUP -> 产品名-芯片型号-序列号 -> 当前用户名称 -> DesktopLayout
 
+注意：没有使用计算机名称：计算机名称会因为网络冲突，而变化，会导致log目录和备份目录频繁改变，而且无法关闭自动改名，这是macos系统功能之一。所以不能使用计算机名称。
 
 .
 
@@ -164,6 +173,8 @@ grep -R "nosort" /opt/homebrew/etc/bash_completion.d
 
 # 建议通过 generate_homebrew_sudoers.py 自动生成这部分配置规则 （因为平均每个软件有300条规则）
 # 请看 Github项目： Generate_Homebrew_Sudoers （自动生成Homebrew APP升级所需的visudo免密配置）
+
+Generate_Homebrew_Sudoers ： https://github.com/Accademia/Generate_Homebrew_Sudoers
 
 
 ```
