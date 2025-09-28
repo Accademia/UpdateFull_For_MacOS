@@ -10,10 +10,8 @@
 最终效果：
 --------------------------------
 
-<details>
-  <summary>展开查看完整长图</summary>
-  <img src="[./assets/final-long.png](https://github.com/user-attachments/assets/ce357124-78b5-40b7-bc39-bed087b2875b)" alt="完整流程" width="820">
-</details>
+<img width="700"  alt="example" src="https://github.com/user-attachments/assets/eaf6ff98-7180-4420-8f56-ba77471028b1" />
+
 
 
 .
