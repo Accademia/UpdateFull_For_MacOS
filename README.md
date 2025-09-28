@@ -10,7 +10,7 @@
 最终效果：
 --------------------------------
 
-<img width="1212" height="8856" alt="longshot20250928174955-1" src="https://github.com/user-attachments/assets/ce357124-78b5-40b7-bc39-bed087b2875b" />
+<img width="680" height="8856" alt="longshot20250928174955-1" src="https://github.com/user-attachments/assets/ce357124-78b5-40b7-bc39-bed087b2875b" />
 
 
 
