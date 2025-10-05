@@ -45,6 +45,28 @@ COMPUTER_NAME=$(scutil --get ComputerName)
 # 用于标记需要手动运行安装器的 cask
 MANUAL_INSTALL_CASKS=("paragon-ntfs" "paragon-extfs")
 
+
+################################################################################
+# 新增：初始化下载失败记录和重试参数
+#
+# 为了在并行下载阶段准确记录下载失败的软件包及其下载链接，本脚本引入以下变量：
+#   FAILED_FETCH_FORMULAS_FILE ：记录 formula 下载失败的包名与下载链接
+#   FAILED_FETCH_CASKS_FILE    ：记录 cask 下载失败的包名与下载链接
+#   DOWNLOAD_MAX_RETRIES       ：每个软件包下载时最大的重试次数，默认 3 次
+# 这些文件在脚本运行开始时会被清空，并在并行下载任务中写入。变量需要导出以便
+# 在 sudo/parallel 环境中生效。
+FAILED_FETCH_FORMULAS_FILE="$LOG_PATH/.failed_fetch_formulas"
+FAILED_FETCH_CASKS_FILE="$LOG_PATH/.failed_fetch_casks"
+# 清空失败记录文件，确保每次运行独立
+: > "$FAILED_FETCH_FORMULAS_FILE"
+: > "$FAILED_FETCH_CASKS_FILE"
+# 下载失败的最大重试次数（可按需调整）
+DOWNLOAD_MAX_RETRIES=3
+# 导出变量供子进程使用
+export FAILED_FETCH_FORMULAS_FILE FAILED_FETCH_CASKS_FILE DOWNLOAD_MAX_RETRIES
+################################################################################
+
+
 # ================================================================================================
 # 参数设置：用户可修改 （End）
 # ================================================================================================
@@ -379,6 +401,8 @@ print_error() {
   printf "[ERROR] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
   echo -e "$*" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 }
+
+
 
 
 
@@ -1669,26 +1693,84 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
     export -f run_as_normal_user      # 供 GNU parallel 内部 shell 调用 (需要时)
     export LOG_FULL_LAST LOG_FULL_FILE   # 让 sudo -E 能继承日志路径
 
+    # -----------------------------------------------------------------------------
+    # 新增：定义下载函数用于并行下载 formula 和 cask，支持重试并记录失败链接
+    #
+    # 这两个函数会被 GNU parallel 调用以下载对应的软件包。当下载失败时，会按
+    # DOWNLOAD_MAX_RETRIES 指定的次数进行重试，并在最终失败时把包名和
+    # 下载链接追加写入失败记录文件，供后续安装阶段判断是否跳过升级。
+    fetch_brew_formula() {
+        local pkg="$1"
+        local success=0
+        local tmpfile
+        tmpfile=$(mktemp)
+        local max_retry=${DOWNLOAD_MAX_RETRIES:-3}
+        local i
+        for ((i=1; i<=max_retry; i++)); do
+            # 执行下载并将输出记录到日志和临时文件
+            brew fetch --formula --retry "$pkg" 2>&1 \
+                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" \
+                | tee "$tmpfile"
+            fetch_exit=${PIPESTATUS[0]}
+            if [ $fetch_exit -eq 0 ]; then
+                success=1
+                break
+            fi
+            sleep 1
+        done
+        if [ $success -eq 1 ]; then
+            echo -e "✅  下载成功 [formula] ：$pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        else
+            echo -e "❌  下载失败 [formula] ：$pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            # 提取最后出现的 URL（若无则为空）
+            url=$(grep -oE 'https?://[^[:space:]]+' "$tmpfile" | tail -n1 || true)
+            echo "$pkg|$url" >> "$FAILED_FETCH_FORMULAS_FILE"
+        fi
+        rm -f "$tmpfile"
+    }
+    export -f fetch_brew_formula
+
+    fetch_brew_cask() {
+        local pkg="$1"
+        local success=0
+        local tmpfile
+        tmpfile=$(mktemp)
+        local max_retry=${DOWNLOAD_MAX_RETRIES:-3}
+        local i
+        for ((i=1; i<=max_retry; i++)); do
+            brew fetch --cask --retry "$pkg" 2>&1 \
+                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" \
+                | tee "$tmpfile"
+            fetch_exit=${PIPESTATUS[0]}
+            if [ $fetch_exit -eq 0 ]; then
+                success=1
+                break
+            fi
+            sleep 1
+        done
+        if [ $success -eq 1 ]; then
+            echo -e "✅  下载成功 [cask] ：$pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        else
+            echo -e "❌  下载失败 [cask] ：$pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            url=$(grep -oE 'https?://[^[:space:]]+' "$tmpfile" | tail -n1 || true)
+            echo "$pkg|$url" >> "$FAILED_FETCH_CASKS_FILE"
+        fi
+        rm -f "$tmpfile"
+    }
+    export -f fetch_brew_cask
+    # -----------------------------------------------------------------------------
+
+
     # ---------------- ① 并行下载 formula ----------------
     if [ ${#packages_to_fetch_formulas[@]} -gt 0 ]; then
-      run_as_normal_user parallel --will-cite --line-buffer --unsafe -j16 \
-        "if brew fetch --formula --retry {} 2>&1  | tee -a \"$LOG_FULL_LAST\" \"$LOG_FULL_FILE\"; then \
-             echo -e '✅  下载成功 [formula] ：{} ' | tee -a \"$LOG_FULL_LAST\" \"$LOG_FULL_FILE\"; \
-         else \
-             echo -e '❌  下载失败 [formula] ：{} ' | tee -a \"$LOG_FULL_LAST\" \"$LOG_FULL_FILE\"; \
-         fi" \
-        ::: "${packages_to_fetch_formulas[@]}" &
+      # 使用自定义的 fetch_brew_formula 函数并行下载，每个任务会自动重试和记录失败链接
+      run_as_normal_user parallel --will-cite --line-buffer --unsafe -j16 fetch_brew_formula ::: "${packages_to_fetch_formulas[@]}" &
     fi
-    
+
     # ---------------- ② 并行下载 cask ----------------
     if [ ${#packages_to_fetch_casks[@]} -gt 0 ]; then
-      run_as_normal_user parallel --will-cite --line-buffer --unsafe -j16 \
-        "if brew fetch --cask --retry {} 2>&1  | tee -a \"$LOG_FULL_LAST\" \"$LOG_FULL_FILE\"; then \
-             echo -e '✅  下载成功 [cask] ：{} ' | tee -a \"$LOG_FULL_LAST\" \"$LOG_FULL_FILE\"; \
-         else \
-             echo -e '❌  下载失败 [cask] ：{} ' | tee -a \"$LOG_FULL_LAST\" \"$LOG_FULL_FILE\"; \
-         fi" \
-        ::: "${packages_to_fetch_casks[@]}" &
+      # 使用自定义的 fetch_brew_cask 函数并行下载，每个任务会自动重试和记录失败链接
+      run_as_normal_user parallel --will-cite --line-buffer --unsafe -j16 fetch_brew_cask ::: "${packages_to_fetch_casks[@]}" &
     fi
     
     wait  # 等待所有并行任务完成
@@ -1697,8 +1779,6 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
     
     #brew doctor  2>&1                                                                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     #exit 1                                                                                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"          # 用于调试 ！！
-
-
 
 
 
@@ -1715,6 +1795,18 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
 
         # 循环逐个处理每个过期的 Homebrew formula
         for pkg_brew_formula in "${packages_brew_formulas[@]}"; do
+
+            # 如果在并行下载阶段检测到该 formula 下载失败，则直接跳过升级
+            if [[ -n "$FAILED_FETCH_FORMULAS_FILE" && -f "$FAILED_FETCH_FORMULAS_FILE" ]]; then
+                fail_line=$(grep -F "${pkg_brew_formula}|" "$FAILED_FETCH_FORMULAS_FILE" || true)
+                if [[ -n "$fail_line" ]]; then
+                    fail_url=$(echo "$fail_line" | cut -d'|' -f2-)
+                    echo -e "❌  更新失败 [formula] : $pkg_brew_formula (下载失败：$fail_url)" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    updated_list+=("failure|formula|$pkg_brew_formula|fetch_failed:$fail_url")
+                    echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    continue
+                fi
+            fi
 
             brew_formula_tmpfile=$(mktemp)
 
@@ -1883,6 +1975,18 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
 
         # 逐个安装 每个待更新的 cask app
         for pkg_brew_cask in "${packages_brew_casks[@]}"; do
+
+            # 如果在并行下载阶段检测到该 cask 下载失败，则直接跳过升级
+            if [[ -n "$FAILED_FETCH_CASKS_FILE" && -f "$FAILED_FETCH_CASKS_FILE" ]]; then
+                fail_line=$(grep -F "${pkg_brew_cask}|" "$FAILED_FETCH_CASKS_FILE" || true)
+                if [[ -n "$fail_line" ]]; then
+                    fail_url=$(echo "$fail_line" | cut -d'|' -f2-)
+                    echo -e "❌  更新失败 [cask]   : $pkg_brew_cask (下载失败：$fail_url)" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    updated_list+=("failure|cask|$pkg_brew_cask|fetch_failed:$fail_url")
+                    echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    continue
+                fi
+            fi
 
             # 新增：为 cask 升级输出创建临时文件，避免变量未定义导致 tee 报错
             brew_cask_tmpfile=$(mktemp)
@@ -2274,6 +2378,11 @@ else
         fi
         # 构造基础输出行（符号、结果、类型、名称）
         line="$symbol  更新$status_text $type_display$spacing : $name"
+        # 如果是失败且 brew_method 为 fetch_failed:<URL>，则追加下载失败原因
+        if [ "$status" = "failure" ] && [[ "$brew_method" == fetch_failed:* ]]; then
+            fail_url="${brew_method#fetch_failed:}"
+            line="$symbol  更新$status_text $type_display$spacing : $name (下载失败：$fail_url)"
+        fi
         # 若通过重装更新，则附加警告标记和具体命令
         if [ "$status" = "success" ]; then
             if [ "$brew_method" = "reinstall_force" ]; then
