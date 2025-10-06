@@ -1,14 +1,13 @@
 
-功能与目的：
---------------------------------
+# 功能与目的：
+
  一键更新 MacOS 内安装的所有 第三方软件
 
 
 .
 
 
-最终效果：
---------------------------------
+# 最终效果：
 
 <img width="700"  alt="example" src="https://github.com/user-attachments/assets/eaf6ff98-7180-4420-8f56-ba77471028b1" />
 
@@ -17,8 +16,8 @@
 .
 
 
-可以更新哪些程序？
---------------------------------
+# 可以更新哪些程序？
+
  - 本脚本会，调用以下个程序，完成自动化更新
 	- HomeBrew	：更新 Homebrew下载的APP
 	- Mas		：更新 App Store下载的APP
@@ -29,8 +28,8 @@
 
 .
 
-使用方法：
---------------------------------
+# 使用方法：
+
 1. 下载usercmd_updatefull
 2. 在桌面 创建 “快捷方式”（点击后调用本脚本）
 3，请将命令拷贝至：/usr/local/bin目录中（或将文件所在的路径，加入到环境变量的$PATH中）
@@ -45,8 +44,8 @@
 .
 
 
-日志保存在哪？
---------------------------------
+# 日志保存在哪？
+
  - 每次执行完成后，会自动打开日志目录（如果不希望自动打开，可以注释掉脚本最后一段中Open命令开头的代码）
  - 日志路径：icloud云盘 -> LOG -> 产品名-芯片型号-序列号 ->
  - 启动台LaunchPad的备份路径：icloud云盘 -> BACKUP -> 产品名-芯片型号-序列号 -> 当前用户名称 -> DesktopLayout
@@ -56,8 +55,8 @@
 .
 
 
-如何设置定时更新？
---------------------------------
+# 如何设置定时更新？
+
  - 建议使用 Lingon Pro（或类似软件），将usercmd_updatefull挂载为循环任务（比如每天夜间3点钟执行）
     https://lingon-x.macupdate.com/
 
@@ -73,8 +72,7 @@
 .
 
 
-出现Error的应对
---------------------------------
+# 出现Error的应对
 
 如果出现如下错误：
 ```
@@ -95,8 +93,7 @@ grep -R "nosort" /opt/homebrew/etc/bash_completion.d
 .
 
 
-如何避免密码请求？
---------------------------------
+# 如何避免密码请求？
 
 
  - 可以通过类似于（  brew upgrade --debug --verbose --greedy ）命令，查看是哪些程序触发了密码请求，
@@ -176,65 +173,54 @@ grep -R "nosort" /opt/homebrew/etc/bash_completion.d
 
 ```
 
-Generate_Homebrew_Sudoers ： https://github.com/Accademia/Generate_Homebrew_Sudoers
+⚠️⚠️⚠️ Generate_Homebrew_Sudoers ： https://github.com/Accademia/Generate_Homebrew_Sudoers
 
 
 
-.
 
-如何检测visudo是否生效
---------------------------------
+
+- 如何检测visudo是否生效
+
 ```
 sudo -l
 ```
 
-.
 
-如何查看visudo配置文件
---------------------------------
+
+- 如何查看visudo配置文件
+
 ```
 sudo cat /etc/sudoers
 ```
 
-.
 
-如何编辑visudo配置文件 
---------------------------------
+- 如何编辑visudo配置文件 
+
 ```
 sudo visudo
 ```
-注意，退出保存时，新配置回立刻生效，无需手动reload 
 
 
-.
+- 在homebrew中需要手动更新的软件
 
-在homebrew中需要手动更新的软件
---------------------------------
-
-请注意：下述软件，虽然可以通过homebrew安装和更新，但是还需要调用图形界面进行手动操作。
-
+```
 paragon-extfs
-
 paragon-ntfs
+```
 
 
-.
 
+- ⚠️⚠️ 在编辑visudoers时，一定 一定 一定 一定 不要修改(删除) 如下配置！！！ 不然不可能要要面临重装系统！
 
-特别提示： 
---------------------------------
-
-在编辑visudoers时，一定 一定 一定 一定 不要修改(删除) 如下配置！！！
 ```
 root            ALL = (ALL) ALL
 ```
-不然不可能要要面临重装系统！
 
 
 .
 
-其他： 
---------------------------------
+# 其他： 
+
 
 如果想 全自动 “强制升级” 已安装的 “所有Homebrew cask软件” ，可以使用如下命令：
 ```
@@ -255,8 +241,7 @@ brew list --cask    | xargs brew reinstall --force --cask --debug --verbose
 brew list --cask | xargs -I {} sh -c 'brew reinstall --force --cask --debug --verbose {} || echo "Error reinstalling {}" >> reinstall_cask_errors.txt'
 ```
 
-
-# 如果发生中断，请使用如下命令继续执行
+如果发生中断，请使用如下命令继续执行
 ```
 brew list --formula | sed -n '/软件的homebrew英文名称/,$p' | xargs brew reinstall --force --debug --verbose
 brew list --cask    | sed -n '/软件的homebrew英文名称/,$p' | xargs brew reinstall --force --debug --verbose --cask
@@ -267,13 +252,14 @@ brew list --cask | sed -n '/软件的homebrew英文名称/,$p' | xargs -I {} sh 
 ```
 
 
-# 如果想快速将APP与homebrew解绑，而不删除app，请使用如下命令
+如果想快速将APP与homebrew解绑，而不删除app，请使用如下命令
 ```
 rm -rf /opt/homebrew/Caskroom/应用名.app
 brew clwanup
 ```
-如：
 ```
+# 如：
+
 rm -rf /opt/homebrew/Caskroom/microsoft-excel
 rm -rf /opt/homebrew/Caskroom/microsoft-outlook
 rm -rf /opt/homebrew/Caskroom/microsoft-powerpoint
