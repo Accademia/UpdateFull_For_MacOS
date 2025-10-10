@@ -1809,6 +1809,8 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             fi
 
             brew_formula_tmpfile=$(mktemp)
+            # 初始化当前 formula 处理的失败原因变量，用于捕捉校验失败或权限错误等信息
+            error_reason=""
 
             # ---------- 尝试升级 ----------
             # 检查是否以 root 身份运行
@@ -1840,10 +1842,10 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                         targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
                         echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_formula 重装 ( brew link --overwrite $pkg_brew_formula )  ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                         # 以目标用户身份执行 Homebrew 命令
-                        sudo -H -u "$targetUser" bash -c "brew link --overwrite $pkg_brew_formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        sudo -H -u "$targetUser" bash -c "brew link --overwrite $pkg_brew_formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_formula_tmpfile"
                     else
                         echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $pkg_brew_formula 重装 ( brew link --overwrite $pkg_brew_formula ) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                        brew link --overwrite "$pkg_brew_formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        brew link --overwrite "$pkg_brew_formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_formula_tmpfile"
                     fi
 
                     #brew link --overwrite "$pkg_brew_formula" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -1884,10 +1886,10 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                     targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
                     echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_formula 重装 ( brew reinstall $pkg_brew_formula --verbose --debug )  ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     # 以目标用户身份执行 Homebrew 命令
-                    sudo -H -u "$targetUser" bash -c "brew reinstall $pkg_brew_formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    sudo -H -u "$targetUser" bash -c "brew reinstall $pkg_brew_formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_formula_tmpfile"
                 else
                     echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $pkg_brew_formula 重装 ( brew reinstall $pkg_brew_formula --verbose --debug ) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                    brew reinstall "$pkg_brew_formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    brew reinstall "$pkg_brew_formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_formula_tmpfile"
                 fi
 
                 brew_formula_reinstall_exit=${PIPESTATUS[0]}  # 取 brew reinstall 的退出码
@@ -1902,10 +1904,10 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                         targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
                         echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_formula 强制重装 ( brew reinstall --force $pkg_brew_formula --verbose --debug )  ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                         # 以目标用户身份执行 Homebrew 命令
-                        sudo -H -u "$targetUser" bash -c "brew reinstall --force $pkg_brew_formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        sudo -H -u "$targetUser" bash -c "brew reinstall --force $pkg_brew_formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_formula_tmpfile"
                     else
                         echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $pkg_brew_formula 强制重装 ( brew reinstall --force $pkg_brew_formula --verbose --debug ) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                        brew reinstall --force "$pkg_brew_formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        brew reinstall --force "$pkg_brew_formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_formula_tmpfile"
                     fi
                     brew_formula_reinstall_force_exit=${PIPESTATUS[0]}  # 取 brew reinstall 的退出码
                     brew_formula_final_exit=$brew_formula_reinstall_force_exit
@@ -1931,8 +1933,25 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             else
                 brew_formula_method="upgrade"
             fi    
-
-            #updated_list+=("success|cask|$pkg_brew_formula|$brew_formula_method")
+            # 在最终状态为失败时解析失败原因（如 SHA-256 校验失败或权限不足）
+            if [ $brew_formula_final_exit -ne 0 ]; then
+                # 检查是否存在 SHA 校验失败信息
+                if grep -qi 'sha-256 mismatch' "$brew_formula_tmpfile"; then
+                    expected="$(grep -i 'Expected:' "$brew_formula_tmpfile" | head -n1 | awk -F':' '{print $2}' | xargs)"
+                    actual="$(grep -i 'Actual:' "$brew_formula_tmpfile" | head -n1 | awk -F':' '{print $2}' | xargs)"
+                    # 记录失败原因为 sha256 校验不一致，并包含实际和期望的校验码
+                    error_reason="sha256:${actual}:${expected}"
+                # 检查是否存在权限问题关键词
+                elif grep -qi 'permission denied' "$brew_formula_tmpfile" || grep -qi 'operation not permitted' "$brew_formula_tmpfile"; then
+                    # 标记权限错误；具体命令将在最终输出时根据 brew_formula_method 推断
+                    error_reason="permission"
+                fi
+                # 如果检测到了失败原因，则在 brew_formula_method 后附加；以分号分隔
+                if [ -n "$error_reason" ]; then
+                    brew_formula_method="${brew_formula_method};${error_reason}"
+                fi
+            fi
+            # 将结果写入 updated_list
             if [ $brew_formula_final_exit -eq 0 ] ; then
                 updated_list+=("success|formula|$pkg_brew_formula|$brew_formula_method")
             else
@@ -1990,6 +2009,8 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
 
             # 新增：为 cask 升级输出创建临时文件，避免变量未定义导致 tee 报错
             brew_cask_tmpfile=$(mktemp)
+            # 初始化当前 cask 处理的失败原因变量，用于捕捉校验失败或权限错误等信息
+            error_reason=""
 
             # 初始化每个 cask 应用的状态变量
             brew_cask_app_name=""
@@ -2043,10 +2064,10 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                     targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
                     echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_cask 重装 ( brew reinstall --cask $pkg_brew_cask --verbose --debug ) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     # 以目标用户身份执行 Homebrew 命令
-                    sudo -H -u "$targetUser" bash -c "brew reinstall --cask  $pkg_brew_cask 2>&1"       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    sudo -H -u "$targetUser" bash -c "brew reinstall --cask  $pkg_brew_cask 2>&1"       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_cask_tmpfile"
                 else
                     echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $pkg_brew_cask 重装 ( brew reinstall --cask $pkg_brew_cask --verbose --debug ) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-                    brew reinstall --cask "$pkg_brew_cask" 2>&1                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    brew reinstall --cask "$pkg_brew_cask" 2>&1                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_cask_tmpfile"
                 fi
    
                 brew_cask_reinstall_exit=${PIPESTATUS[0]}    # 获取 brew reinstall 的退出码  
@@ -2205,10 +2226,10 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                           targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
                           echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_cask 强制覆盖安装 ( brew reinstall --cask --force $pkg_brew_cask --verbose --debug ) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                           # 以目标用户身份执行 Homebrew 命令
-                          sudo -H -u "$targetUser" bash -c "brew reinstall --cask --force $pkg_brew_cask 2>&1"       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                          sudo -H -u "$targetUser" bash -c "brew reinstall --cask --force $pkg_brew_cask 2>&1"       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_cask_tmpfile"
                       else
                           echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $pkg_brew_cask 强制覆盖安装 ( brew reinstall --cask --force $pkg_brew_cask --verbose --debug ) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-                          brew reinstall --cask --force "$pkg_brew_cask" 2>&1                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                          brew reinstall --cask --force "$pkg_brew_cask" 2>&1                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_cask_tmpfile"
                       fi
        
                       #brew reinstall --cask --force "$pkg_brew_cask" 2>&1                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -2277,7 +2298,22 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                 brew_cask_method="upgrade"
             fi                
 
-            #updated_list+=("success|cask|$pkg_brew_cask|$brew_cask_method")
+            # 处理失败情况时解析错误原因
+            if [ $brew_cask_final_exit -ne 0 ]; then
+                # 检查 SHA-256 校验失败
+                if grep -qi 'sha-256 mismatch' "$brew_cask_tmpfile"; then
+                    expected="$(grep -i 'Expected:' "$brew_cask_tmpfile" | head -n1 | awk -F':' '{print $2}' | xargs)"
+                    actual="$(grep -i 'Actual:' "$brew_cask_tmpfile" | head -n1 | awk -F':' '{print $2}' | xargs)"
+                    error_reason="sha256:${actual}:${expected}"
+                # 检查权限错误关键词
+                elif grep -qi 'permission denied' "$brew_cask_tmpfile" || grep -qi 'operation not permitted' "$brew_cask_tmpfile"; then
+                    error_reason="permission"
+                fi
+                if [ -n "$error_reason" ]; then
+                    brew_cask_method="${brew_cask_method};${error_reason}"
+                fi
+            fi
+            # 将结果添加到 updated_list
             if [ $brew_cask_final_exit -eq 0 ] ; then
                 updated_list+=("success|cask|$pkg_brew_cask|$brew_cask_method")
             else
@@ -2358,7 +2394,7 @@ else
     # 逐条输出更新结果
     for entry in "${updated_list[@]}"; do
         IFS='|' read -r status type name brew_method <<< "$entry"
-        # 每次循环重置，避免上一条的 reinstall 提示“串味”
+        # 每次循环重置，避免上一条的 reinstall 提示串入下一条
         brew_warning_cmd=""
         # 根据状态选择符号和文字
         if [ "$status" = "success" ]; then
@@ -2371,26 +2407,74 @@ else
         # 根据类型调整对齐格式
         if [ "$type" = "cask" ]; then
             type_display="[cask]"
-            spacing="   "      # cask 比 formula 短3个字母，补3个空格对齐
+            spacing="   "
         else
             type_display="[formula]"
             spacing=""
         fi
+        # 解析 brew_method：可能包含分号分隔的附加失败原因
+        base_method="$brew_method"
+        extra_reason=""
+        if [[ "$brew_method" == *";"* ]]; then
+            base_method="${brew_method%%;*}"
+            extra_reason="${brew_method#*;}"
+        fi
         # 构造基础输出行（符号、结果、类型、名称）
         line="$symbol  更新$status_text $type_display$spacing : $name"
-        # 如果是失败且 brew_method 为 fetch_failed:<URL>，则追加下载失败原因
-        if [ "$status" = "failure" ] && [[ "$brew_method" == fetch_failed:* ]]; then
-            fail_url="${brew_method#fetch_failed:}"
-            line="$symbol  更新$status_text $type_display$spacing : $name (下载失败：$fail_url)"
+        # 处理失败情况的额外信息
+        if [ "$status" = "failure" ]; then
+            # 如果是下载失败，格式为 fetch_failed:<URL>
+            if [[ "$base_method" == fetch_failed:* ]]; then
+                fail_url="${base_method#fetch_failed:}"
+                line="$symbol  更新$status_text $type_display$spacing : $name (下载失败：$fail_url)"
+            elif [ -n "$extra_reason" ]; then
+                # 根据附加错误原因类型生成友好提示
+                # 分割 errorReason : e.g. sha256:actual:expected 或 permission
+                IFS=':' read -r reason_type part1 part2 <<< "$extra_reason"
+                if [ "$reason_type" = "sha256" ]; then
+                    actual="$part1"
+                    expected="$part2"
+                    line="$symbol  更新$status_text $type_display$spacing : $name (SHA-256 校验失败：实际校验码 $actual  期望校验码 $expected)"
+                elif [ "$reason_type" = "permission" ]; then
+                    # 根据 base_method 推断导致权限问题的命令
+                    cmd_str=""
+                    case "$base_method" in
+                        upgrade)
+                            if [ "$type" = "cask" ]; then
+                                cmd_str="brew upgrade --cask --greedy $name"
+                            else
+                                cmd_str="brew upgrade $name"
+                            fi
+                            ;;
+                        reinstall)
+                            if [ "$type" = "cask" ]; then
+                                cmd_str="brew reinstall --cask $name"
+                            else
+                                cmd_str="brew reinstall $name"
+                            fi
+                            ;;
+                        reinstall_force)
+                            if [ "$type" = "cask" ]; then
+                                cmd_str="brew reinstall --cask --force $name"
+                            else
+                                cmd_str="brew reinstall --force $name"
+                            fi
+                            ;;
+                        relink)
+                            cmd_str="brew link --overwrite $name"
+                            ;;
+                    esac
+                    line="$symbol  更新$status_text $type_display$spacing : $name (权限不足：$cmd_str)"
+                fi
+            fi
         fi
-        # 若通过重装更新，则附加警告标记和具体命令
+        # 处理成功情况的重装警告信息（忽略附加的失败原因）
         if [ "$status" = "success" ]; then
-            if [ "$brew_method" = "reinstall_force" ]; then
-                # 强制重装成功的情况
+            # 仅根据 base_method 决定是否显示重装警告
+            if [ "$base_method" = "reinstall_force" ]; then
                 brew_warning_cmd="brew reinstall --cask --force $name"
                 [ "$type" != "cask" ] && brew_warning_cmd="brew reinstall --force $name"
-            elif [ "$brew_method" = "reinstall" ]; then
-                # 普通重装成功的情况
+            elif [ "$base_method" = "reinstall" ]; then
                 brew_warning_cmd="brew reinstall --cask $name"
                 [ "$type" != "cask" ] && brew_warning_cmd="brew reinstall $name"
             fi
