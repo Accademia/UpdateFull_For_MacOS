@@ -61,9 +61,19 @@ FAILED_FETCH_CASKS_FILE="$LOG_PATH/.failed_fetch_casks"
 : > "$FAILED_FETCH_FORMULAS_FILE"
 : > "$FAILED_FETCH_CASKS_FILE"
 # 下载失败的最大重试次数（可按需调整）
-DOWNLOAD_MAX_RETRIES=3
+# 默认尝试五次，对于网络问题或链接不可用时会重试
+DOWNLOAD_MAX_RETRIES=5
 # 导出变量供子进程使用
 export FAILED_FETCH_FORMULAS_FILE FAILED_FETCH_CASKS_FILE DOWNLOAD_MAX_RETRIES
+
+# =====================
+# 新增：校验失败重试参数（默认 1 次）
+#
+# 当 Homebrew 在安装过程中检测到下载后的文件 SHA-256 校验失败时，
+# 本脚本会停止后续的重装尝试并直接标记为失败。该变量允许用户配置
+# 重新尝试升级的次数（1 表示不重试）。如需尝试多次，可修改此值。
+SHA_MISMATCH_MAX_RETRIES=1
+export SHA_MISMATCH_MAX_RETRIES
 ################################################################################
 
 
@@ -1704,22 +1714,74 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         local success=0
         local tmpfile
         tmpfile=$(mktemp)
-        local max_retry=${DOWNLOAD_MAX_RETRIES:-3}
-        local i
-        for ((i=1; i<=max_retry; i++)); do
-            # 执行下载并将输出记录到日志和临时文件
+        # 下载失败重试次数与校验失败重试次数
+        local max_download_retry=${DOWNLOAD_MAX_RETRIES:-5}
+        local max_sha_retry=${SHA_MISMATCH_MAX_RETRIES:-1}
+        local download_attempt=0
+        local sha_attempt=0
+        # 循环尝试：根据错误类型分别重试
+        while true; do
+            download_attempt=$((download_attempt + 1))
             brew fetch --formula --retry "$pkg" 2>&1 \
                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" \
                 | tee "$tmpfile"
             fetch_exit=${PIPESTATUS[0]}
-            if [ $fetch_exit -eq 0 ]; then
+            if [ $fetch_exit -ne 0 ]; then
+                # 下载失败
+                if [ $download_attempt -lt $max_download_retry ]; then
+                    sleep 1
+                    continue
+                else
+                    # 达到下载重试上限
+                    success=0
+                    break
+                fi
+            fi
+            # 下载成功后，校验 SHA
+            local brew_cache_path=""
+            local brew_expected_sha=""
+            local json=""
+            if [ "$(id -u)" -eq 0 ]; then
+                local targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+                brew_cache_path=$(sudo -n -H -u "$targetUser" /bin/bash -lc "brew --cache --formula \"$pkg\"" 2>/dev/null)
+                json=$(sudo -n -H -u "$targetUser" /bin/bash -lc "brew info --json=v2 \"$pkg\"" 2>/dev/null)
+            else
+                brew_cache_path=$(brew --cache --formula "$pkg")
+                json=$(brew info --json=v2 "$pkg" 2>/dev/null)
+            fi
+            if [ -n "$brew_cache_path" ] && [ -f "$brew_cache_path" ]; then
+                local_sha=$(shasum -a 256 "$brew_cache_path" | awk '{print $1}')
+                if [ -n "$json" ]; then
+                    brew_expected_sha=$(/usr/bin/plutil -extract "formulae.0.bottle.stable.files.${platform_key}.sha256" raw -o - - <<< "$json" 2>/dev/null)
+                    if [ -z "$brew_expected_sha" ]; then
+                        brew_expected_sha=$(/usr/bin/plutil -extract "formulae.0.bottle.stable.files.all.sha256" raw -o - - <<< "$json" 2>/dev/null)
+                    fi
+                    if [ -z "$brew_expected_sha" ]; then
+                        brew_expected_sha=$(/usr/bin/plutil -extract "formulae.0.urls.stable.checksum" raw -o - - <<< "$json" 2>/dev/null)
+                    fi
+                fi
+                if [ -n "$brew_expected_sha" ] && [ "$local_sha" != "$brew_expected_sha" ]; then
+                    sha_attempt=$((sha_attempt + 1))
+                    if [ $sha_attempt -lt $max_sha_retry ]; then
+                        rm -f "$brew_cache_path"
+                        sleep 1
+                        continue
+                    fi
+                    success=2
+                    break
+                else
+                    success=1
+                    break
+                fi
+            else
                 success=1
                 break
             fi
-            sleep 1
         done
         if [ $success -eq 1 ]; then
             echo -e "✅  下载成功 [formula] ：$pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        elif [ $success -eq 2 ]; then
+            echo -e "⚠️  下载成功 [formula] ：$pkg (警告：校验码不匹配)" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         else
             echo -e "❌  下载失败 [formula] ：$pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             # 提取最后出现的 URL（若无则为空）
@@ -1735,21 +1797,65 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         local success=0
         local tmpfile
         tmpfile=$(mktemp)
-        local max_retry=${DOWNLOAD_MAX_RETRIES:-3}
-        local i
-        for ((i=1; i<=max_retry; i++)); do
+        # 下载失败重试次数与校验失败重试次数
+        local max_download_retry=${DOWNLOAD_MAX_RETRIES:-5}
+        local max_sha_retry=${SHA_MISMATCH_MAX_RETRIES:-1}
+        local download_attempt=0
+        local sha_attempt=0
+        while true; do
+            download_attempt=$((download_attempt + 1))
             brew fetch --cask --retry "$pkg" 2>&1 \
                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" \
                 | tee "$tmpfile"
             fetch_exit=${PIPESTATUS[0]}
-            if [ $fetch_exit -eq 0 ]; then
+            if [ $fetch_exit -ne 0 ]; then
+                if [ $download_attempt -lt $max_download_retry ]; then
+                    sleep 1
+                    continue
+                else
+                    success=0
+                    break
+                fi
+            fi
+            # 下载成功后校验 SHA
+            local brew_cache_path=""
+            local brew_expected_sha=""
+            local json=""
+            if [ "$(id -u)" -eq 0 ]; then
+                local targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+                brew_cache_path=$(sudo -n -H -u "$targetUser" /bin/bash -lc "brew --cache --cask \"$pkg\"" 2>/dev/null)
+                json=$(sudo -n -H -u "$targetUser" /bin/bash -lc "brew info --json=v2 \"$pkg\"" 2>/dev/null)
+            else
+                brew_cache_path=$(brew --cache --cask "$pkg")
+                json=$(brew info --json=v2 "$pkg" 2>/dev/null)
+            fi
+            if [ -n "$brew_cache_path" ] && [ -f "$brew_cache_path" ]; then
+                local_sha=$(shasum -a 256 "$brew_cache_path" | awk '{print $1}')
+                if [ -n "$json" ]; then
+                    brew_expected_sha=$(/usr/bin/plutil -extract "casks.0.sha256" raw -o - - <<< "$json" 2>/dev/null)
+                fi
+                if [[ -n "$brew_expected_sha" && "$brew_expected_sha" != "null" && "$local_sha" != "$brew_expected_sha" ]]; then
+                    sha_attempt=$((sha_attempt + 1))
+                    if [ $sha_attempt -lt $max_sha_retry ]; then
+                        rm -f "$brew_cache_path"
+                        sleep 1
+                        continue
+                    fi
+                    success=2
+                    break
+                else
+                    success=1
+                    break
+                fi
+            else
                 success=1
                 break
             fi
-            sleep 1
         done
         if [ $success -eq 1 ]; then
             echo -e "✅  下载成功 [cask] ：$pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        elif [ $success -eq 2 ]; then
+            echo -e "⚠️  下载成功 [cask] ：$pkg (警告：校验码不匹配)" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         else
             echo -e "❌  下载失败 [cask] ：$pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             url=$(grep -oE 'https?://[^[:space:]]+' "$tmpfile" | tail -n1 || true)
@@ -1809,8 +1915,6 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             fi
 
             brew_formula_tmpfile=$(mktemp)
-            # 初始化当前 formula 处理的失败原因变量，用于捕捉校验失败或权限错误等信息
-            error_reason=""
 
             # ---------- 尝试升级 ----------
             # 检查是否以 root 身份运行
@@ -1829,6 +1933,25 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             brew_formula_final_exit=$brew_formula_upgrade_exit             # 先假定最终状态 = 升级状态
             brew_formula_relink_exit=false
 
+            # ---------- 新增：SHA-256 校验失败检测 ----------
+            # 如果此次升级失败且输出中含有 SHA-256 mismatch，则提取期望和实际校验码并停止后续尝试
+            # 允许用户通过 SHA_MISMATCH_MAX_RETRIES 配置尝试次数（默认为 1）
+            if [ "$brew_formula_upgrade_exit" -ne 0 ]; then
+                # 查找关键字（兼容大小写）
+                if grep -qiE 'sha[- ]?256 mismatch' "$brew_formula_tmpfile"; then
+                    # 抽取期望和实际校验码（若有）
+                    sha_expected=$(grep -i 'Expected:' "$brew_formula_tmpfile" | head -n1 | sed -E 's/.*Expected:[[:space:]]*//I')
+                    sha_actual=$(grep -i 'Actual:' "$brew_formula_tmpfile" | head -n1 | sed -E 's/.*Actual:[[:space:]]*//I')
+                    # 输出警告并停止重试
+                    echo -e "⚠️  检测到 SHA-256 校验失败 [formula] $pkg_brew_formula ，停止后续尝试。实际校验码: ${sha_actual:-未知} ，期望校验码: ${sha_expected:-未知}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    # 记录失败状态，方法为 sha256_mismatch:actual:expected
+                    updated_list+=("failure|formula|$pkg_brew_formula|sha256_mismatch:${sha_actual:-unknown}:${sha_expected:-unknown}")
+                    echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    rm -f "$brew_formula_tmpfile"
+                    continue   # 跳过后续链接或重装步骤
+                fi
+            fi
+
             # ---------- 若升级失败则尝试重装 ----------
             if [ $brew_formula_upgrade_exit -ne 0 ] ; then
 
@@ -1842,10 +1965,10 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                         targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
                         echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_formula 重装 ( brew link --overwrite $pkg_brew_formula )  ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                         # 以目标用户身份执行 Homebrew 命令
-                        sudo -H -u "$targetUser" bash -c "brew link --overwrite $pkg_brew_formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_formula_tmpfile"
+                        sudo -H -u "$targetUser" bash -c "brew link --overwrite $pkg_brew_formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     else
                         echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $pkg_brew_formula 重装 ( brew link --overwrite $pkg_brew_formula ) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                        brew link --overwrite "$pkg_brew_formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_formula_tmpfile"
+                        brew link --overwrite "$pkg_brew_formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     fi
 
                     #brew link --overwrite "$pkg_brew_formula" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -1886,10 +2009,10 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                     targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
                     echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_formula 重装 ( brew reinstall $pkg_brew_formula --verbose --debug )  ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     # 以目标用户身份执行 Homebrew 命令
-                    sudo -H -u "$targetUser" bash -c "brew reinstall $pkg_brew_formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_formula_tmpfile"
+                    sudo -H -u "$targetUser" bash -c "brew reinstall $pkg_brew_formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 else
                     echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $pkg_brew_formula 重装 ( brew reinstall $pkg_brew_formula --verbose --debug ) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                    brew reinstall "$pkg_brew_formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_formula_tmpfile"
+                    brew reinstall "$pkg_brew_formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 fi
 
                 brew_formula_reinstall_exit=${PIPESTATUS[0]}  # 取 brew reinstall 的退出码
@@ -1904,10 +2027,10 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                         targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
                         echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_formula 强制重装 ( brew reinstall --force $pkg_brew_formula --verbose --debug )  ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                         # 以目标用户身份执行 Homebrew 命令
-                        sudo -H -u "$targetUser" bash -c "brew reinstall --force $pkg_brew_formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_formula_tmpfile"
+                        sudo -H -u "$targetUser" bash -c "brew reinstall --force $pkg_brew_formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     else
                         echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $pkg_brew_formula 强制重装 ( brew reinstall --force $pkg_brew_formula --verbose --debug ) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                        brew reinstall --force "$pkg_brew_formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_formula_tmpfile"
+                        brew reinstall --force "$pkg_brew_formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     fi
                     brew_formula_reinstall_force_exit=${PIPESTATUS[0]}  # 取 brew reinstall 的退出码
                     brew_formula_final_exit=$brew_formula_reinstall_force_exit
@@ -1933,25 +2056,8 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             else
                 brew_formula_method="upgrade"
             fi    
-            # 在最终状态为失败时解析失败原因（如 SHA-256 校验失败或权限不足）
-            if [ $brew_formula_final_exit -ne 0 ]; then
-                # 检查是否存在 SHA 校验失败信息
-                if grep -qi 'sha-256 mismatch' "$brew_formula_tmpfile"; then
-                    expected="$(grep -i 'Expected:' "$brew_formula_tmpfile" | head -n1 | awk -F':' '{print $2}' | xargs)"
-                    actual="$(grep -i 'Actual:' "$brew_formula_tmpfile" | head -n1 | awk -F':' '{print $2}' | xargs)"
-                    # 记录失败原因为 sha256 校验不一致，并包含实际和期望的校验码
-                    error_reason="sha256:${actual}:${expected}"
-                # 检查是否存在权限问题关键词
-                elif grep -qi 'permission denied' "$brew_formula_tmpfile" || grep -qi 'operation not permitted' "$brew_formula_tmpfile"; then
-                    # 标记权限错误；具体命令将在最终输出时根据 brew_formula_method 推断
-                    error_reason="permission"
-                fi
-                # 如果检测到了失败原因，则在 brew_formula_method 后附加；以分号分隔
-                if [ -n "$error_reason" ]; then
-                    brew_formula_method="${brew_formula_method};${error_reason}"
-                fi
-            fi
-            # 将结果写入 updated_list
+
+            #updated_list+=("success|cask|$pkg_brew_formula|$brew_formula_method")
             if [ $brew_formula_final_exit -eq 0 ] ; then
                 updated_list+=("success|formula|$pkg_brew_formula|$brew_formula_method")
             else
@@ -2009,8 +2115,6 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
 
             # 新增：为 cask 升级输出创建临时文件，避免变量未定义导致 tee 报错
             brew_cask_tmpfile=$(mktemp)
-            # 初始化当前 cask 处理的失败原因变量，用于捕捉校验失败或权限错误等信息
-            error_reason=""
 
             # 初始化每个 cask 应用的状态变量
             brew_cask_app_name=""
@@ -2051,6 +2155,20 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             brew_cask_upgrade_exit=${PIPESTATUS[0]}        # 取 brew upgrade 的退出码
             brew_cask_final_exit=$brew_cask_upgrade_exit             # 先假定最终状态 = 升级状态
 
+            # ---------- 新增：SHA-256 校验失败检测 ----------
+            # 当首次升级失败且输出包含 SHA-256 mismatch 时，直接记录失败并跳过后续重装
+            if [ "$brew_cask_upgrade_exit" -ne 0 ]; then
+                if grep -qiE 'sha[- ]?256 mismatch' "$brew_cask_tmpfile"; then
+                    sha_expected=$(grep -i 'Expected:' "$brew_cask_tmpfile" | head -n1 | sed -E 's/.*Expected:[[:space:]]*//I')
+                    sha_actual=$(grep -i 'Actual:' "$brew_cask_tmpfile" | head -n1 | sed -E 's/.*Actual:[[:space:]]*//I')
+                    echo -e "⚠️  检测到 SHA-256 校验失败 [cask]   $pkg_brew_cask ，停止后续尝试。实际校验码: ${sha_actual:-未知} ，期望校验码: ${sha_expected:-未知}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    updated_list+=("failure|cask|$pkg_brew_cask|sha256_mismatch:${sha_actual:-unknown}:${sha_expected:-unknown}")
+                    echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    rm -f "$brew_cask_tmpfile"
+                    continue   # 跳过后续重装
+                fi
+            fi
+
             # ---------- 若升级失败则尝试重装 ----------
             if [ $brew_cask_upgrade_exit -ne 0 ] ; then
 
@@ -2064,10 +2182,10 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                     targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
                     echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_cask 重装 ( brew reinstall --cask $pkg_brew_cask --verbose --debug ) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     # 以目标用户身份执行 Homebrew 命令
-                    sudo -H -u "$targetUser" bash -c "brew reinstall --cask  $pkg_brew_cask 2>&1"       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_cask_tmpfile"
+                    sudo -H -u "$targetUser" bash -c "brew reinstall --cask  $pkg_brew_cask 2>&1"       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 else
                     echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $pkg_brew_cask 重装 ( brew reinstall --cask $pkg_brew_cask --verbose --debug ) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-                    brew reinstall --cask "$pkg_brew_cask" 2>&1                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_cask_tmpfile"
+                    brew reinstall --cask "$pkg_brew_cask" 2>&1                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 fi
    
                 brew_cask_reinstall_exit=${PIPESTATUS[0]}    # 获取 brew reinstall 的退出码  
@@ -2226,10 +2344,10 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                           targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
                           echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_cask 强制覆盖安装 ( brew reinstall --cask --force $pkg_brew_cask --verbose --debug ) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                           # 以目标用户身份执行 Homebrew 命令
-                          sudo -H -u "$targetUser" bash -c "brew reinstall --cask --force $pkg_brew_cask 2>&1"       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_cask_tmpfile"
+                          sudo -H -u "$targetUser" bash -c "brew reinstall --cask --force $pkg_brew_cask 2>&1"       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                       else
                           echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $pkg_brew_cask 强制覆盖安装 ( brew reinstall --cask --force $pkg_brew_cask --verbose --debug ) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-                          brew reinstall --cask --force "$pkg_brew_cask" 2>&1                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_cask_tmpfile"
+                          brew reinstall --cask --force "$pkg_brew_cask" 2>&1                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                       fi
        
                       #brew reinstall --cask --force "$pkg_brew_cask" 2>&1                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -2298,22 +2416,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                 brew_cask_method="upgrade"
             fi                
 
-            # 处理失败情况时解析错误原因
-            if [ $brew_cask_final_exit -ne 0 ]; then
-                # 检查 SHA-256 校验失败
-                if grep -qi 'sha-256 mismatch' "$brew_cask_tmpfile"; then
-                    expected="$(grep -i 'Expected:' "$brew_cask_tmpfile" | head -n1 | awk -F':' '{print $2}' | xargs)"
-                    actual="$(grep -i 'Actual:' "$brew_cask_tmpfile" | head -n1 | awk -F':' '{print $2}' | xargs)"
-                    error_reason="sha256:${actual}:${expected}"
-                # 检查权限错误关键词
-                elif grep -qi 'permission denied' "$brew_cask_tmpfile" || grep -qi 'operation not permitted' "$brew_cask_tmpfile"; then
-                    error_reason="permission"
-                fi
-                if [ -n "$error_reason" ]; then
-                    brew_cask_method="${brew_cask_method};${error_reason}"
-                fi
-            fi
-            # 将结果添加到 updated_list
+            #updated_list+=("success|cask|$pkg_brew_cask|$brew_cask_method")
             if [ $brew_cask_final_exit -eq 0 ] ; then
                 updated_list+=("success|cask|$pkg_brew_cask|$brew_cask_method")
             else
@@ -2394,7 +2497,7 @@ else
     # 逐条输出更新结果
     for entry in "${updated_list[@]}"; do
         IFS='|' read -r status type name brew_method <<< "$entry"
-        # 每次循环重置，避免上一条的 reinstall 提示串入下一条
+        # 每次循环重置，避免上一条的 reinstall 提示“串味”
         brew_warning_cmd=""
         # 根据状态选择符号和文字
         if [ "$status" = "success" ]; then
@@ -2407,74 +2510,34 @@ else
         # 根据类型调整对齐格式
         if [ "$type" = "cask" ]; then
             type_display="[cask]"
-            spacing="   "
+            spacing="   "      # cask 比 formula 短3个字母，补3个空格对齐
         else
             type_display="[formula]"
             spacing=""
         fi
-        # 解析 brew_method：可能包含分号分隔的附加失败原因
-        base_method="$brew_method"
-        extra_reason=""
-        if [[ "$brew_method" == *";"* ]]; then
-            base_method="${brew_method%%;*}"
-            extra_reason="${brew_method#*;}"
-        fi
         # 构造基础输出行（符号、结果、类型、名称）
         line="$symbol  更新$status_text $type_display$spacing : $name"
-        # 处理失败情况的额外信息
-        if [ "$status" = "failure" ]; then
-            # 如果是下载失败，格式为 fetch_failed:<URL>
-            if [[ "$base_method" == fetch_failed:* ]]; then
-                fail_url="${base_method#fetch_failed:}"
-                line="$symbol  更新$status_text $type_display$spacing : $name (下载失败：$fail_url)"
-            elif [ -n "$extra_reason" ]; then
-                # 根据附加错误原因类型生成友好提示
-                # 分割 errorReason : e.g. sha256:actual:expected 或 permission
-                IFS=':' read -r reason_type part1 part2 <<< "$extra_reason"
-                if [ "$reason_type" = "sha256" ]; then
-                    actual="$part1"
-                    expected="$part2"
-                    line="$symbol  更新$status_text $type_display$spacing : $name (SHA-256 校验失败：实际校验码 $actual  期望校验码 $expected)"
-                elif [ "$reason_type" = "permission" ]; then
-                    # 根据 base_method 推断导致权限问题的命令
-                    cmd_str=""
-                    case "$base_method" in
-                        upgrade)
-                            if [ "$type" = "cask" ]; then
-                                cmd_str="brew upgrade --cask --greedy $name"
-                            else
-                                cmd_str="brew upgrade $name"
-                            fi
-                            ;;
-                        reinstall)
-                            if [ "$type" = "cask" ]; then
-                                cmd_str="brew reinstall --cask $name"
-                            else
-                                cmd_str="brew reinstall $name"
-                            fi
-                            ;;
-                        reinstall_force)
-                            if [ "$type" = "cask" ]; then
-                                cmd_str="brew reinstall --cask --force $name"
-                            else
-                                cmd_str="brew reinstall --force $name"
-                            fi
-                            ;;
-                        relink)
-                            cmd_str="brew link --overwrite $name"
-                            ;;
-                    esac
-                    line="$symbol  更新$status_text $type_display$spacing : $name (权限不足：$cmd_str)"
-                fi
-            fi
+        # 如果是失败且 brew_method 为 fetch_failed:<URL>，则追加下载失败原因
+        # 处理 SHA-256 校验失败的情况
+        if [ "$status" = "failure" ] && [[ "$brew_method" == sha256_mismatch:* ]]; then
+            # brew_method 格式: sha256_mismatch:actual:expected
+            tmp="${brew_method#sha256_mismatch:}"
+            sha_actual="${tmp%%:*}"
+            sha_expected="${tmp#*:}"
+            line="$symbol  更新$status_text $type_display$spacing : $name (SHA-256校验失败：实际: $sha_actual, 期望: $sha_expected)"
+        # 如果是失败且 brew_method 为 fetch_failed:<URL>，则追加下载失败原因
+        elif [ "$status" = "failure" ] && [[ "$brew_method" == fetch_failed:* ]]; then
+            fail_url="${brew_method#fetch_failed:}"
+            line="$symbol  更新$status_text $type_display$spacing : $name (下载失败：$fail_url)"
         fi
-        # 处理成功情况的重装警告信息（忽略附加的失败原因）
+        # 若通过重装更新，则附加警告标记和具体命令
         if [ "$status" = "success" ]; then
-            # 仅根据 base_method 决定是否显示重装警告
-            if [ "$base_method" = "reinstall_force" ]; then
+            if [ "$brew_method" = "reinstall_force" ]; then
+                # 强制重装成功的情况
                 brew_warning_cmd="brew reinstall --cask --force $name"
                 [ "$type" != "cask" ] && brew_warning_cmd="brew reinstall --force $name"
-            elif [ "$base_method" = "reinstall" ]; then
+            elif [ "$brew_method" = "reinstall" ]; then
+                # 普通重装成功的情况
                 brew_warning_cmd="brew reinstall --cask $name"
                 [ "$type" != "cask" ] && brew_warning_cmd="brew reinstall $name"
             fi
