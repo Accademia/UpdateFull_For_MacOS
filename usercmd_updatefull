@@ -515,7 +515,8 @@ macports_upgrade_outdated_quiet() {
     echo -e "MacPorts 下载安装 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     echo -e "【升级摘要】" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
-    sudo /opt/local/bin/port upgrade outdated -N --no-rev-upgrade 2>&1 \
+    # 使用 -u 开关可在升级完成后卸载旧版本，以便在完成升级后自动清理老版本；--no-rev-upgrade 禁止在升级之后触发 rev-upgrade 检查
+    sudo /opt/local/bin/port -u upgrade outdated -N --no-rev-upgrade 2>&1 \
       | /usr/bin/grep -E '^--->  (Upgrading|Installing|Activating|Deactivating) |^Error:' \
       | /usr/bin/sed -E \
         -e 's/^--->[[:space:]]+Upgrading[[:space:]]+([^[:space:]]+)[[:space:]]+@([^[:space:]]+)[[:space:]]+to[[:space:]]+@([^[:space:]]+).*/• \1  \2  →  \3/' \
@@ -807,11 +808,23 @@ if [ "$architecture" = "arm64" ]; then
             # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
             targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
             echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 Homebrew 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-            # 以目标用户身份执行 Homebrew 命令
+            # 以目标用户身份执行 Homebrew 命令：更新索引
             sudo -H -u "$targetUser" bash -c 'brew update --force 2>&1'                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            # 关闭匿名使用统计，提升隐私
+            echo -e "✓  设置 Homebrew analytics off" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            sudo -H -u "$targetUser" bash -c 'brew analytics off 2>&1'                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+           ## 执行 brew doctor 进行环境自检，不影响整体退出码
+           #echo -e "✓  执行 brew doctor 自检" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+           #sudo -H -u "$targetUser" bash -c 'brew doctor || true'                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         else
             echo -e "✓   当前用户'$USER'，为普通权限，直接运行 Homebrew 自更新 ... "             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             brew update --force 2>&1                                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            # 关闭匿名使用统计，提升隐私
+            echo -e "✓  设置 Homebrew analytics off" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            brew analytics off 2>&1                                                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+           ## 执行 brew doctor 进行环境自检，不影响整体退出码
+           #echo -e "✓  执行 brew doctor 自检" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+           #brew doctor || true                                                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         fi
 
        #exit 1
@@ -1035,6 +1048,7 @@ if command -v /opt/local/bin/port >/dev/null 2>&1; then
 
     # 保证 CLT 收据存在，否则跳过 MacPorts 更新
     if ensure_clt_or_skip_macports; then
+        # MacPorts 基础更新：仅运行自更新以更新 MacPorts base 和 ports 树
         sudo /opt/local/bin/port selfupdate 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     fi
 
@@ -2474,11 +2488,20 @@ if [ "$(id -u)" -eq 0 ]; then
     echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 brew cleanup ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     # 以目标用户身份执行 Homebrew 命令
     sudo -H -u "$targetUser" bash -c 'brew cleanup --prune=all 2>&1'       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    sudo -H -u "$targetUser" bash -c 'brew autoremove 2>&1'       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    # 使用 -s 参数彻底清理下载缓存，包括最新版本的下载文件
+    sudo -H -u "$targetUser" bash -c 'brew cleanup -s 2>&1'                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    # 自动移除不再依赖的“孤儿”包
+    sudo -H -u "$targetUser" bash -c 'brew autoremove 2>&1'                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    # 列出缺失依赖，仅提示，不影响退出码
+    sudo -H -u "$targetUser" bash -c 'brew missing || true'                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 else
     echo -e "✓  当前用户'$USER'，为普通权限，直接运行 brew cleanup ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-    brew cleanup --prune=all 2>&1                                                           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    brew autoremove 2>&1                                                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    brew cleanup --prune=all 2>&1                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    # 使用 -s 参数彻底清理下载缓存，包括最新版本的下载文件
+    brew cleanup -s 2>&1                                                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    brew autoremove 2>&1                                                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    # 列出缺失依赖，仅提示，不影响退出码
+    brew missing || true                                                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 fi
 
 
@@ -2873,7 +2896,20 @@ else
         printf "\033[1;34m[Clean]\033[0m "
         printf "[Clean] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
         echo "MacPorts 清理残留 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        # 官方 reclaim 命令会删除日志、旧档和 distfiles，并尝试卸载非活动版本
         sudo /opt/local/bin/port -q reclaim
+        
+        # 卸载仍然处于非活动状态的端口（如果 reclaim 未能完全删除）
+        printf "\033[1;34m[Uninstall]\033[0m "
+        printf "[Uninstall] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+        echo "MacPorts 卸载非活动旧版本 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        sudo /opt/local/bin/port uninstall inactive
+        
+        # 删除无人依赖的叶子端口
+        printf "\033[1;34m[Leaves]\033[0m "
+        printf "[Leaves] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+        echo "MacPorts 移除无人依赖的叶子端口 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        sudo /opt/local/bin/port echo leaves | xargs sudo /opt/local/bin/port uninstall
 
         echo "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
