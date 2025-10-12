@@ -1554,6 +1554,20 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         #echo -e "brew_cache_path = $brew_cache_path"                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         
         if [ -f "$brew_cache_path" ]; then
+            ################################################################
+            # 修正：brew --cache 返回的路径可能指向 bottle_manifest.json
+            # 这种情况下校验会错误，因为 manifest 文件和真正的瓶子文件 sha 不同。
+            # 如果检测到文件名以 .bottle_manifest.json 结尾，尝试在同目录搜索对应
+            # 的 .bottle.tar.gz 文件并替换 brew_cache_path。
+            ################################################################
+            if [[ "$brew_cache_path" == *.bottle_manifest.json ]]; then
+                cache_dir="$(dirname "$brew_cache_path")"
+                # 搜索第一个匹配该公式名称的瓶子文件
+                candidate=$(ls "$cache_dir" 2>/dev/null | grep -E "${pkg_brew_formula}.*\.bottle.*\.tar\.gz$" | head -n1 || true)
+                if [ -n "$candidate" ]; then
+                    brew_cache_path="$cache_dir/$candidate"
+                fi
+            fi
             local_sha=$(shasum -a 256 "$brew_cache_path" | awk '{print $1}')
             ############################################
             # 计算 brew_expected_sha —— 自动降权 + 双日志输出
@@ -1764,6 +1778,17 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                 json=$(brew info --json=v2 "$pkg" 2>/dev/null)
             fi
             if [ -n "$brew_cache_path" ] && [ -f "$brew_cache_path" ]; then
+                ################################################################
+                # 修正：brew --cache 返回的文件可能是 bottle_manifest.json，而不是真正的瓶子包。
+                # 如果是 manifest，则尝试查找同目录的 .bottle.tar.gz 文件并使用该文件计算 SHA。
+                ################################################################
+                if [[ "$brew_cache_path" == *.bottle_manifest.json ]]; then
+                    cache_dir="$(dirname "$brew_cache_path")"
+                    candidate=$(ls "$cache_dir" 2>/dev/null | grep -E "${pkg}.*\.bottle.*\.tar\.gz$" | head -n1 || true)
+                    if [ -n "$candidate" ]; then
+                        brew_cache_path="$cache_dir/$candidate"
+                    fi
+                fi
                 local_sha=$(shasum -a 256 "$brew_cache_path" | awk '{print $1}')
                 if [ -n "$json" ]; then
                     brew_expected_sha=$(/usr/bin/plutil -extract "formulae.0.bottle.stable.files.${platform_key}.sha256" raw -o - - <<< "$json" 2>/dev/null)
