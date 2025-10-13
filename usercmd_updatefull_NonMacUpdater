@@ -98,10 +98,10 @@ LOG_MACUPDATER_FILE="$LOG_PATH/Update_MacUpdater.log"
 echo -e "" > "$LOG_MACUPDATER_FILE"
 
 # 定义：被测试的外网网址（需要翻墙的网址）
-TARGET_1="github.com"
-TARGET_2="brew.sh"
-TARGET_3="apps.apple.com/us/app/apple-store/id375380948"
-TARGET_4="macupdater.com"
+TARGET_1="github.com"                                       # 测试 主流开源软件下载库 的连通性
+TARGET_2="google.com"                                       # 测试 homebrew 的主站 连通性 (brew.sh)
+TARGET_3="apps.apple.com/us/app/apple-store/id375380948"    # 测试 Mac AppStore 连通性 （本链接是 苹果官方 Apple Store ）
+TARGET_4="macupdater.com"                                   # 测试 MacUpdater 连通性
 # 如果不能访问上述网站，会导致很多软件都 更新失败。
 
 
@@ -1555,17 +1555,21 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         
         if [ -f "$brew_cache_path" ]; then
             ################################################################
-            # 修正：brew --cache 返回的路径可能指向 bottle_manifest.json
-            # 这种情况下校验会错误，因为 manifest 文件和真正的瓶子文件 sha 不同。
-            # 如果检测到文件名以 .bottle_manifest.json 结尾，尝试在同目录搜索对应
-            # 的 .bottle.tar.gz 文件并替换 brew_cache_path。
+            # 修正：brew --cache 可能返回 bottle_manifest.json 路径，这不是实际瓶子文件
+            # manifest 与真正的 .bottle.tar.gz 文件的 SHA256 不一致，导致误判
+            # 如果检测到 manifest 文件，则尝试在同目录寻找匹配包名的 .bottle*.tar.gz 文件
             ################################################################
             if [[ "$brew_cache_path" == *.bottle_manifest.json ]]; then
                 cache_dir="$(dirname "$brew_cache_path")"
-                # 搜索第一个匹配该公式名称的瓶子文件
-                candidate=$(ls "$cache_dir" 2>/dev/null | grep -E "${pkg_brew_formula}.*\.bottle.*\.tar\.gz$" | head -n1 || true)
-                if [ -n "$candidate" ]; then
-                    brew_cache_path="$cache_dir/$candidate"
+                # 使用通配符查找匹配的瓶子文件
+                candidate=""
+                for f in "$cache_dir"/*"${pkg_brew_formula}"*.bottle*.tar.gz; do
+                    # 只取第一个匹配
+                    candidate="$f"
+                    break
+                done
+                if [ -n "$candidate" ] && [ -f "$candidate" ]; then
+                    brew_cache_path="$candidate"
                 fi
             fi
             local_sha=$(shasum -a 256 "$brew_cache_path" | awk '{print $1}')
@@ -1668,7 +1672,8 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                 brew_expected_sha=$(/usr/bin/plutil -extract "casks.0.sha256" raw -o - - <<< "$json" 2>/dev/null)
             fi
 
-            if [[ "$brew_expected_sha" == "null" || -z "$brew_expected_sha" ]]; then
+            # 处理 cask 的 SHA256: 如果为 null/no_check 或为空，则认为无需校验
+            if [[ "$brew_expected_sha" == "null" || -z "$brew_expected_sha" || "$brew_expected_sha" == "no_check" ]]; then
                 echo -e "✅  [已缓存] 无校验版 ｜ [cask] ：：$pkg_brew_cask " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 continue
             fi
@@ -1779,14 +1784,18 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             fi
             if [ -n "$brew_cache_path" ] && [ -f "$brew_cache_path" ]; then
                 ################################################################
-                # 修正：brew --cache 返回的文件可能是 bottle_manifest.json，而不是真正的瓶子包。
-                # 如果是 manifest，则尝试查找同目录的 .bottle.tar.gz 文件并使用该文件计算 SHA。
+                # 修正：brew --cache 可能返回的是 bottle_manifest.json 文件
+                # manifest 的 SHA 与真正的瓶子文件不同，需查找对应的 .bottle*.tar.gz
                 ################################################################
                 if [[ "$brew_cache_path" == *.bottle_manifest.json ]]; then
                     cache_dir="$(dirname "$brew_cache_path")"
-                    candidate=$(ls "$cache_dir" 2>/dev/null | grep -E "${pkg}.*\.bottle.*\.tar\.gz$" | head -n1 || true)
-                    if [ -n "$candidate" ]; then
-                        brew_cache_path="$cache_dir/$candidate"
+                    candidate=""
+                    for f in "$cache_dir"/*"${pkg}"*.bottle*.tar.gz; do
+                        candidate="$f"
+                        break
+                    done
+                    if [ -n "$candidate" ] && [ -f "$candidate" ]; then
+                        brew_cache_path="$candidate"
                     fi
                 fi
                 local_sha=$(shasum -a 256 "$brew_cache_path" | awk '{print $1}')
@@ -1835,6 +1844,9 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         local pkg="$1"
         local success=0
         local tmpfile
+        # 提前声明用于跨迭代的校验码变量
+        local local_sha=""
+        local brew_expected_sha=""
         tmpfile=$(mktemp)
         # 下载失败重试次数与校验失败重试次数
         local max_download_retry=${DOWNLOAD_MAX_RETRIES:-5}
@@ -1858,7 +1870,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             fi
             # 下载成功后校验 SHA
             local brew_cache_path=""
-            local brew_expected_sha=""
+            # brew_expected_sha 在循环外已声明，用于记录上一次迭代的期望值
             local json=""
             if [ "$(id -u)" -eq 0 ]; then
                 local targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
@@ -1873,7 +1885,8 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                 if [ -n "$json" ]; then
                     brew_expected_sha=$(/usr/bin/plutil -extract "casks.0.sha256" raw -o - - <<< "$json" 2>/dev/null)
                 fi
-                if [[ -n "$brew_expected_sha" && "$brew_expected_sha" != "null" && "$local_sha" != "$brew_expected_sha" ]]; then
+                # 如果期望校验码为 null/no_check，则认为无需校验并视为成功
+                if [[ -n "$brew_expected_sha" && "$brew_expected_sha" != "null" && "$brew_expected_sha" != "no_check" && "$local_sha" != "$brew_expected_sha" ]]; then
                     sha_attempt=$((sha_attempt + 1))
                     if [ $sha_attempt -lt $max_sha_retry ]; then
                         rm -f "$brew_cache_path"
@@ -1894,7 +1907,8 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         if [ $success -eq 1 ]; then
             echo -e "✅  下载成功 [cask] ：$pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         elif [ $success -eq 2 ]; then
-            echo -e "⚠️  下载成功 [cask] ：$pkg (警告：校验码不匹配)" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            # 打印本地和期望校验码，便于排查
+            echo -e "⚠️  下载成功 [cask] ：$pkg (警告：校验码不匹配)\n    本地 SHA256: ${local_sha:-未知}\n    期望 SHA256: ${brew_expected_sha:-未知}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         else
             echo -e "❌  下载失败 [cask] ：$pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             url=$(grep -oE 'https?://[^[:space:]]+' "$tmpfile" | tail -n1 || true)
