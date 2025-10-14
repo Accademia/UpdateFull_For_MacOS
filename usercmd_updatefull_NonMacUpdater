@@ -729,6 +729,7 @@ printf "\033[1;34m[INFO]\033[0m "
 printf "[INFO] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 # 在 OS 行末尾附加版本号信息，以便显示但不影响平台键
 if [ -n "$os_version" ]; then
+    # 显示代号和版本号，避免影响平台键
     echo -e "OS 版本     = '$os_name / v$os_version' " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 else
     echo -e "OS 版本     = '$os_name'" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -1867,6 +1868,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             # 下载成功后，校验 SHA
             local brew_cache_path=""
             local brew_expected_sha=""
+            local registry_sha=""
             local json=""
             if [ "$(id -u)" -eq 0 ]; then
                 local targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
@@ -1892,29 +1894,49 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                         brew_cache_path="$candidate"
                     fi
                 fi
+                local local_sha
                 local_sha=$(shasum -a 256 "$brew_cache_path" | awk '{print $1}')
+                # 解析 brew_expected_sha 来自 formula JSON
                 if [ -n "$json" ]; then
-                    brew_expected_sha=$(/usr/bin/plutil -extract "formulae.0.bottle.stable.files.${platform_key}.sha256" raw -o - - <<< "$json" 2>/dev/null)
-                    if [ -z "$brew_expected_sha" ]; then
-                        brew_expected_sha=$(/usr/bin/plutil -extract "formulae.0.bottle.stable.files.all.sha256" raw -o - - <<< "$json" 2>/dev/null)
+                    if [ -n "$platform_key" ]; then
+                        brew_expected_sha=$(/usr/bin/plutil -extract "formulae.0.bottle.stable.files.${platform_key}.sha256" raw -o - - <<< "$json" 2>/dev/null || true)
                     fi
                     if [ -z "$brew_expected_sha" ]; then
-                        brew_expected_sha=$(/usr/bin/plutil -extract "formulae.0.urls.stable.checksum" raw -o - - <<< "$json" 2>/dev/null)
+                        brew_expected_sha=$(/usr/bin/plutil -extract "formulae.0.bottle.stable.files.all.sha256" raw -o - - <<< "$json" 2>/dev/null || true)
+                    fi
+                    if [ -z "$brew_expected_sha" ]; then
+                        brew_expected_sha=$(/usr/bin/plutil -extract "formulae.0.urls.stable.checksum" raw -o - - <<< "$json" 2>/dev/null || true)
                     fi
                 fi
-                if [ -n "$brew_expected_sha" ] && [ "$local_sha" != "$brew_expected_sha" ]; then
-                    sha_attempt=$((sha_attempt + 1))
-                    if [ $sha_attempt -lt $max_sha_retry ]; then
-                        rm -f "$brew_cache_path"
-                        sleep 1
-                        continue
-                    fi
-                    success=2
-                    break
-                else
+                # 从 brew fetch 输出中获取 GHCR blob 的 sha256 digest
+                registry_sha=$(grep -oE 'blobs/sha256:[0-9a-f]+' "$tmpfile" | tail -n1 | sed 's/.*blobs\/sha256://')
+                # -------- 校验逻辑 --------
+                # 1) JSON 命中且一致 → 成功
+                if [ -n "$brew_expected_sha" ] && [ "$local_sha" = "$brew_expected_sha" ]; then
                     success=1
                     break
                 fi
+                # 2) 如果 registry sha 存在且一致 → 成功（JSON 可能延迟）
+                if [ -n "$registry_sha" ] && [ "$local_sha" = "$registry_sha" ]; then
+                    echo -e "[INFO] $pkg 校验通过（使用 registry 校验；formula API 可能延迟）" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    success=1
+                    break
+                fi
+                # 3) 若二者均不匹配，重试或报警
+                sha_attempt=$((sha_attempt + 1))
+                if [ $sha_attempt -lt $max_sha_retry ]; then
+                    rm -f "$brew_cache_path"
+                    sleep 1
+                    continue
+                fi
+                # 三方值输出，供排查
+                [ -z "$brew_expected_sha" ] && brew_expected_sha="(未获取)"
+                [ -z "$registry_sha" ] && registry_sha="(未获取)"
+                echo -e "      expected(formula)=$brew_expected_sha" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "      expected(registry)=$registry_sha"     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "      local=$local_sha"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                success=2
+                break
             else
                 success=1
                 break
