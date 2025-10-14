@@ -5,6 +5,51 @@
 #设置执行所需的 环境变量！
 export PATH="/usr/local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/opt/local/bin:/opt/local/sbin:$PATH"
 
+# 为了避免某些多语言 Cask 默认下载系统语言版本导致网络不可达，
+# 默认根据系统的首选语言自动设置 Homebrew Cask 的语言选项。
+# 当系统语言对应的下载镜像不可用时，可通过修改下方算法或在脚本
+# 外部预定义 HOMEBREW_CASK_OPTS 环境变量以覆盖自动检测结果。
+#
+# 读取 macOS 的首选语言。优先从 AppleLanguages 读取第一个元素，
+# 如果不可用，则退回到 AppleLocale。检测结果会简化为 brew 支持的
+# IETF 语言标记格式。若无法检测则默认使用 en-US。
+if [ -z "$HOMEBREW_CASK_OPTS" ]; then
+    __brew_lang=""
+    if command -v defaults >/dev/null 2>&1; then
+        # 尝试读取 AppleLanguages 的首选项
+        __first_lang="$(defaults read -g AppleLanguages 2>/dev/null | awk -F '"' 'NR==2 {print $2}')"
+        if [ -n "$__first_lang" ]; then
+            __brew_lang="$__first_lang"
+        else
+            # 如果 AppleLanguages 不可用，则读取 AppleLocale
+            __locale="$(defaults read -g AppleLocale 2>/dev/null || defaults read NSGlobalDomain AppleLocale 2>/dev/null)"
+            # 去除 @ 符号及其后内容
+            __locale="${__locale%%@*}"
+            # 将 zh_CN 等下划线形式转换为 zh-CN
+            __brew_lang="$(echo "$__locale" | tr '_' '-')"
+        fi
+    fi
+    # 针对常见语言代码进行映射修正
+    case "$__brew_lang" in
+        zh-Hans*|zh_CN*|zh-CN*)
+            __brew_lang="zh-CN"
+            ;;
+        zh-Hant*|zh_TW*|zh-TW*)
+            __brew_lang="zh-TW"
+            ;;
+        en*|en_US*|en-US*)
+            __brew_lang="en-US"
+            ;;
+        "")
+            __brew_lang="en-US"
+            ;;
+    esac
+    export HOMEBREW_CASK_OPTS="--language=$__brew_lang"
+    # 同时设置 BREW_CASK_LANGUAGE 变量，便于传参到 brew fetch 等命令
+    export BREW_CASK_LANGUAGE="$__brew_lang"
+    unset __first_lang __locale __brew_lang
+fi
+
 
 # ================================================================================================
 # 参数设置：用户可修改 （Start）
@@ -1282,10 +1327,11 @@ if brew list --cask | grep -q "^macupdater\$"; then
         targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
         echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 macupdater 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 以目标用户身份执行 Homebrew 命令
-        sudo -H -u "$targetUser" bash -c 'brew upgrade --greedy --cask macupdater 2>&1'  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        # 显式传递语言配置，避免 sudo 环境丢失 HOMEBREW_CASK_OPTS
+        sudo -H -u "$targetUser" env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew upgrade --greedy --cask macupdater 2>&1  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     else
         echo -e "✓  当前用户'$USER'，为普通权限，直接运行 macupdater 自更新 ... "     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-        brew upgrade --greedy --cask macupdater 2>&1                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew upgrade --greedy --cask macupdater 2>&1                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     fi
 
 else
@@ -1303,10 +1349,11 @@ else
         targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
         echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 macupdater 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 以目标用户身份执行 Homebrew 命令
-        sudo -H -u "$targetUser" bash -c 'brew reinstall --cask --force macupdater 2>&1'       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        # 显式传递语言配置，避免 sudo 环境丢失 HOMEBREW_CASK_OPTS
+        sudo -H -u "$targetUser" env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew reinstall --cask --force macupdater 2>&1       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     else
         echo -e "✓  当前用户'$USER'，为普通权限，直接运行 macupdater 安装 ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-        brew reinstall --cask --force macupdater 2>&1                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew reinstall --cask --force macupdater 2>&1                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     fi
     
     echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
@@ -1822,7 +1869,8 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
           echo -e "Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 并行下载（parallel download）安装包"  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     
           # -n 非交互；-E 保留 LOG_* 环境变量；-H 修正 HOME
-          sudo -n -E -H -u "$targetUser" "$@"
+          # 通过 env 显式传递 HOMEBREW_CASK_OPTS，避免 sudo 过滤掉该环境变量
+          sudo -n -E -H -u "$targetUser" env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" "$@"
       else
           # 已是普通用户
           "$@"
@@ -2315,7 +2363,8 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
               targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
               echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_cask 升级 ( brew upgrade --cask --greedy $pkg_brew_cask --verbose --debug ) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
               # 以目标用户身份执行 Homebrew 命令
-              sudo -H -u "$targetUser" bash -c "brew upgrade --cask --greedy $pkg_brew_cask 2>&1"         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_cask_tmpfile"
+              # 传递 HOMEBREW_CASK_OPTS 至目标用户环境，确保语言设置生效
+              sudo -H -u "$targetUser" env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew upgrade --cask --greedy "$pkg_brew_cask" 2>&1         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_cask_tmpfile"
             else
               echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $pkg_brew_cask 升级 ( brew upgrade --cask --greedy $pkg_brew_cask --verbose --debug ) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
               brew upgrade --cask --greedy "$pkg_brew_cask" 2>&1                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_cask_tmpfile"
@@ -2351,7 +2400,8 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                     targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
                     echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_cask 重装 ( brew reinstall --cask $pkg_brew_cask --verbose --debug ) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     # 以目标用户身份执行 Homebrew 命令
-                    sudo -H -u "$targetUser" bash -c "brew reinstall --cask  $pkg_brew_cask 2>&1"       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    # 传递 HOMEBREW_CASK_OPTS 至目标用户环境，确保语言设置生效
+                    sudo -H -u "$targetUser" env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew reinstall --cask  "$pkg_brew_cask" 2>&1       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 else
                     echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $pkg_brew_cask 重装 ( brew reinstall --cask $pkg_brew_cask --verbose --debug ) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
                     brew reinstall --cask "$pkg_brew_cask" 2>&1                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -2513,7 +2563,8 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                           targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
                           echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_cask 强制覆盖安装 ( brew reinstall --cask --force $pkg_brew_cask --verbose --debug ) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                           # 以目标用户身份执行 Homebrew 命令
-                          sudo -H -u "$targetUser" bash -c "brew reinstall --cask --force $pkg_brew_cask 2>&1"       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                          # 传递 HOMEBREW_CASK_OPTS 至目标用户环境，确保语言设置生效
+                          sudo -H -u "$targetUser" env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew reinstall --cask --force "$pkg_brew_cask" 2>&1       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                       else
                           echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $pkg_brew_cask 强制覆盖安装 ( brew reinstall --cask --force $pkg_brew_cask --verbose --debug ) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
                           brew reinstall --cask --force "$pkg_brew_cask" 2>&1                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
