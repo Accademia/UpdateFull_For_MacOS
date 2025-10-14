@@ -99,7 +99,7 @@ echo -e "" > "$LOG_MACUPDATER_FILE"
 
 # 定义：被测试的外网网址（需要翻墙的网址）
 TARGET_1="github.com"                                       # 测试 主流开源软件下载库 的连通性
-TARGET_2="google.com"                                       # 测试 homebrew 的主站 连通性 (brew.sh)
+TARGET_2="ghcr.io"                                          # 测试 homebrew 的主站 连通性 (brew.sh)
 TARGET_3="apps.apple.com/us/app/apple-store/id375380948"    # 测试 Mac AppStore 连通性 （本链接是 苹果官方 Apple Store ）
 TARGET_4="macupdater.com"                                   # 测试 MacUpdater 连通性
 # 如果不能访问上述网站，会导致很多软件都 更新失败。
@@ -694,7 +694,62 @@ printf  "\033[1;34m[INFO]\033[0m "
 printf  "[INFO] "                                                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "当前用户            = '$USER'"                                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
-echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+# echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+
+# ==================================
+# 检测并同步主机名称（ComputerName、LocalHostName 与 HostName）
+# 在工作目录检查之前执行，以便 Info 信息和 OK 信息分组显示。
+# ==================================
+
+sync_message=""  # 保存需要在后续打印的同步结果信息
+
+# 获取当前的名称信息
+computer_name="$(scutil --get ComputerName 2>/dev/null || true)"
+local_host_name="$(scutil --get LocalHostName 2>/dev/null || true)"
+host_name_output="$(scutil --get HostName 2>/dev/null || true)"
+
+# 处理 HostName 输出，去掉前缀并判断是否设置
+host_name=""
+if [ -n "$host_name_output" ]; then
+    host_name="${host_name_output#HostName*: }"
+    if [[ "$host_name" = "not set" ]]; then
+        host_name=""
+    fi
+fi
+
+if [ -n "$host_name" ]; then
+    # 已设置 HostName
+    if [ "$computer_name" = "$host_name" ] && [ "$local_host_name" = "$host_name" ]; then
+        # 已一致，打印 [INFO]
+        printf "\033[1;34m[INFO]\033[0m "
+        printf "[INFO] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+        echo -e "计算机名称已一致    = '$host_name'  ( HostName \\ ComputerName \\ LocalHostName ) " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    else
+        # 不一致，打印差异
+        printf "\033[1;34m[INFO]\033[0m "
+        printf "[INFO] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+        echo -e "名称 (计算机)       = '$computer_name' " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        printf "\033[1;34m[INFO]\033[0m "
+        printf "[INFO] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+        echo -e "名称 (本地主机)     = '$local_host_name'  " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        printf "\033[1;34m[INFO]\033[0m "
+        printf "[INFO] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+        echo -e "名称 (主机)         = '$host_name'  " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        # 执行同步操作
+        sudo scutil --set ComputerName "$host_name" > /dev/null 2>&1
+        sudo scutil --set LocalHostName "$host_name" > /dev/null 2>&1
+        # 设置同步完成后需要打印的消息
+        sync_message="已同步主机名称"
+    fi
+else
+    # HostName 未设置，打印警告信息
+    printf "\033[1;34m[WARN] ⚠️ \033[0m "
+    printf "[WARN] ⚠️ " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "HostName 未设置，无法同步 ComputerName 与 LocalHostName。请运行：sudo scutil --set HostName \"$local_host_name\" 后再执行脚本。" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+fi
+
+# 打印一个空行，分隔 Info 与 OK 区块
+echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 # 获取当前工作目录
 current_dir=$(pwd)
@@ -709,6 +764,13 @@ else
     # 如果相等，打印无需切换
     echo -e "\033[1;32m[OK] 无需切换 工作目录 \033[0m "
     echo -e "[OK] 无需切换 工作目录 "                                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+fi
+
+# 如果之前进行了主机名同步，则在此处打印同步的 OK 消息
+if [ -n "$sync_message" ]; then
+    printf "\033[1;32m[OK]\033[0m "
+    printf "[OK] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "$sync_message" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 fi
 
 # ========= 环境初始化结束 =========
