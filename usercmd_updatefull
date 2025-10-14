@@ -683,9 +683,16 @@ disk_capacity=$(system_profiler SPStorageDataType \
         | awk -F'(' '{print $1}' \
         | sed 's/^ *//; s/ *$//')
 storage_info="${memory_size} / ${disk_capacity}"
-# 获取 OS 的 版本名称 (如 tahoe 26)
-os_name=$(awk '/SOFTWARE LICENSE AGREEMENT FOR macOS/' '/System/Library/CoreServices/Setup Assistant.app/Contents/Resources/en.lproj/OSXSoftwareLicense.rtf' | awk -F 'macOS ' '{print $NF}' | awk '{print substr($0, 0, length($0)-1)}')
-os_name=$(echo "$os_name" | tr '[:upper:]' '[:lower:]')
+# 获取 OS 的 版本名称 (如 tahoe 26)，仅保留代号部分（如 tahoe）
+os_full_name=$(awk '/SOFTWARE LICENSE AGREEMENT FOR macOS/' '/System/Library/CoreServices/Setup Assistant.app/Contents/Resources/en.lproj/OSXSoftwareLicense.rtf' | awk -F 'macOS ' '{print $NF}' | awk '{print substr($0, 0, length($0)-1)}')
+os_full_name=$(echo "$os_full_name" | tr '[:upper:]' '[:lower:]')
+os_name=$(echo "$os_full_name" | awk '{print $1}')
+
+# 获取操作系统版本号（例如 26.0.1 或 15.0），用于显示但不用于平台键
+os_version=""
+if command -v sw_vers >/dev/null 2>&1; then
+    os_version=$(sw_vers -productVersion 2>/dev/null || echo "")
+fi
 # 获取硬件序列号
 hardware_sn=$(system_profiler SPHardwareDataType | awk -F': ' '/Serial Number/{print $2}' | sed 's/^ *//')
 # 获取当前的名称信息，用于显示计算机名称
@@ -720,7 +727,12 @@ echo -e "存储容量    = '$storage_info'" | tee -a "$LOG_FULL_LAST" "$LOG_FULL
 
 printf "\033[1;34m[INFO]\033[0m "
 printf "[INFO] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "OS 版本     = '$os_name'" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+# 在 OS 行末尾附加版本号信息，以便显示但不影响平台键
+if [ -n "$os_version" ]; then
+    echo -e "OS 版本     = '$os_name / v$os_version' " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+else
+    echo -e "OS 版本     = '$os_name'" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+fi
 
 printf "\033[1;34m[INFO]\033[0m "
 printf "[INFO] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
@@ -785,15 +797,15 @@ echo -e ""                                                                      
 
 printf "\033[1;34m[INFO]\033[0m "
 printf "[INFO] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "根目录   (当前用户) = '$HOME'" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e "根目录      = '$HOME'  (当前用户)" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 printf "\033[1;34m[INFO]\033[0m "
 printf "[INFO] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "工作目录 (当前脚本) = '$(pwd)'" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e "工作目录    = '$(pwd)'  (当前脚本)" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 printf "\033[1;34m[INFO]\033[0m "
 printf "[INFO] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "当前用户            = '$USER'" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e "当前用户    = '$USER'" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -858,12 +870,12 @@ if [ "$architecture" = "arm64" ]; then
     brew_path=$(brew --prefix)
     printf  "\033[1;34m[INFO]\033[0m "
     printf  "[INFO] "                                                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "Homebrew目录 : '$brew_path'"                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "Homebrew目录 = '$brew_path'"                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     # 获取 CPU 的 处理器指令集
     cpu_isa=$(uname -m)
     printf  "\033[1;34m[INFO]\033[0m "
     printf  "[INFO] "                                                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "CPU   指令集 : '$cpu_isa'"                                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "CPU   指令集 = '$cpu_isa'"                                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
