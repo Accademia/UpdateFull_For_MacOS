@@ -758,12 +758,12 @@ current_dir=$(pwd)
 if [ "$HOME" != "$current_dir" ]; then
     # 如果不相等，切换到 $HOME
     cd "$HOME"
-    echo -e "\033[1;32m[OK]工作目录 已切换为 : '$(pwd)' \033[0m "
+    echo -e "\033[1;36m[OK]工作目录 已切换为 : '$(pwd)' \033[0m "
     echo -e "[OK] 工作目录 已切换为 : '$(pwd)' "                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 else
     # 如果相等，打印无需切换
-    echo -e "\033[1;32m[OK] 无需切换 工作目录 \033[0m "
-    echo -e "[OK] 无需切换 工作目录 "                                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "\033[1;36m[OK] 工作目录 无需切换 \033[0m "
+    echo -e "[OK] 工作目录 无需切换 "                                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 fi
 
 # 如果之前进行了主机名同步，则在此处打印同步的 OK 消息
@@ -877,9 +877,8 @@ if [ "$architecture" = "arm64" ]; then
 
     if [[ $cpu_isa == "arm64" && $brew_path == "/opt/homebrew" ]]; then
 
-        printf  "\033[1;32m[OK]\033[0m   "
-        printf  "[OK]   "                                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-        echo -e "Homebrew 无需更改"                                                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "\033[1;36m[OK] Homebrew 无需更改  \033[0m"
+        echo -e "[OK] Homebrew 无需更改  "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
         # 更新 Homebrew
         echo -e ""                                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
         echo -e ""                                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
