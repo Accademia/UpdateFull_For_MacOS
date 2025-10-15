@@ -877,7 +877,7 @@ echo -e ""                                                                      
 # -----------------------------------------------
 
 echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-echo -e "\033[1;36m 检测 “Homebrew与系统架构” 是否匹配 ...        \033[0m"
+echo -e "\033[1;36m 检测 “Homebrew与系统架构” 是否匹配         \033[0m"
 echo -e "\033[1;36m-----------------------------------------------\033[0m" 
 
 echo -e "----------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
@@ -934,7 +934,7 @@ if [ "$architecture" = "arm64" ]; then
         echo -e ""                                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
         echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-        echo -e "\033[1;36m 更新 Homebrew 工具 ...\033[0m"
+        echo -e "\033[1;36m 更新 Homebrew 工具 \033[0m"
         echo -e "\033[1;36m-----------------------------------------------\033[0m" 
 
         echo -e "----------------------------------"                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
@@ -944,27 +944,49 @@ if [ "$architecture" = "arm64" ]; then
         echo -e ""                                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
         # 检查是否以 root 身份运行
+        # 初始化退出码变量，用于统计 Homebrew 更新和 analytics 操作的执行结果
+        brew_update_rc=0
+        brew_analytics_rc=0
         if [ "$(id -u)" -eq 0 ]; then
             # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
             targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
             echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 Homebrew 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             # 以目标用户身份执行 Homebrew 命令：更新索引
-            sudo -H -u "$targetUser" bash -c 'brew update --force 2>&1'                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            sudo -H -u "$targetUser" brew update --force 2>&1 |
+                tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            brew_update_rc=${PIPESTATUS[0]}
             # 关闭匿名使用统计，提升隐私
             echo -e "✓  设置 Homebrew analytics off" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-            sudo -H -u "$targetUser" bash -c 'brew analytics off 2>&1'                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            sudo -H -u "$targetUser" brew analytics off 2>&1 |
+                tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            brew_analytics_rc=${PIPESTATUS[0]}
            ## 执行 brew doctor 进行环境自检，不影响整体退出码
            #echo -e "✓  执行 brew doctor 自检" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-           #sudo -H -u "$targetUser" bash -c 'brew doctor || true'                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+           #sudo -H -u "$targetUser" brew doctor || true                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         else
             echo -e "✓   当前用户'$USER'，为普通权限，直接运行 Homebrew 自更新 ... "             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-            brew update --force 2>&1                                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            brew update --force 2>&1 |
+                tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            brew_update_rc=${PIPESTATUS[0]}
             # 关闭匿名使用统计，提升隐私
             echo -e "✓  设置 Homebrew analytics off" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-            brew analytics off 2>&1                                                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            brew analytics off 2>&1 |
+                tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            brew_analytics_rc=${PIPESTATUS[0]}
            ## 执行 brew doctor 进行环境自检，不影响整体退出码
            #echo -e "✓  执行 brew doctor 自检" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
            #brew doctor || true                                                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        fi
+
+        echo -e ""
+
+        # 根据更新和 analytics 的退出码输出总结信息
+        if [ $brew_update_rc -eq 0 ] && [ $brew_analytics_rc -eq 0 ]; then
+            echo -e '\033[1;36m[OK] 更新 Homebrew 工具 已完成\033[0m '
+            echo -e '[OK] 更新 Homebrew 工具 已完成' | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+        else
+            echo -e '\033[1;31m[ERROR] 更新 Homebrew 工具 失败 ❌\033[0m '
+            echo -e '[ERROR] 更新 Homebrew 工具 失败 ❌' | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
         fi
 
        #exit 1
@@ -1054,7 +1076,7 @@ check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 if ! brew list | grep -q "^jq$" || ! brew list | grep -q "^coreutils$" || ! brew list | grep -q "^parallel$" || ! brew list | grep -q "^aria2$";  then
     echo -e ""                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    echo -e "\033[1;36m 安装 其他必备工具 ...\033[0m"
+    echo -e "\033[1;36m 安装 其他必备工具 \033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
 
     echo -e "----------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
@@ -1110,7 +1132,7 @@ check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 if brew list --formula | grep -q "^mas\$"; then
 
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    echo -e "\033[1;36m 更新 Mas 工具 ...\033[0m"
+    echo -e "\033[1;36m 更新 Mas 工具 \033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
 
     echo -e "----------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
@@ -1120,21 +1142,41 @@ if brew list --formula | grep -q "^mas\$"; then
     echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
     # 检查是否以 root 身份运行
+    mas_update_rc=0
     if [ "$(id -u)" -eq 0 ]; then
         # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
         targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
         echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 Mas 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 以目标用户身份执行 Homebrew 命令
-        sudo -H -u "$targetUser" bash -c 'brew upgrade mas 2>&1'       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        sudo -H -u "$targetUser" brew upgrade mas 2>&1 |
+            tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        mas_update_rc=${PIPESTATUS[0]}
     else
         echo -e "✓  当前用户'$USER'，为普通权限，直接运行 Mas 自更新 ... "            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-        brew upgrade mas 2>&1                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        brew upgrade mas 2>&1 |
+            tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        mas_update_rc=${PIPESTATUS[0]}
+    fi
+
+    echo -e  ""
+
+    # 输出 Mas 更新结果：只有当更新命令返回 0 时标记为成功
+    if [ $mas_update_rc -eq 0 ]; then
+        # 打印绿色 [OK] 提示（彩色输出仅在控制台显示）
+        echo -e  '\033[1;36m[OK] 更新 Mas 工具 已完成\033[0m '
+        # 在日志中记录 [OK] 状态但不重复显示到控制台
+        echo -e  '[OK] 更新 Mas 工具 已完成' | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    else
+        # 打印红色 [ERROR] 提示（彩色输出仅在控制台显示）
+        echo -e  '\033[1;31m[ERROR] 更新 Mas 工具 失败 ❌\033[0m '
+        # 在日志中记录 [ERROR] 状态但不重复显示到控制台
+        echo -e  '[ERROR] 更新 Mas 工具 失败 ❌' | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     fi
 
 else
 
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    echo -e "\033[1;36m Mas 未安装，开始安装 ...\033[0m"
+    echo -e "\033[1;36m Mas 未安装，开始安装 \033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
     echo -e "----------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e "Mas 未安装，开始安装"                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
@@ -1179,7 +1221,7 @@ check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 if command -v /opt/local/bin/port >/dev/null 2>&1; then
 
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    echo -e "\033[1;36m 更新 MacPorts 工具 ...\033[0m"
+    echo -e "\033[1;36m 更新 MacPorts 工具 \033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
     echo -e "----------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e "更新 MacPorts 工具  "       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
@@ -1187,14 +1229,30 @@ if command -v /opt/local/bin/port >/dev/null 2>&1; then
     echo -e ""                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     # 保证 CLT 收据存在，否则跳过 MacPorts 更新
+    macports_update_rc=0
     if ensure_clt_or_skip_macports; then
         # MacPorts 基础更新：仅运行自更新以更新 MacPorts base 和 ports 树
         sudo /opt/local/bin/port selfupdate 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        macports_update_rc=${PIPESTATUS[0]}
+    fi
+    # 输出 MacPorts 更新结果（即便没有执行更新，也视为成功）。
+    echo -e ""
+    # 仅当自更新命令返回 0 时视为成功，其余情况标记为错误。
+    if [ $macports_update_rc -eq 0 ]; then
+        # 打印绿色 [OK] 提示
+        echo -e '\033[1;36m[OK] 更新 MacPorts 工具 已完成\033[0m '
+        # 在日志中记录 [OK]
+        echo -e '[OK] 更新 MacPorts 工具 已完成' | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    else
+        # 打印红色 [ERROR] 提示
+        echo -e  '\033[1;31m[ERROR] 更新 MacPorts 工具 失败 ❌\033[0m '
+        # 在日志中记录 [ERROR]
+        echo -e  '[ERROR] 更新 MacPorts 工具 失败 ❌' | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     fi
 
 else
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    echo -e "\033[1;36m MacPorts 未安装，开始安装 ...\033[0m"
+    echo -e "\033[1;36m MacPorts 未安装，开始安装 \033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
     echo -e "----------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e "MacPorts 未安装，开始安装  "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
@@ -1245,7 +1303,7 @@ check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 if brew list --formula | grep -q "^topgrade\$"; then
 
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    echo -e "\033[1;36m 更新 TopGrade 工具 ...\033[0m"
+    echo -e "\033[1;36m 更新 TopGrade 工具 \033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
     echo -e "----------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e "更新 TopGrade 工具"                                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
@@ -1254,21 +1312,41 @@ if brew list --formula | grep -q "^topgrade\$"; then
     echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
     # 检查是否以 root 身份运行
+    topgrade_update_rc=0
     if [ "$(id -u)" -eq 0 ]; then
         # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
         targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
         echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 topgrade 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 以目标用户身份执行 Homebrew 命令
-        sudo -H -u "$targetUser" bash -c 'brew upgrade --greedy --force topgrade 2>&1'  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        sudo -H -u "$targetUser" brew upgrade --greedy --force topgrade 2>&1 |
+            tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        topgrade_update_rc=${PIPESTATUS[0]}
     else
         echo -e "✓  当前用户'$USER'，为普通权限，直接运行 topgrade 自更新 ... "       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-        brew upgrade --greedy --force topgrade 2>&1                                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        brew upgrade --greedy --force topgrade 2>&1 |
+            tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        topgrade_update_rc=${PIPESTATUS[0]}
+    fi
+    
+    echo -e ""
+
+    # 输出 TopGrade 更新结果：成功或失败
+    if [ $topgrade_update_rc -eq 0 ]; then
+        # 打印绿色 [OK] 提示
+        echo -e '\033[1;36m[OK] 更新 TopGrade 工具 已完成\033[0m '
+        # 在日志中记录 [OK] 状态
+        echo -e '[OK] 更新 TopGrade 工具 已完成' | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    else
+        # 打印红色 [ERROR] 提示
+        echo -e '\033[1;31m[ERROR] 更新 TopGrade 工具 失败 ❌\033[0m '
+        # 在日志中记录 [ERROR] 状态
+        echo -e '[ERROR] 更新 TopGrade 工具 失败 ❌' | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     fi
 
 else
 
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    echo -e "\033[1;36m TopGrade 未安装，开始安装 ...\033[0m"
+    echo -e "\033[1;36m TopGrade 未安装，开始安装 \033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
     echo -e "----------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e "TopGrade 未安装，开始安装"                                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
@@ -1314,7 +1392,7 @@ check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 if brew list --cask | grep -q "^macupdater\$"; then
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    echo -e "\033[1;36m 更新 MacUpdater 工具 ...\033[0m"
+    echo -e "\033[1;36m 更新 MacUpdater 工具 \033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
     echo -e "----------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e "更新 MacUpdater 工具"                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
@@ -1322,22 +1400,41 @@ if brew list --cask | grep -q "^macupdater\$"; then
     echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     
     # 检查是否以 root 身份运行
+    macupdater_update_rc=0
     if [ "$(id -u)" -eq 0 ]; then
         # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
         targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
         echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 macupdater 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        # 以目标用户身份执行 Homebrew 命令
-        # 显式传递语言配置，避免 sudo 环境丢失 HOMEBREW_CASK_OPTS
-        sudo -H -u "$targetUser" env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew upgrade --greedy --cask macupdater 2>&1  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        # 以目标用户身份执行 Homebrew 命令，并显式传递语言配置
+        sudo -H -u "$targetUser" env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew upgrade --greedy --cask macupdater 2>&1 |
+            tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        macupdater_update_rc=${PIPESTATUS[0]}
     else
         echo -e "✓  当前用户'$USER'，为普通权限，直接运行 macupdater 自更新 ... "     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-        env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew upgrade --greedy --cask macupdater 2>&1                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew upgrade --greedy --cask macupdater 2>&1 |
+            tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        macupdater_update_rc=${PIPESTATUS[0]}
+    fi
+
+    echo -e ""
+
+    # 输出 MacUpdater 更新结果：成功或失败
+    if [ $macupdater_update_rc -eq 0 ]; then
+        # 打印绿色 [OK] 提示
+        echo -e '\033[1;36m[OK] 更新 MacUpdater 工具 已完成\033[0m '
+        # 在日志中记录 [OK] 状态
+        echo -e '[OK] 更新 MacUpdater 工具 已完成' | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    else
+        # 打印红色 [ERROR] 提示
+        echo -e '\033[1;31m[ERROR] 更新 MacUpdater 工具 失败 ❌\033[0m '
+        # 在日志中记录 [ERROR] 状态
+        echo -e '[ERROR] 更新 MacUpdater 工具 失败 ❌' | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     fi
 
 else
 
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    echo -e "\033[1;36m MacUpdater 未安装，开始安装 ...\033[0m"
+    echo -e "\033[1;36m MacUpdater 未安装，开始安装 \033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
     echo -e "----------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e "MacUpdater 未安装，开始安装 "                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
@@ -1541,7 +1638,7 @@ echo -e ""                                                                      
 export HOMEBREW_NO_INTERACTIVE=1
 
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
-echo -e "\033[1;32m 运行 HomeBrew ...                             \033[0m"
+echo -e "\033[1;32m 运行 HomeBrew                             \033[0m"
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 
 echo -e "----------------------------------"                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
@@ -2813,7 +2910,7 @@ MAS_MAX_RETRIES=3                                                               
 MAS_RETRY_DELAY=5                                                                       # 每次重试之间等待5秒
 
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
-echo -e "\033[1;32m 运行 Mas ...                                  \033[0m"
+echo -e "\033[1;32m 运行 Mas                                   \033[0m"
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 
 echo -e "----------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
@@ -3045,7 +3142,7 @@ export MacPorts_NO_INTERACTIVE=1
 
 
 echo -e "\033[1;32m-----------------------------------------------\033[0m"
-echo -e "\033[1;32m 运行 MacPorts ...                             \033[0m"
+echo -e "\033[1;32m 运行 MacPorts                              \033[0m"
 echo -e "\033[1;32m-----------------------------------------------\033[0m"
 
 echo -e "----------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
@@ -3145,7 +3242,7 @@ echo -e ""                                                                      
 export SoftwareUpdate_NO_INTERACTIVE=1
 
 echo -e "\033[1;32m-----------------------------------------------\033[0m"  
-echo -e "\033[1;32m 运行 MacOS System Update ...                  \033[0m"  
+echo -e "\033[1;32m 运行 MacOS System Update                   \033[0m"  
 echo -e "\033[1;32m-----------------------------------------------\033[0m"  
 
 echo -e "----------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
@@ -3225,7 +3322,7 @@ export TopGrade_NO_INTERACTIVE=1
 
 
 echo -e "\033[1;32m-----------------------------------------------\033[0m"  
-echo -e "\033[1;32m 运行 TopGrade ...                             \033[0m"  
+echo -e "\033[1;32m 运行 TopGrade                              \033[0m"  
 echo -e "\033[1;32m-----------------------------------------------\033[0m"  
 
 echo -e "----------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
@@ -3372,7 +3469,7 @@ MacUpdater_ENABLE="true"
 export MacUpdater_NO_INTERACTIVE=1
 
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
-echo -e "\033[1;32m 运行 MacUpdater ...                           \033[0m"
+echo -e "\033[1;32m 运行 MacUpdater                            \033[0m"
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 
 echo -e "----------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
@@ -3564,7 +3661,7 @@ echo -e ""                                                                      
 # 最后打印执行完成的时间
 
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
-echo -e "\033[1;32m 已完成 所有更新  ...                          \033[0m"
+echo -e "\033[1;32m 已完成 所有更新                            \033[0m"
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 
 echo -e "----------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
