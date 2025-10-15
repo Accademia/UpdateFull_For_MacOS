@@ -978,7 +978,7 @@ if [ "$architecture" = "arm64" ]; then
            #brew doctor || true                                                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         fi
 
-        echo -e ""
+        echo -e ""  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
         # 根据更新和 analytics 的退出码输出总结信息
         if [ $brew_update_rc -eq 0 ] && [ $brew_analytics_rc -eq 0 ]; then
@@ -1158,7 +1158,7 @@ if brew list --formula | grep -q "^mas\$"; then
         mas_update_rc=${PIPESTATUS[0]}
     fi
 
-    echo -e  ""
+    echo -e  "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     # 输出 Mas 更新结果：只有当更新命令返回 0 时标记为成功
     if [ $mas_update_rc -eq 0 ]; then
@@ -1236,7 +1236,9 @@ if command -v /opt/local/bin/port >/dev/null 2>&1; then
         macports_update_rc=${PIPESTATUS[0]}
     fi
     # 输出 MacPorts 更新结果（即便没有执行更新，也视为成功）。
-    echo -e ""
+
+    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
     # 仅当自更新命令返回 0 时视为成功，其余情况标记为错误。
     if [ $macports_update_rc -eq 0 ]; then
         # 打印绿色 [OK] 提示
@@ -1328,7 +1330,7 @@ if brew list --formula | grep -q "^topgrade\$"; then
         topgrade_update_rc=${PIPESTATUS[0]}
     fi
     
-    echo -e ""
+    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     # 输出 TopGrade 更新结果：成功或失败
     if [ $topgrade_update_rc -eq 0 ]; then
@@ -1416,7 +1418,7 @@ if brew list --cask | grep -q "^macupdater\$"; then
         macupdater_update_rc=${PIPESTATUS[0]}
     fi
 
-    echo -e ""
+    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     # 输出 MacUpdater 更新结果：成功或失败
     if [ $macupdater_update_rc -eq 0 ]; then
