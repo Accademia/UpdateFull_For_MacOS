@@ -217,55 +217,7 @@ root            ALL = (ALL) ALL
 ```
 
 
-.
 
-# 其他： 
-
-
-如果想 全自动 “强制升级” 已安装的 “所有Homebrew cask软件” ，可以使用如下命令：
-```
-brew tap buo/cask-upgrade
-brew cu -a -y -f
-```
-
-如果想 全自动 “强制重装” 已安装的 “所有Homebrew软件” ，可以使用如下命令：
-```
-# 重装所有 命令行软件
-brew list --formula | xargs brew reinstall --force
-或（遇到Error也不间断执行，错误记录在txt文件当中）
-brew list --formula | xargs -I {} sh -c 'brew reinstall --force --debug --verbose {} || echo "Error reinstalling {}" >> reinstall_formula_errors.txt'
-
-# 重装所有 图形软件
-brew list --cask    | xargs brew reinstall --force --cask --debug --verbose
-# 或（遇到Error也不间断执行，错误记录在txt文件当中）
-brew list --cask | xargs -I {} sh -c 'brew reinstall --force --cask --debug --verbose {} || echo "Error reinstalling {}" >> reinstall_cask_errors.txt'
-```
-
-如果发生中断，请使用如下命令继续执行
-```
-brew list --formula | sed -n '/软件的homebrew英文名称/,$p' | xargs brew reinstall --force --debug --verbose
-brew list --cask    | sed -n '/软件的homebrew英文名称/,$p' | xargs brew reinstall --force --debug --verbose --cask
-```
-或（遇到Error也不间断执行，错误记录在txt文件当中）
-```
-brew list --cask | sed -n '/软件的homebrew英文名称/,$p' | xargs -I {} sh -c 'brew reinstall --force --debug --verbose --cask {} || echo "Error reinstalling {}" >> reinstall_cask_errors.txt'
-```
-
-
-如果想快速将APP与homebrew解绑，而不删除app，请使用如下命令
-```
-rm -rf /opt/homebrew/Caskroom/应用名.app
-brew clwanup
-```
-```
-# 如：
-
-rm -rf /opt/homebrew/Caskroom/microsoft-excel
-rm -rf /opt/homebrew/Caskroom/microsoft-outlook
-rm -rf /opt/homebrew/Caskroom/microsoft-powerpoint
-rm -rf /opt/homebrew/Caskroom/microsoft-onenote
-rm -rf /opt/homebrew/Caskroom/microsoft-onedrive
-```
 .
 
 声明：
