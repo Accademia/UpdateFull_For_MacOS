@@ -61,13 +61,13 @@
     https://lingon-x.macupdate.com/
 
  - (后台执行) 挂载命令 ：
-    + 方法 1 : /usr/bin/open /usr/local/bin/usercmd_updatefull                                （推荐，前台执行）
-    + 方法 2 : /opt/homebrew/bin/bash /usr/local/bin/usercmd_updatefull                       （后台执行）
-    + 方法 3 ：/usr/bin/sudo -n /opt/homebrew/bin/bash /usr/local/bin/usercmd_updatefull      （后台执行 + 以ROOT权限执行）
+    + 方法 1 : /usr/bin/open /usr/local/bin/usercmd_updatefull                                （相当于：前台执行）
+    + 方法 2 : /opt/homebrew/bin/bash /usr/local/bin/usercmd_updatefull                       （相当于：后台执行）
+    + 方法 3 ：/usr/bin/sudo -n /opt/homebrew/bin/bash /usr/local/bin/usercmd_updatefull      （相当于：后台执行 + 以ROOT权限执行）
     + 特别注意：⚠️⚠️⚠️⚠️  
-        + 后台执行usercmd_updatefull时，千万不要不加 /opt/homebrew/bin/bash ，而直接调用 /usr/local/bin/usercmd_updatefull。这会导致visudo失效
-        + 因为程序Generate_Homebrew_Sudoers在前台生成的规则，不能足量覆盖/usr/local/bin/usercmd_updatefull程序在后台 直接执行时的所有免密请求，会多出特别多前台生成规则时无法看到的高权限命令）。
-        + ⚠️ 前台调用时，无上述限制！！使用opt/homebrew/bin/bash /usr/local/bin/usercmd_updatefull 或直接使用/usr/local/bin/usercmd_updatefull 执行都可以正常匹配Generate_Homebrew_Sudoers生成的免密规则。
+        + 后台执行usercmd_updatefull时，千万不要不加 /opt/homebrew/bin/bash ，而直接调用 /usr/local/bin/usercmd_updatefull。这会导致Generate_Homebrew_Sudoers生成的免密规则失效。
+        + 因为，程序Generate_Homebrew_Sudoers在前台生成免密规则，不能足量覆盖/usr/local/bin/usercmd_updatefull程序在后台 直接执行时的所有免密请求，会多出来特别多 在前台生成规则时 无法看到的高权限命令。从而导致执行被卡住。
+        + 但是前台调用/usr/local/bin/usercmd_updatefull时，无上述限制！！
 
     PS：
     如果命令被存储到 /usr/local/bin 路径下 ！
