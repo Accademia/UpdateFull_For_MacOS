@@ -837,7 +837,7 @@ echo -e "[OK] 硬件检测 已完成" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 # 如果进行了主机名同步，则打印 OK 消息
 if [ -n "$sync_message" ]; then
-    echo -e "\033[1;36m[OK] $sync_message\033[0m " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "\033[1;36m[OK] $sync_message\033[0m " 
     echo -e "[OK] $sync_message" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 fi
 
