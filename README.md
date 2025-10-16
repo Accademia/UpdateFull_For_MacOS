@@ -64,6 +64,7 @@
     + 方法 1 : /usr/bin/open /usr/local/bin/usercmd_updatefull                                （推荐，前台执行）
     + 方法 2 : /opt/homebrew/bin/bash /usr/local/bin/usercmd_updatefull                       （后台执行）
     + 方法 3 ：/usr/bin/sudo -n /opt/homebrew/bin/bash /usr/local/bin/usercmd_updatefull      （后台执行 + 以ROOT权限执行）
+    + 特别注意：⚠️⚠️⚠️⚠️  后台执行usercmd_updatefull时，千万不要不加 /opt/homebrew/bin/bash，而直接调用 /usr/local/bin/usercmd_updatefull。这会导致visudo失效（因为程序Generate_Homebrew_Sudoers在前台生成的规则，不能足量覆盖免密请求，会多出特别多前台生成规则时无法看到的高权限命令）
 
     PS：
     如果命令被存储到 /usr/local/bin 路径下 ！

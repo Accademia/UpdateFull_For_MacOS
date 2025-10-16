@@ -67,7 +67,15 @@ DURATION_MINUTES=10     # 拒绝执行结束前 的 时间长度（10分钟，�
 
 
 # 路径：保存日志文件的路径
-ICLOUD_PATH="$HOME/Library/Mobile Documents/com~apple~CloudDocs"            # 获取 iCloud 云盘路径，
+# 根据当前运行环境动态确定 iCloud 云盘路径。若以 root 身份运行（例如通过 sudo 调用），
+# 则根据实际登录用户的家目录计算 iCloud 路径，保证日志和备份路径始终保存在真实用户的 iCloud 目录下。
+if [[ "$(id -u)" -eq 0 ]]; then
+    targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+    targetHome=$(eval echo "~$targetUser")
+    ICLOUD_PATH="$targetHome/Library/Mobile Documents/com~apple~CloudDocs"
+else
+    ICLOUD_PATH="$HOME/Library/Mobile Documents/com~apple~CloudDocs"
+fi
 # 生成用于标识设备的目录名称。格式为“型号名称-芯片名称-序列号/用户名”。
 # 型号名称取自系统信息的 Model Name 并删除空格；芯片名称去掉 Apple 前缀并删除所有空格；序列号读取系统序列号。
 MODEL_NAME_RAW=$(system_profiler SPHardwareDataType 2>/dev/null | awk -F: '/Model Name/{print $2; exit}')
@@ -77,7 +85,16 @@ CPU_BRAND_TRIM=$(echo "${CPU_BRAND_RAW}" | sed 's/^Apple[[:space:]]*//;s/^[[:spa
 CPU_BRAND_CLEAN=$(echo "${CPU_BRAND_TRIM}" | sed 's/[[:space:]]//g')
 SERIAL_NUMBER_RAW=$(system_profiler SPHardwareDataType 2>/dev/null | awk -F: '/Serial Number/{print $2; exit}')
 SERIAL_NUMBER_CLEAN=$(echo "${SERIAL_NUMBER_RAW}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-USER_NAME="${USER:-$(whoami)}"
+# 为了确保无论脚本以哪种方式运行（普通用户/通过 sudo 提权等），日志目录均基于实际登录用户而不是当前有效 UID。
+# 如果当前 uid 为 0（root），优先使用 $SUDO_USER（sudo 调用者），否则从控制台获取活跃用户；
+# 否则直接使用 $USER 环境变量，若未设置则回退到控制台用户。
+if [[ "$(id -u)" -eq 0 ]]; then
+    # 以 root 运行时尝试还原到调用 sudo 的用户，若不存在则使用当前控制台登录用户
+    USER_NAME="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+else
+    # 非 root 情况直接使用 USER 环境变量，若不存在则使用当前控制台登录用户
+    USER_NAME="${USER:-$(stat -f '%Su' /dev/console)}"
+fi
 DEVICE_DIR="${MODEL_NAME_CLEAN}-${CPU_BRAND_CLEAN}-${SERIAL_NUMBER_CLEAN}"
 # 清理多余的连字符
 DEVICE_DIR=$(echo "$DEVICE_DIR" | sed 's/--*/-/g; s/^-//; s/-$//')
@@ -706,13 +723,13 @@ echo -e "测试安装环境：$(date '+%Y-%m-%d %H:%M:%S') ... "                
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
-echo -e "\033[1;36m----------------------------------\033[0m" 
+echo -e "\033[1;36m-----------------------------------------------\033[0m" 
 echo -e "\033[1;36m 检查 ：软硬件信息            \033[0m"
-echo -e "\033[1;36m----------------------------------\033[0m" 
+echo -e "\033[1;36m-----------------------------------------------\033[0m" 
 
-echo -e "----------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "-------------------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "检查 ：软硬件信息            "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "----------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "-------------------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 # 采集系统软硬件信息
 
@@ -831,13 +848,13 @@ echo -e ""                                                                      
 # 检查 ：工作目录（权限） 是否 正确分配
 # -----------------------------------------------
 
-echo -e "\033[1;36m----------------------------------\033[0m" 
+echo -e "\033[1;36m-----------------------------------------------\033[0m" 
 echo -e "\033[1;36m 检查 ：工作目录 & 权限            \033[0m"
-echo -e "\033[1;36m----------------------------------\033[0m" 
+echo -e "\033[1;36m-----------------------------------------------\033[0m" 
 
-echo -e "----------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "-------------------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "检查 ：工作目录 & 权限            "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "----------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "-------------------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
@@ -880,9 +897,9 @@ echo -e "\033[1;36m-----------------------------------------------\033[0m"
 echo -e "\033[1;36m 检测 “Homebrew与系统架构” 是否匹配         \033[0m"
 echo -e "\033[1;36m-----------------------------------------------\033[0m" 
 
-echo -e "----------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "-------------------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "检测 “Homebrew与系统架构” 是否匹配"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "----------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "-------------------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
@@ -937,9 +954,9 @@ if [ "$architecture" = "arm64" ]; then
         echo -e "\033[1;36m 更新 Homebrew 工具 \033[0m"
         echo -e "\033[1;36m-----------------------------------------------\033[0m" 
 
-        echo -e "----------------------------------"                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+        echo -e "-------------------------------------------"                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
         echo -e "更新 Homebrew 工具 "                                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-        echo -e "----------------------------------"                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+        echo -e "-------------------------------------------"                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
         echo -e ""                                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
@@ -1079,9 +1096,9 @@ if ! brew list | grep -q "^jq$" || ! brew list | grep -q "^coreutils$" || ! brew
     echo -e "\033[1;36m 安装 其他必备工具 \033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
 
-    echo -e "----------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "-------------------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e "安装 其他必备工具 "                                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "----------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "-------------------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 fi
 
@@ -1135,9 +1152,9 @@ if brew list --formula | grep -q "^mas\$"; then
     echo -e "\033[1;36m 更新 Mas 工具 \033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
 
-    echo -e "----------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "-------------------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e "更新 Mas 工具"                                                             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "----------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "-------------------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
     echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
@@ -1178,9 +1195,9 @@ else
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
     echo -e "\033[1;36m Mas 未安装，开始安装 \033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    echo -e "----------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "-------------------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e "Mas 未安装，开始安装"                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "----------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "-------------------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
     # 检查是否以 root 身份运行
     if [ "$(id -u)" -eq 0 ]; then
@@ -1223,9 +1240,9 @@ if command -v /opt/local/bin/port >/dev/null 2>&1; then
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
     echo -e "\033[1;36m 更新 MacPorts 工具 \033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    echo -e "----------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "-------------------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e "更新 MacPorts 工具  "       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "----------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "-------------------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e ""                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     # 保证 CLT 收据存在，否则跳过 MacPorts 更新
@@ -1256,9 +1273,9 @@ else
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
     echo -e "\033[1;36m MacPorts 未安装，开始安装 \033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    echo -e "----------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "-------------------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e "MacPorts 未安装，开始安装  "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "----------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "-------------------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 
     if ensure_clt_or_skip_macports; then
@@ -1307,9 +1324,9 @@ if brew list --formula | grep -q "^topgrade\$"; then
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
     echo -e "\033[1;36m 更新 TopGrade 工具 \033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    echo -e "----------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "-------------------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e "更新 TopGrade 工具"                                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "----------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "-------------------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
     echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
@@ -1350,9 +1367,9 @@ else
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
     echo -e "\033[1;36m TopGrade 未安装，开始安装 \033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    echo -e "----------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "-------------------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e "TopGrade 未安装，开始安装"                                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "----------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "-------------------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
     echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
@@ -1396,9 +1413,9 @@ if brew list --cask | grep -q "^macupdater\$"; then
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
     echo -e "\033[1;36m 更新 MacUpdater 工具 \033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    echo -e "----------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "-------------------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e "更新 MacUpdater 工具"                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "----------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "-------------------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     
     # 检查是否以 root 身份运行
@@ -1438,9 +1455,9 @@ else
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
     echo -e "\033[1;36m MacUpdater 未安装，开始安装 \033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    echo -e "----------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "-------------------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e "MacUpdater 未安装，开始安装 "                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "----------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "-------------------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     
     # 检查是否以 root 身份运行
     if [ "$(id -u)" -eq 0 ]; then
@@ -1488,9 +1505,9 @@ echo -e  ""                                                                     
 echo -e "\033[1;34m-----------------------------------------------\033[0m" 
 echo -e "\033[1;34m 开始更新 APP: $(date)                         \033[0m"
 echo -e "\033[1;34m-----------------------------------------------\033[0m" 
-echo -e "----------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "-------------------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "开始更新 APP: $(date)"                                                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "----------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "-------------------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 echo -e  ""                                                                             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 echo -e  ""                                                                             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -1510,9 +1527,9 @@ echo -e "\033[1;32m-----------------------------------------------\033[0m"
 echo -e "\033[1;32m 备份 桌面布局（Launchpad）                    \033[0m"
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 
-echo -e "----------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "-------------------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "备份 桌面布局（Launchpad）"                                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "----------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "-------------------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 
 echo -e ""                                                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
@@ -1643,9 +1660,9 @@ echo -e "\033[1;32m-----------------------------------------------\033[0m"
 echo -e "\033[1;32m 运行 HomeBrew                             \033[0m"
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 
-echo -e "----------------------------------"                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "-------------------------------------------"                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "运行 HomeBrew"                                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "----------------------------------"                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "-------------------------------------------"                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 
 # 等待3秒，开始执行
@@ -2915,9 +2932,9 @@ echo -e "\033[1;32m-----------------------------------------------\033[0m"
 echo -e "\033[1;32m 运行 Mas                                   \033[0m"
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 
-echo -e "----------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "-------------------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "运行 Mas"                                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "----------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "-------------------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
   
 
 # 等待3秒，开始执行
@@ -3147,9 +3164,9 @@ echo -e "\033[1;32m-----------------------------------------------\033[0m"
 echo -e "\033[1;32m 运行 MacPorts                              \033[0m"
 echo -e "\033[1;32m-----------------------------------------------\033[0m"
 
-echo -e "----------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "-------------------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "运行 MacPorts"                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "----------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "-------------------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 # 拒绝执行时间窗口
@@ -3247,9 +3264,9 @@ echo -e "\033[1;32m-----------------------------------------------\033[0m"
 echo -e "\033[1;32m 运行 MacOS System Update                   \033[0m"  
 echo -e "\033[1;32m-----------------------------------------------\033[0m"  
 
-echo -e "----------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "-------------------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "运行 MacOS System Update"                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "----------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "-------------------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
@@ -3327,9 +3344,9 @@ echo -e "\033[1;32m-----------------------------------------------\033[0m"
 echo -e "\033[1;32m 运行 TopGrade                              \033[0m"  
 echo -e "\033[1;32m-----------------------------------------------\033[0m"  
 
-echo -e "----------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "-------------------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "运行 TopGrade"                                                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "----------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "-------------------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
@@ -3474,9 +3491,9 @@ echo -e "\033[1;32m-----------------------------------------------\033[0m"
 echo -e "\033[1;32m 运行 MacUpdater                            \033[0m"
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 
-echo -e "----------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "-------------------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "运行 MacUpdater"                                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "----------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "-------------------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
@@ -3619,9 +3636,9 @@ echo -e "\033[1;32m-----------------------------------------------\033[0m"
 echo -e "\033[1;32m 恢复 桌面布局（Launchpad）                    \033[0m"
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 
-echo -e "----------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "-------------------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "恢复 桌面布局（Launchpad）"                                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "----------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "-------------------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     
@@ -3666,9 +3683,9 @@ echo -e "\033[1;32m-----------------------------------------------\033[0m"
 echo -e "\033[1;32m 已完成 所有更新                            \033[0m"
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 
-echo -e "----------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "-------------------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "已完成 所有更新"                                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "----------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "-------------------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     
