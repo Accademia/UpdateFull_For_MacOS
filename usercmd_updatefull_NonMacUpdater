@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/opt/homebrew/bin/bash       # Apple Silicon
 
 # 自动执行的批处理：HomeBrew \ Mas \ MacPorts \ TopGrade \ MacUpdater
 

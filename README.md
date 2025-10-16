@@ -60,7 +60,7 @@
  - 建议使用 Lingon Pro（或类似软件），将usercmd_updatefull挂载为循环任务（比如每天夜间3点钟执行）
     https://lingon-x.macupdate.com/
 
- - 挂载命令：
+ - (后台执行) 挂载命令 ：
     + 方法 1 : /usr/bin/open /usr/local/bin/usercmd_updatefull                                （推荐，前台执行）
     + 方法 2 : /opt/homebrew/bin/bash /usr/local/bin/usercmd_updatefull                       （后台执行）
     + 方法 3 ：/usr/bin/sudo -n /opt/homebrew/bin/bash /usr/local/bin/usercmd_updatefull      （后台执行 + 以ROOT权限执行）
