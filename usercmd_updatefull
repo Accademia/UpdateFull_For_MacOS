@@ -161,7 +161,7 @@ echo -e "" > "$LOG_MACUPDATER_FILE"
 
 # 定义：被测试的外网网址（需要翻墙的网址）
 TARGET_1="github.com"                                       # 测试 主流开源软件下载库 的连通性
-TARGET_2="ghcr.io"                                          # 测试 homebrew 的主站 连通性 (brew.sh)
+TARGET_2="formulae.brew.sh/api/formula.jws.json"            # 测试 homebrew 的主站 连通性 (brew.sh)
 TARGET_3="apps.apple.com/us/app/apple-store/id375380948"    # 测试 Mac AppStore 连通性 （本链接是 苹果官方 Apple Store ）
 TARGET_4="macupdater.com"                                   # 测试 MacUpdater 连通性
 # 如果不能访问上述网站，会导致很多软件都 更新失败。
@@ -2203,16 +2203,54 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
     # ---------------- ① 并行下载 formula ----------------
     if [ ${#packages_to_fetch_formulas[@]} -gt 0 ]; then
       # 使用自定义的 fetch_brew_formula 函数并行下载，每个任务会自动重试和记录失败链接
-      run_as_normal_user parallel --will-cite --line-buffer --unsafe -j16 fetch_brew_formula ::: "${packages_to_fetch_formulas[@]}" &
+      if [ "$(id -u)" -eq 0 ]; then
+        # 以 root 身份运行时，将函数定义传递给目标用户，并显式保留必要的环境变量
+        targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+        func_defs=$(declare -f fetch_brew_formula)
+        formula_parallel_cmd="parallel --will-cite --line-buffer --unsafe -j16 fetch_brew_formula ::: ${packages_to_fetch_formulas[*]}"
+        # 不在后台执行 sudo 调用，确保输出同步到当前终端
+        sudo -n -H -u "$targetUser" env \
+            PATH="$PATH" \
+            HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" \
+            BREW_CASK_LANGUAGE="$BREW_CASK_LANGUAGE" \
+            LOG_FULL_LAST="$LOG_FULL_LAST" \
+            LOG_FULL_FILE="$LOG_FULL_FILE" \
+            FAILED_FETCH_FORMULAS_FILE="$FAILED_FETCH_FORMULAS_FILE" \
+            FAILED_FETCH_CASKS_FILE="$FAILED_FETCH_CASKS_FILE" \
+            DOWNLOAD_MAX_RETRIES="$DOWNLOAD_MAX_RETRIES" \
+            SHA_MISMATCH_MAX_RETRIES="$SHA_MISMATCH_MAX_RETRIES" \
+            bash -lc "$func_defs; $formula_parallel_cmd"
+      else
+        # 非 root 情况下直接调用 parallel
+        parallel --will-cite --line-buffer --unsafe -j16 fetch_brew_formula ::: "${packages_to_fetch_formulas[@]}"
+      fi
     fi
 
     # ---------------- ② 并行下载 cask ----------------
     if [ ${#packages_to_fetch_casks[@]} -gt 0 ]; then
       # 使用自定义的 fetch_brew_cask 函数并行下载，每个任务会自动重试和记录失败链接
-      run_as_normal_user parallel --will-cite --line-buffer --unsafe -j16 fetch_brew_cask ::: "${packages_to_fetch_casks[@]}" &
+      if [ "$(id -u)" -eq 0 ]; then
+        targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+        func_defs=$(declare -f fetch_brew_cask)
+        cask_parallel_cmd="parallel --will-cite --line-buffer --unsafe -j16 fetch_brew_cask ::: ${packages_to_fetch_casks[*]}"
+        # 不在后台执行 sudo 调用，确保输出同步到当前终端
+        sudo -n -H -u "$targetUser" env \
+            PATH="$PATH" \
+            HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" \
+            BREW_CASK_LANGUAGE="$BREW_CASK_LANGUAGE" \
+            LOG_FULL_LAST="$LOG_FULL_LAST" \
+            LOG_FULL_FILE="$LOG_FULL_FILE" \
+            FAILED_FETCH_FORMULAS_FILE="$FAILED_FETCH_FORMULAS_FILE" \
+            FAILED_FETCH_CASKS_FILE="$FAILED_FETCH_CASKS_FILE" \
+            DOWNLOAD_MAX_RETRIES="$DOWNLOAD_MAX_RETRIES" \
+            SHA_MISMATCH_MAX_RETRIES="$SHA_MISMATCH_MAX_RETRIES" \
+            bash -lc "$func_defs; $cask_parallel_cmd"
+      else
+        parallel --will-cite --line-buffer --unsafe -j16 fetch_brew_cask ::: "${packages_to_fetch_casks[@]}"
+      fi
     fi
-    
-    wait  # 等待所有并行任务完成
+
+    # 无需等待后台任务，因为不再在后台执行
 
     #echo -e "✅ 所有下载任务 已完成/已退出"                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     
