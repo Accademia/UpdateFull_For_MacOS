@@ -581,7 +581,7 @@ macports_mark_migrated() {
 
 # 静默升级过期端口并生成摘要
 macports_upgrade_outdated_quiet() {
-    printf  "\033[1;34m[Download & Install]\033[0m " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    printf  "\033[1;34m[Download & Install]\033[0m " 
     printf  "[Download & Install] "                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e "MacPorts 下载安装 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     echo -e "【升级摘要】" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
