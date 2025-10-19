@@ -648,7 +648,7 @@ macports_upgrade_outdated_quiet() {
     echo -e "【升级摘要】" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     # 使用 -u 开关可在升级完成后卸载旧版本，以便在完成升级后自动清理老版本；--no-rev-upgrade 禁止在升级之后触发 rev-upgrade 检查
-    sudo /opt/local/bin/port -u upgrade outdated -N --no-rev-upgrade 2>&1 \
+    sudo /opt/local/bin/port -u -N upgrade --no-rev-upgrade outdated 2>&1 \
       | /usr/bin/grep -E '^--->  (Upgrading|Installing|Activating|Deactivating) |^Error:' \
       | /usr/bin/sed -E \
         -e 's/^--->[[:space:]]+Upgrading[[:space:]]+([^[:space:]]+)[[:space:]]+@([^[:space:]]+)[[:space:]]+to[[:space:]]+@([^[:space:]]+).*/• \1  \2  →  \3/' \
