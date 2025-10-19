@@ -1,4 +1,10 @@
-#!/opt/homebrew/bin/bash       # Apple Silicon
+#!/usr/bin/env bash       # Apple Silicon
+# 自动切换到 Homebrew 或 /usr/local 安装的 bash（若存在），保证脚本在较新版本的 bash 中运行。
+if [[ -x /opt/homebrew/bin/bash && "$BASH" != "/opt/homebrew/bin/bash" ]]; then
+  exec /opt/homebrew/bin/bash "$0" "$@"
+elif [[ -x /usr/local/bin/bash && "$BASH" != "/usr/local/bin/bash" ]]; then
+  exec /usr/local/bin/bash "$0" "$@"
+fi
 
 # 自动执行的批处理：HomeBrew \ Mas \ MacPorts \ TopGrade \ MacUpdater
 
@@ -13,6 +19,15 @@ else
     PARALLEL_BIN="parallel"
 fi
 export PARALLEL_BIN
+
+# 动态计算并行下载任务数量：根据 CPU 核心数设定 xargs/parallel 的 -P 参数
+CPU_CORES=$(sysctl -n hw.ncpu 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)
+# 如果无法检测或结果非法，则默认设置为 4
+if ! echo "$CPU_CORES" | grep -qE '^[0-9]+$' || [ "$CPU_CORES" -lt 1 ]; then
+    CPU_CORES=4
+fi
+PARALLEL_JOBS=$CPU_CORES
+export PARALLEL_JOBS
 
 # 为了避免某些多语言 Cask 默认下载系统语言版本导致网络不可达，
 # 默认根据系统的首选语言自动设置 Homebrew Cask 的语言选项。
@@ -168,6 +183,18 @@ LOG_MACUPDATER_FILE="$LOG_PATH/Update_MacUpdater.log"
 
 echo -e "" > "$LOG_MACUPDATER_FILE"
 
+# 开启严格模式与统一错误处理。
+# 使用 set -Eeuo pipefail 让脚本在遇到未捕获的错误时立即退出，
+# 并通过 trap 捕捉 ERR 事件，在出错时输出详细的错误信息到日志文件。
+set -u -o pipefail -E
+trap 'last_cmd=$BASH_COMMAND; code=$?; line=${BASH_LINENO[0]}; \
+     # 只有非零返回码才视为错误，code=0 时忽略
+     if [ "$code" -ne 0 ]; then \
+         printf "[FATAL] 第 %s 行命令 \"%s\" 失败，退出码=%s\n" "$line" "$last_cmd" "$code" | \
+         tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_ERROR_FILE"; \
+         exit "$code"; \
+     fi' ERR
+
 # 定义：被测试的外网网址（需要翻墙的网址）
 TARGET_1="github.com"                                       # 测试 主流开源软件下载库 的连通性
 TARGET_2="formulae.brew.sh/api/formula.jws.json"            # 测试 homebrew 的主站 连通性 (brew.sh)
@@ -271,9 +298,11 @@ show_progress() {
     for ((i=0; i<filled; i++)); do bar+="█"; done
     for ((i=0; i<empty; i++)); do bar+="-"; done
 
-    # 打印进度条到终端
-    printf "\r进度: [%-${bar_width}s] %d%% | 未识别: %d | 需更新: %d | 已扫描: %d/%d" \
-        "$bar" "$percent" "$unrecognized" "$to_update" "$scanned" "$total" > /dev/tty
+    # 打印进度条到终端（仅当存在交互终端）
+    if [ -t 1 ]; then
+        printf "\r进度: [%-${bar_width}s] %d%% | 未识别: %d | 需更新: %d | 已扫描: %d/%d" \
+            "$bar" "$percent" "$unrecognized" "$to_update" "$scanned" "$total" > /dev/tty
+    fi
 
 }
 
@@ -298,6 +327,7 @@ run_command_with_show_progress() {
     echo -e "✓  执行命令: $CMD"         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOCAL_LOG_FILE"
 
     # 执行命令并实时处理输出
+    # 通过在管道结尾加上 '|| true' 避免 set -e 与 pipefail 在命令非零退出时导致脚本终止
     eval "$CMD" 2>&1         | tee -a  "$LOCAL_LOG_FILE" | while IFS= read -r line; do
         # 检查是否为 'Scan did stop scanning' 的行
         if [[ "$line" =~ Scan\ did\ stop\ scanning\ \'[^\']+\'\ app\.\.\. ]]; then
@@ -307,10 +337,12 @@ run_command_with_show_progress() {
 
         # 记录每一行到日志文件
         echo -e "$line" >> "$LOCAL_LOG_FILE"
-    done
+    done || true
 
-    # 完成后换行（避免下次输出覆盖进度条）
-    echo -e "" > /dev/tty
+    # 完成后换行（避免下次输出覆盖进度条，仅当存在交互终端）
+    if [ -t 1 ]; then
+        echo -e "" > /dev/tty
+    fi
     echo -e ""         | tee -a  "$LOCAL_LOG_FILE"
 
 }
@@ -482,6 +514,30 @@ print_error() {
   printf "[ERROR] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
   echo -e "$*" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 }
+
+# -------------------------------------------------------------------------------
+# 辅助函数：run_as_normal_user 和 maybe_run_as_normal_user
+# 这些函数在脚本顶层定义，确保在任何地方调用时均已存在。
+# run_as_normal_user 会在当前为 root 时降权到真实用户并执行命令，否则直接执行。
+# maybe_run_as_normal_user 会根据当前权限自动选择运行 run_as_normal_user 或直接执行命令。
+run_as_normal_user() {
+  if [ "$(id -u)" -eq 0 ]; then
+      local targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+      # 在 root 模式下，使用 sudo 保留环境并降权执行命令，避免重复打印提示
+      sudo -n -E -H -u "$targetUser" env PATH="/opt/homebrew/bin:/usr/local/bin:$PATH" HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" "$@"
+  else
+      "$@"
+  fi
+}
+maybe_run_as_normal_user() {
+  if [ "$(id -u)" -eq 0 ]; then
+      run_as_normal_user "$@"
+  else
+      "$@"
+  fi
+}
+export -f run_as_normal_user
+export -f maybe_run_as_normal_user
 
 
 
@@ -1099,51 +1155,76 @@ echo -e ""                                                                      
 # 调用检查时间范围函数
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
-if ! brew list | grep -q "^jq$" || ! brew list | grep -q "^coreutils$" || ! brew list | grep -q "^parallel$" || ! brew list | grep -q "^aria2$";  then
-    echo -e ""                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-    echo -e "\033[1;36m-----------------------------------------------\033[0m" 
+# 使用安全方式检查四个必备的 Homebrew 工具（jq、coreutils、parallel、aria2）是否已安装。
+# 当脚本以 root 身份运行时降权执行 brew list 以获取正确的安装列表；否则直接执行 brew list。
+need_install_other_tools=false
+brew_list_output=""
+if [ "$(id -u)" -eq 0 ]; then
+    targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+    brew_list_output=$(sudo -n -E -H -u "$targetUser" env PATH="/opt/homebrew/bin:/usr/local/bin:$PATH" brew list 2>/dev/null || true)
+else
+    brew_list_output=$(brew list 2>/dev/null || true)
+fi
+for tool in jq coreutils parallel aria2; do
+    if ! echo "$brew_list_output" | grep -q "^${tool}$"; then
+        need_install_other_tools=true
+        break
+    fi
+done
+if [ "$need_install_other_tools" = true ]; then
+    echo -e ""                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "\033[1;36m-----------------------------------------------\033[0m"
     echo -e "\033[1;36m 安装 其他必备工具 \033[0m"
-    echo -e "\033[1;36m-----------------------------------------------\033[0m" 
+    echo -e "\033[1;36m-----------------------------------------------\033[0m"
 
     echo -e "-------------------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e "安装 其他必备工具 "                                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e "-------------------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 fi
 
-if ! brew list | grep -q "^aria2$"; then
+# 定义辅助函数：根据安装列表决定是否执行 brew install
+install_if_missing() {
+    local pkg="$1"
+    local list="$2"
+    if echo "$list" | grep -q "^${pkg}$"; then
+        return 0
+    fi
+    # 输出安装提示
     printf  "\033[1;34m[INFO]\033[0m "
-    echo -e "[安装] aria2 ... "                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-    brew install aria2                                                                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-    echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-fi
+    echo -e "[安装] $pkg ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    # 根据权限执行安装
+    if [ "$(id -u)" -eq 0 ]; then
+        targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+        sudo -n -E -H -u "$targetUser" env PATH="/opt/homebrew/bin:/usr/local/bin:$PATH" brew install "$pkg" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    else
+        brew install "$pkg" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    fi
+    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+}
 
-if ! brew list | grep -q "^parallel$"; then
-    printf  "\033[1;34m[INFO]\033[0m "
-    echo -e "[安装] parallel ... "                                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-    brew install parallel                                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-    echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-fi
+# 逐个检查并安装工具
+install_if_missing "aria2" "$brew_list_output"
+install_if_missing "parallel" "$brew_list_output"
+install_if_missing "coreutils" "$brew_list_output"
+install_if_missing "jq" "$brew_list_output"
 
-if ! brew list | grep -q "^coreutils$"; then
-    printf  "\033[1;34m[INFO]\033[0m "
-    echo -e "[安装] coreutils ... "                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-    brew install coreutils                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-    echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+# 检查并安装 buo/cask-upgrade tap
+taps_output=""
+if [ "$(id -u)" -eq 0 ]; then
+    taps_output=$(sudo -n -E -H -u "$targetUser" env PATH="/opt/homebrew/bin:/usr/local/bin:$PATH" brew tap 2>/dev/null || true)
+else
+    taps_output=$(brew tap 2>/dev/null || true)
 fi
-
-if ! brew list | grep -q "^jq$"; then
+if ! echo "$taps_output" | grep -q '^buo/cask-upgrade$'; then
     printf  "\033[1;34m[INFO]\033[0m "
-    echo -e "[安装] jq ... "                                                             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-    brew install jq                                                                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-    echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-fi
-
-if ! brew tap | grep -q '^buo/cask-upgrade$'; then
-    printf  "\033[1;34m[INFO]\033[0m "
-    echo -e "[安装] buo/cask-upgrad ... "                                                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-    brew tap buo/cask-upgrade                                                           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-    echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    echo -e "[安装] buo/cask-upgrad ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    if [ "$(id -u)" -eq 0 ]; then
+        sudo -n -E -H -u "$targetUser" env PATH="/opt/homebrew/bin:/usr/local/bin:$PATH" brew tap buo/cask-upgrade 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    else
+        brew tap buo/cask-upgrade 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    fi
+    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 fi
 
 
@@ -1155,7 +1236,22 @@ fi
 # 调用检查时间范围函数
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
-if brew list --formula | grep -q "^mas\$"; then
+# 判断 mas 是否已安装：在 root 环境降权执行 brew list --formula
+mas_installed=false
+{
+    mas_list_output=""
+    if [ "$(id -u)" -eq 0 ]; then
+        mas_targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+        mas_list_output=$(sudo -n -E -H -u "$mas_targetUser" env PATH="/opt/homebrew/bin:/usr/local/bin:$PATH" brew list --formula 2>/dev/null || true)
+    else
+        mas_list_output=$(brew list --formula 2>/dev/null || true)
+    fi
+    if echo "$mas_list_output" | grep -q '^mas$'; then
+        mas_installed=true
+    fi
+}
+
+if [ "$mas_installed" = true ]; then
 
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
     echo -e "\033[1;36m 更新 Mas 工具 \033[0m"
@@ -1171,7 +1267,7 @@ if brew list --formula | grep -q "^mas\$"; then
     mas_update_rc=0
     if [ "$(id -u)" -eq 0 ]; then
         # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
-        targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
+        targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
         echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 Mas 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 以目标用户身份执行 Homebrew 命令
         sudo -H -u "$targetUser" brew upgrade mas 2>&1 |
@@ -1211,7 +1307,7 @@ else
     # 检查是否以 root 身份运行
     if [ "$(id -u)" -eq 0 ]; then
         # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
-        targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
+        targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
         echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 Mas 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 以目标用户身份执行 Homebrew 命令
         sudo -H -u "$targetUser" bash -c 'brew reinstall --force mas 2>&1'              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -1325,10 +1421,26 @@ echo -e ""                                                                      
 # 检查 5 ：TopGrade 是否安装（并更新）
 # -----------------------------------------------
 
+
 # 调用检查时间范围函数
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
-if brew list --formula | grep -q "^topgrade\$"; then
+# 判断 TopGrade 是否已安装：在 root 环境降权执行 brew list --formula
+topgrade_installed=false
+{
+    tg_list_output=""
+    if [ "$(id -u)" -eq 0 ]; then
+        tg_targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+        tg_list_output=$(sudo -n -E -H -u "$tg_targetUser" env PATH="/opt/homebrew/bin:/usr/local/bin:$PATH" brew list --formula 2>/dev/null || true)
+    else
+        tg_list_output=$(brew list --formula 2>/dev/null || true)
+    fi
+    if echo "$tg_list_output" | grep -q '^topgrade$'; then
+        topgrade_installed=true
+    fi
+}
+
+if [ "$topgrade_installed" = true ]; then
 
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
     echo -e "\033[1;36m 更新 TopGrade 工具 \033[0m"
@@ -1343,7 +1455,7 @@ if brew list --formula | grep -q "^topgrade\$"; then
     topgrade_update_rc=0
     if [ "$(id -u)" -eq 0 ]; then
         # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
-        targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
+        targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
         echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 topgrade 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 以目标用户身份执行 Homebrew 命令
         sudo -H -u "$targetUser" brew upgrade --greedy --force topgrade 2>&1 |
@@ -1357,7 +1469,7 @@ if brew list --formula | grep -q "^topgrade\$"; then
     fi
     
     echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-
+    
     # 输出 TopGrade 更新结果：成功或失败
     if [ $topgrade_update_rc -eq 0 ]; then
         # 打印绿色 [OK] 提示
@@ -1385,7 +1497,7 @@ else
     # 检查是否以 root 身份运行
     if [ "$(id -u)" -eq 0 ]; then
         # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
-        targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
+        targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
         echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 topgrade 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 以目标用户身份执行 Homebrew 命令
         sudo -H -u "$targetUser" bash -c 'brew reinstall --force topgrade 2>&1'         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -1415,10 +1527,26 @@ echo -e ""                                                                      
 # 检查 6 ：MacUpdater 是否安装（并更新）
 # ------------------------------------------------
 
+
 # 调用检查时间范围函数
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
-if brew list --cask | grep -q "^macupdater\$"; then
+# 判断 MacUpdater 是否已安装：在 root 环境降权执行 brew list --cask
+macupdater_installed=false
+{
+    mu_list_output=""
+    if [ "$(id -u)" -eq 0 ]; then
+        mu_targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+        mu_list_output=$(sudo -n -E -H -u "$mu_targetUser" env PATH="/opt/homebrew/bin:/usr/local/bin:$PATH" brew list --cask 2>/dev/null || true)
+    else
+        mu_list_output=$(brew list --cask 2>/dev/null || true)
+    fi
+    if echo "$mu_list_output" | grep -q '^macupdater$'; then
+        macupdater_installed=true
+    fi
+}
+
+if [ "$macupdater_installed" = true ]; then
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
     echo -e "\033[1;36m 更新 MacUpdater 工具 \033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
@@ -1431,7 +1559,7 @@ if brew list --cask | grep -q "^macupdater\$"; then
     macupdater_update_rc=0
     if [ "$(id -u)" -eq 0 ]; then
         # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
-        targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
+        targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
         echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 macupdater 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 以目标用户身份执行 Homebrew 命令，并显式传递语言配置
         sudo -H -u "$targetUser" env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew upgrade --greedy --cask macupdater 2>&1 |
@@ -1471,7 +1599,7 @@ else
     # 检查是否以 root 身份运行
     if [ "$(id -u)" -eq 0 ]; then
         # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
-        targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
+        targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
         echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 macupdater 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 以目标用户身份执行 Homebrew 命令
         # 显式传递语言配置，避免 sudo 环境丢失 HOMEBREW_CASK_OPTS
@@ -1490,7 +1618,7 @@ else
         echo -e "❌ MacUpdater 安装失败。"                                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     fi
 fi
-    
+
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 #echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
@@ -1978,30 +2106,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
 
     fi
 
-    ##############################################################################
-    # 函数: run_as_normal_user
-    # 说明: 若脚本当前 UID=0，则解析 targetUser 并用 sudo -E -H -u targetUser
-    #       执行传入的整条命令；否则直接执行。不硬编码用户名。
-    ##############################################################################
-    run_as_normal_user() {
-      if [ "$(id -u)" -eq 0 ]; then
-          # 取触发脚本的真实用户; 若无 SUDO_USER, 退回控制台登录用户
-          local targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
-    
-          # 友好提示一次（防止重复刷屏，可按需注释）
-          printf '\033[1;34m[INFO]\033[0m '
-          #echo -e "Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行: $*"  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-          echo -e "Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 并行下载（parallel download）安装包"  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    
-          # -n 非交互；-E 保留 LOG_* 环境变量；-H 修正 HOME
-          # 通过 env 显式传递 HOMEBREW_CASK_OPTS，避免 sudo 过滤掉该环境变量
-          sudo -n -E -H -u "$targetUser" env PATH="$PATH" HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" "$@"
-      else
-          # 已是普通用户
-          "$@"
-      fi
-    }
-    export -f run_as_normal_user      # 供 GNU parallel 内部 shell 调用 (需要时)
+    # run_as_normal_user 和 maybe_run_as_normal_user 的定义已移动到脚本的顶层，避免在使用前未定义。
     export LOG_FULL_LAST LOG_FULL_FILE   # 让 sudo -E 能继承日志路径
 
     # -----------------------------------------------------------------------------
@@ -2144,7 +2249,8 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         local sha_attempt=0
         while true; do
             download_attempt=$((download_attempt + 1))
-            brew fetch --cask --retry "$pkg" 2>&1 \
+            # 在调用 brew fetch 时显式传入语言选项，防止默认下载不可用的语言包。
+            brew fetch --cask --retry --language="${BREW_CASK_LANGUAGE}" "$pkg" 2>&1 \
                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" \
                 | tee "$tmpfile"
             fetch_exit=${PIPESTATUS[0]}
@@ -2259,7 +2365,7 @@ sudo -n -E -H -u "$targetUser" env PATH="$env_PATH" HOMEBREW_CASK_OPTS="$env_CAS
 EOF
           chmod +x "$xargs_formula_script"
           # 并行执行每个下载任务，并传递必要的环境变量，包括 functions_file 路径
-          printf '%s\n' "${packages_to_fetch_formulas[@]}" | xargs -n1 -P16 -I {} bash "$xargs_formula_script" "{}" "$targetUser" "$functions_file" "$PATH" "$HOMEBREW_CASK_OPTS"
+          printf '%s\n' "${packages_to_fetch_formulas[@]}" | xargs -n1 -P"$PARALLEL_JOBS" -I {} bash "$xargs_formula_script" "{}" "$targetUser" "$functions_file" "$PATH" "$HOMEBREW_CASK_OPTS"
           rm -f "$xargs_formula_script"
         fi
         if [ $total_cask_count -gt 0 ]; then
@@ -2276,7 +2382,7 @@ env_CASK_OPTS="$5"
 sudo -n -E -H -u "$targetUser" env PATH="$env_PATH" HOMEBREW_CASK_OPTS="$env_CASK_OPTS" bash -lc "source \"${functions_file}\"; fetch_brew_cask \"${pkg}\""
 EOF
           chmod +x "$xargs_cask_script"
-          printf '%s\n' "${packages_to_fetch_casks[@]}" | xargs -n1 -P16 -I {} bash "$xargs_cask_script" "{}" "$targetUser" "$functions_file" "$PATH" "$HOMEBREW_CASK_OPTS"
+          printf '%s\n' "${packages_to_fetch_casks[@]}" | xargs -n1 -P"$PARALLEL_JOBS" -I {} bash "$xargs_cask_script" "{}" "$targetUser" "$functions_file" "$PATH" "$HOMEBREW_CASK_OPTS"
           rm -f "$xargs_cask_script"
         fi
       else
@@ -2578,11 +2684,11 @@ EOF
                 # 1) 如果是 root，降权至目标普通用户执行 brew info
                 targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
                 echo -e "✓  Root权限降权至普通权限 ($targetUser) 后，查询 cask 信息..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                brew_cask_info_output=$(sudo -H -u "$targetUser" /bin/bash -lc "brew info --cask \"$pkg_brew_cask\"" 2>&1 | tee -a /dev/tty "$LOG_FULL_LAST" "$LOG_FULL_FILE")
+                brew_cask_info_output=$(sudo -H -u "$targetUser" /bin/bash -lc "brew info --cask \"$pkg_brew_cask\"" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE")
             else
                 # 2) 如果已是普通用户，直接执行 brew info
                 echo -e "✓  当前用户 '$USER' 为普通权限，直接查询 cask 信息..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                brew_cask_info_output=$(brew info --cask "$pkg_brew_cask" 2>&1 | tee -a /dev/tty "$LOG_FULL_LAST" "$LOG_FULL_FILE")
+                brew_cask_info_output=$(brew info --cask "$pkg_brew_cask" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE")
             fi
 
 
@@ -3075,11 +3181,10 @@ echo -e "MAS 应用列表 ... "                                                 
 # 自动获取当前登录用户
 currentUser=$(stat -f%Su /dev/console)
 
-# 如无用户登录则退出
-if [ -z "$currentUser" -o "$currentUser" = "loginwindow" ]; then
-    echo -e "没有用户登录，无法获取 Mac App Store 应用列表。"       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    exit 1
-fi
+# 如无用户登录则跳过 MAS 更新，但不终止整个脚本
+if [ -z "$currentUser" ] || [ "$currentUser" = "loginwindow" ]; then
+    echo -e "未检测到登录用户，跳过 MAS 更新。"       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+else
 
 # 如果是 root 运行，则切换到登录用户运行 mas list
 if [ "$(id -u)" -eq 0 ]; then
@@ -3263,6 +3368,7 @@ else
 fi
 
 
+fi
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 echo -e ""                                                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"     
 
@@ -3399,7 +3505,7 @@ printf "[Scan] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "MacOS 扫描检测 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
 
 # Run the update scan and capture output (stderr included), logging it as well
-MacOSSystemUpdate_output=$(sudo softwareupdate --list --force --agree-to-license 2>&1)  
+MacOSSystemUpdate_output=$(sudo softwareupdate --list 2>&1)
 echo -e "$MacOSSystemUpdate_output" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
 echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
 
@@ -3415,7 +3521,8 @@ else
     printf "\033[1;34m[Download]\033[0m "  
     printf "[Download] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null  
     echo -e "MacOS 下载更新包 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
-    sudo softwareupdate --download --force --agree-to-license 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
+    # 下载所有可用更新包，但不自动安装（去除无效的 --agree-to-license 参数）
+    sudo softwareupdate --download --all --verbose 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     printf "\033[1;34m[Install]\033[0m "  
     printf "[Install] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null  
@@ -3429,7 +3536,7 @@ else
     #    echo "❌  更新失败 ：MacOS ${OLD_VER} -> ${TARGET_VER}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     #fi
 
-    echo -e "⚠️【检测到系统更新】！！请手动输入命令 ： softwareupdate --install --all --force --verbose " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
+    echo -e "⚠️【检测到系统更新】！！如需仅下载更新包，可手动运行：softwareupdate --download --all 。若需安装，请手动运行： softwareupdate --install --all --force --verbose " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     show_sysupdate_popup          # <<< 新增：弹 GUI 提示 
 fi   
 
