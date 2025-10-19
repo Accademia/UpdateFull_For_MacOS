@@ -1,7 +1,10 @@
 
 # 功能与目的：
 
- 一键更新 MacOS 内安装的所有 第三方软件
+ 1. 实现 一键更新 所有第三方 MacOS APP 
+ 
+ 2. 实现 无人值守 更新 所有第三方 MacOSAPP 
+    - 配合 Lingon 和 Generate_Homebrew_Sudoers ： https://github.com/Accademia/Generate_Homebrew_Sudoers
 
 
 .
