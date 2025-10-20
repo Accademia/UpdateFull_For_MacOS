@@ -2254,8 +2254,11 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         local sha_attempt=0
         while true; do
             download_attempt=$((download_attempt + 1))
-            # 在调用 brew fetch 时显式传入语言选项，防止默认下载不可用的语言包。
-            brew fetch --cask --retry --language="${BREW_CASK_LANGUAGE}" "$pkg" 2>&1 \
+            # 调用 brew fetch 下载 cask 时不再传递 --language 选项。
+            # brew fetch 不支持 --language，同时若通过 HOMEBREW_CASK_OPTS 传入语言
+            # 会导致 "invalid option: --language" 错误。为避免此问题，在下载
+            # 阶段显式清空 HOMEBREW_CASK_OPTS 环境变量，只保留必要参数。
+            env HOMEBREW_CASK_OPTS="" brew fetch --cask --retry "$pkg" 2>&1 \
                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" \
                 | tee "$tmpfile"
             fetch_exit=${PIPESTATUS[0]}
