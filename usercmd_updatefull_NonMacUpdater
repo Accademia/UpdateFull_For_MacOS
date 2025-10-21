@@ -3946,8 +3946,7 @@ echo -e "✅  APP 数量（ Homebrew formula   ） ：$brew_formula_count  "    
 echo -e "✅  APP 数量（ Homebrew Cask      ） ：$brew_cask_count  "                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 echo -e "✅  APP 数量（ Mac AppStore       ） ：$mas_app_count   "                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
-# MacUpdater_ENABLE 可能未设置，在严格模式下引用未定义变量会出错。使用默认值展开以防止未定义报错。
-if [ "${MacUpdater_ENABLE:-}" != "true" ]; then  
+if [ "$MacUpdater_ENABLE" != "true" ]; then  
     echo -e "✅  APP 数量（ MAS + HomebrewCask ） ：$gui_app_count "                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 else
     echo -e "✅  APP 数量（ MacUpdater         ） ：$macupdater_app_count  （ $gui_app_count = MAS + HomebrewCask ）"                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
