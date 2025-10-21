@@ -39,18 +39,18 @@
 
 # 使用方法（命令行）
 
-1. 下载usercmd_updatefull
-2，请将命令拷贝至：/usr/local/bin目录中（或将文件所在的路径，加入到环境变量的$PATH中）
-4. 使用usercmd_updatefull命令，启动脚本
-5. 如果要每日自动执行，建议使用 Lingon，将usercmd_updatefull挂载为循环任务（比如每天夜间3点钟执行）
+ 1.  下载usercmd_updatefull
+ 2， 请将命令拷贝至：/usr/local/bin目录中（或将文件所在的路径，加入到环境变量的$PATH中）
+ 3.  使用usercmd_updatefull命令，启动脚本
+ 4.  如果要每日自动执行，建议使用 Lingon，将usercmd_updatefull挂载为循环任务（比如每天夜间3点钟执行）
    - 挂载命令 ：
       ```
       /usr/bin/sudo -n -E /opt/homebrew/bin/bash /usr/local/bin/usercmd_updatefull 
       ```
 
 注意:
-1. 本脚本会检测，目标网站是否能正常访问，如果不能正常访问，建议开启VPN，并将目标网站挂载到黑名单中。
-2. 本脚本，在凌晨 2:50 - 3:00之间，拒绝执行（因为：假定 本脚本会在3:00自动执行）
+1.  本脚本会检测，目标网站是否能正常访问，如果不能正常访问，建议开启VPN，并将目标网站挂载到黑名单中。
+2.  本脚本，在凌晨 2:50 - 3:00之间，拒绝执行（因为：假定 本脚本会在3:00自动执行）
 
 
 .
