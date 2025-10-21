@@ -21,7 +21,7 @@
 
 # 可以更新哪些程序？
 
- - 本脚本会，调用以下个程序，完成自动化更新
+本脚本是 聚合更新软件，会调用 所有主流更新软件，更新所有mac软件
 	- HomeBrew	：更新 Homebrew下载的APP
 	- Mas		：更新 App Store下载的APP
 	- MacPorts	：更新 MacPorts下载（Linux移植）的APP
@@ -59,8 +59,10 @@
 # 日志保存在哪？
 
  - 每次执行完成后，会自动打开日志目录（如果不希望自动打开，可以注释掉脚本最后一段中Open命令开头的代码）
- - 日志路径：icloud云盘 -> LOG -> 产品名-芯片型号-序列号 ->
- - 启动台LaunchPad的备份路径：icloud云盘 -> BACKUP -> 产品名-芯片型号-序列号 -> 当前用户名称 -> DesktopLayout
+ - 日志路径：
+   - icloud云盘 -> LOG -> 产品名-芯片型号-序列号 ->
+ - 启动台LaunchPad的备份路径：
+   - icloud云盘 -> BACKUP -> 产品名-芯片型号-序列号 -> 当前用户名称 -> DesktopLayout
 
 注意：没有使用计算机名称：计算机名称会因为网络冲突，而变化，会导致log目录和备份目录频繁改变，而且无法关闭自动改名，这是macos系统功能之一。所以不能使用计算机名称。
 
@@ -90,7 +92,7 @@
      
     + 特别注意：⚠️⚠️⚠️⚠️  
         + 后台执行usercmd_updatefull时，千万不要不加 /opt/homebrew/bin/bash ，而直接调用 /usr/local/bin/usercmd_updatefull。这会导致Generate_Homebrew_Sudoers生成的免密规则失效。
-        + 因为，程序Generate_Homebrew_Sudoers在前台生成免密规则，不能足量覆盖/usr/local/bin/usercmd_updatefull程序在后台 直接执行时的所有免密请求，会多出来特别多 在前台生成规则时 无法看到的高权限命令。从而导致执行被卡住。
+        + 因为 程序Generate_Homebrew_Sudoers在前台生成免密规则，不能足量覆盖/usr/local/bin/usercmd_updatefull程序在后台 直接执行时的所有免密请求，会多出来特别多 在前台生成规则时 无法看到的高权限命令。从而导致执行被卡住。
         + 但是前台调用/usr/local/bin/usercmd_updatefull时，无上述限制！！
 
     - PS：
