@@ -31,13 +31,22 @@
 
 .
 
-# 使用方法：
+# 使用方法（图形界面）
+
+下载usercmd_updatefull，然后 双击执行。
+
+.
+
+# 使用方法（命令行）
 
 1. 下载usercmd_updatefull
-2. 在桌面 创建 “快捷方式”（点击后调用本脚本）
-3，请将命令拷贝至：/usr/local/bin目录中（或将文件所在的路径，加入到环境变量的$PATH中）
+2，请将命令拷贝至：/usr/local/bin目录中（或将文件所在的路径，加入到环境变量的$PATH中）
 4. 使用usercmd_updatefull命令，启动脚本
-5. 如果要每日自动执行，建议使用 Lingon X（或类似软件），将usercmd_updatefull挂载为循环任务（比如每天夜间3点钟执行）
+5. 如果要每日自动执行，建议使用 Lingon，将usercmd_updatefull挂载为循环任务（比如每天夜间3点钟执行）
+   - 挂载命令 ：
+```
+/usr/bin/sudo -n -E /opt/homebrew/bin/bash /usr/local/bin/usercmd_updatefull 
+```
 
 注意:
 1. 本脚本会检测，目标网站是否能正常访问，如果不能正常访问，建议开启VPN，并将目标网站挂载到黑名单中。
