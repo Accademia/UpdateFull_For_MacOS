@@ -223,25 +223,25 @@ grep -R "nosort" /opt/homebrew/etc/bash_completion.d
 
 - 如何编辑visudo配置文件 
 
-```
-sudo visudo
-```
+   ```
+   sudo visudo
+   ```
 
 
 - 在homebrew中需要手动更新的软件
 
-```
-paragon-extfs
-paragon-ntfs
-```
+  ```
+   paragon-extfs
+   paragon-ntfs
+   ```
 
 
 
 - ⚠️⚠️ 在编辑visudoers时，一定 一定 一定 一定 不要修改(删除) 如下配置！！！ 不然不可能要要面临重装系统！
 
-```
-root            ALL = (ALL) ALL
-```
+   ```
+   root            ALL = (ALL) ALL
+   ```
 
 
 
