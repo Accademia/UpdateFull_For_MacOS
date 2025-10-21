@@ -84,8 +84,8 @@
         + 因为，程序Generate_Homebrew_Sudoers在前台生成免密规则，不能足量覆盖/usr/local/bin/usercmd_updatefull程序在后台 直接执行时的所有免密请求，会多出来特别多 在前台生成规则时 无法看到的高权限命令。从而导致执行被卡住。
         + 但是前台调用/usr/local/bin/usercmd_updatefull时，无上述限制！！
 
-    PS：
-    建议命令被存储到 /usr/local/bin 路径下 ！
+    - PS：
+      - 建议命令被存储到 /usr/local/bin 路径下 ！
 
 
 .
@@ -94,20 +94,25 @@
 # 出现Error的应对
 
 如果出现如下错误：
+
 ```
 /opt/homebrew/etc/bash_completion.d/ipfs: line 5526: complete: nosort: invalid option name
 /opt/homebrew/etc/bash_completion.d/mycli: line 25: complete: nosort: invalid option name
 /opt/homebrew/etc/bash_completion.d/wg: line 99: complete: nosort: invalid option name
 /opt/homebrew/etc/bash_completion.d/wg-quick: line 43: complete: nosort: invalid option name
 ```
+
 则执行此脚本解决问题：
+
 ```
 uesrcmd_fix_nosort
 ```
+
 在执行后，使用如下命令进行验证：   
 
+```
 grep -R "nosort" /opt/homebrew/etc/bash_completion.d
-
+```
 
 .
 
