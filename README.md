@@ -44,9 +44,9 @@
 4. 使用usercmd_updatefull命令，启动脚本
 5. 如果要每日自动执行，建议使用 Lingon，将usercmd_updatefull挂载为循环任务（比如每天夜间3点钟执行）
    - 挂载命令 ：
-```
-/usr/bin/sudo -n -E /opt/homebrew/bin/bash /usr/local/bin/usercmd_updatefull 
-```
+      ```
+      /usr/bin/sudo -n -E /opt/homebrew/bin/bash /usr/local/bin/usercmd_updatefull 
+      ```
 
 注意:
 1. 本脚本会检测，目标网站是否能正常访问，如果不能正常访问，建议开启VPN，并将目标网站挂载到黑名单中。
@@ -70,7 +70,7 @@
 # 如何设置定时更新？
 
  - 建议使用 Lingon Pro（或类似软件），将usercmd_updatefull挂载为循环任务（比如每天夜间3点钟执行）
-    https://lingon-x.macupdate.com/
+    - https://lingon-x.macupdate.com/
 
  - (后台执行) 挂载命令 ：
     + 方法 1 : /usr/bin/open /usr/local/bin/usercmd_updatefull                                
