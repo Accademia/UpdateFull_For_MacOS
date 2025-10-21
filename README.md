@@ -73,7 +73,10 @@
     - https://lingon-x.macupdate.com/
 
  - (后台执行) 挂载命令 ：
-    + 方法 1 : /usr/bin/open /usr/local/bin/usercmd_updatefull                                
+    + 方法 1 : 
+        ```
+        /usr/bin/open /usr/local/bin/usercmd_updatefull                                
+        ```
         + 打开窗口执行，相当于前台执行
     + 方法 2 : /opt/homebrew/bin/bash /usr/local/bin/usercmd_updatefull                       
         + 静默执行，相当于 后台执行
