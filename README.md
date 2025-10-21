@@ -215,7 +215,8 @@ grep -R "nosort" /opt/homebrew/etc/bash_completion.d
 
 ```
 
-⚠️⚠️⚠️ Generate_Homebrew_Sudoers ： https://github.com/Accademia/Generate_Homebrew_Sudoers
+- ⚠️⚠️⚠️ 建议通过 generate_homebrew_sudoers.py 自动生成，更多免密配置规则
+   - 项目：https://github.com/Accademia/Generate_Homebrew_Sudoers
 
 
 
