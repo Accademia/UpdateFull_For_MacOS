@@ -47,7 +47,7 @@
 # 使用方法（命令行）
 
  1.  下载usercmd_updatefull
- 2， 请将命令拷贝至：/usr/local/bin目录中（或将文件所在的路径，加入到环境变量的$PATH中）
+ 2.  请将命令拷贝至：/usr/local/bin目录中（或将文件所在的路径，加入到环境变量的$PATH中）
  3.  使用usercmd_updatefull命令，启动脚本
  4.  如果要每日自动执行，建议使用 Lingon，将usercmd_updatefull挂载为循环任务（比如每天夜间3点钟执行）
    - 挂载命令 ：
