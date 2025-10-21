@@ -23,7 +23,7 @@
 
 本脚本是 聚合更新软件，会调用 所有主流更新软件，更新所有mac软件
   - HomeBrew	：更新 Homebrew下载的APP
-	 - Mas		：更新 App Store下载的APP
+  - Mas		：更新 App Store下载的APP
  	- MacPorts	：更新 MacPorts下载（Linux移植）的APP
  	- TopGreade	：更新 复查上述在线安装的APP
  	- MacUpdater	：更新 下载后离线安装的APP
