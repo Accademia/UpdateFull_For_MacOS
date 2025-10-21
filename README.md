@@ -22,11 +22,16 @@
 # 可以更新哪些程序？
 
 本脚本是 聚合更新软件，会调用 所有主流更新软件，更新所有mac软件
-  - HomeBrew	：更新 Homebrew下载的APP
-  - Mas		：更新 App Store下载的APP
-  - MacPorts	：更新 MacPorts下载（Linux移植）的APP
-  - TopGreade	：更新 复查上述在线安装的APP
-  - MacUpdater	：更新 下载后离线安装的APP
+  - HomeBrew	
+    - 更新 Homebrew 下载的APP
+  - Mas		
+    - 更新 App Store 下载的APP
+  - MacPorts	
+    - 更新 MacPorts下载的APP（Linux移植）
+  - TopGreade	
+    - 更新 更多在线安装的APP
+  - MacUpdater	
+    - 更新 所有APP
 
 在更新后，自动还原LaunchPad（启动台）布局
 
