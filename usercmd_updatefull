@@ -1473,13 +1473,13 @@ if [ "$topgrade_installed" = true ]; then
     if [ "$(id -u)" -eq 0 ]; then
         # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
         targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
-        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 topgrade 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 TopGrade 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 以目标用户身份执行 HomeBrew 命令
         sudo -n -H -u "$targetUser" brew upgrade --greedy --force topgrade 2>&1 |
             tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         topgrade_update_rc=${PIPESTATUS[0]}
     else
-        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 topgrade 自更新 ... "       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 TopGrade 自更新 ... "       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
         brew upgrade --greedy --force topgrade 2>&1 |
             tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         topgrade_update_rc=${PIPESTATUS[0]}
@@ -1577,13 +1577,13 @@ if [ "$macupdater_installed" = true ]; then
     if [ "$(id -u)" -eq 0 ]; then
         # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
         targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
-        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 macupdater 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 MacUpdater 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 以目标用户身份执行 HomeBrew 命令，并显式传递语言配置
         sudo -n -H -u "$targetUser" env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew upgrade --greedy --cask macupdater 2>&1 |
             tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         macupdater_update_rc=${PIPESTATUS[0]}
     else
-        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 macupdater 自更新 ... "     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 MacUpdater 自更新 ... "     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
         env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew upgrade --greedy --cask macupdater 2>&1 |
             tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         macupdater_update_rc=${PIPESTATUS[0]}
@@ -1617,12 +1617,12 @@ else
     if [ "$(id -u)" -eq 0 ]; then
         # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
         targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
-        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 macupdater 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 MacUpdater 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 以目标用户身份执行 HomeBrew 命令
         # 显式传递语言配置，避免 sudo 环境丢失 HOMEBREW_CASK_OPTS
         sudo -n -H -u "$targetUser" env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew reinstall --cask --force macupdater 2>&1       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     else
-        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 macupdater 安装 ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 MacUpdater 安装 ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
         env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew reinstall --cask --force macupdater 2>&1                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     fi
     
