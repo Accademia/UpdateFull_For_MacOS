@@ -3147,8 +3147,8 @@ echo -e ""                                                                      
 #else
 #fi
 
-echo -e "\033[1;32m[OK] HomeBrew upgrade  运行已完成  ✅ \033[1;32m"   
-echo -e "[OK]  HomeBrew upgrade  运行已完成  ✅ "                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "\033[1;32m[OK] HomeBrew Upgrade  运行已完成  ✅ \033[1;32m"   
+echo -e "[OK]  HomeBrew Upgrade  运行已完成  ✅ "                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -3381,8 +3381,8 @@ if [ "$mas_success" = true ]; then
     #else
     #fi
 
-    echo -e "\033[1;32m[OK] Mac App Store upgrade  运行已完成已完成 ，APP 已重启 ✅ \033[1;32m"   
-    echo -e "[OK]  Mac App Store upgrade  运行已完成已完成 ，APP 已重启 ✅ "                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "\033[1;32m[OK] Mac App Store Upgrade  运行已完成已完成 ，APP 已重启 ✅ \033[1;32m"   
+    echo -e "[OK]  Mac App Store Upgrade  运行已完成已完成 ，APP 已重启 ✅ "                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 else
 
@@ -3724,8 +3724,8 @@ echo -e ""                                                                      
 #
 #echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
-echo -e "\033[1;32m[OK] TopGrade upgrade  运行已完成  ✅ \033[1;32m"   
-echo -e "[OK]  TopGrade upgrade  运行已完成  ✅ "                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "\033[1;32m[OK] TopGrade Upgrade  运行已完成  ✅ \033[1;32m"   
+echo -e "[OK]  TopGrade Upgrade  运行已完成  ✅ "                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
