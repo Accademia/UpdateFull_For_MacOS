@@ -1860,7 +1860,7 @@ fi
 brew_cask_count=$((( brew_cask_count * 2 ) /2 ))
 brew_formula_count=$((( brew_formula_count *2 ) /2 ))
 brew_app_count=$(( brew_formula_count + brew_cask_count ))
-echo -e "✅  APP 数量（ Homebrew formula ）：$brew_formula_count  "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e "✅  APP 数量（ Homebrew Formula ）：$brew_formula_count  "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 echo -e "✅  APP 数量（ Homebrew Cask    ）：$brew_cask_count  "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 echo -e "✅  APP 数量（ Homebrew         ）：$brew_app_count  "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
@@ -1937,7 +1937,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
     # 第 2 步：并行下载（提高下载速度）
     printf "\033[1;34m[Download]\033[0m "
     printf "[Download] "                                                                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "开始下载：HomeBrew formula / cask（ 并行 ） ... "                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "开始下载：Homebrew Formula / Cask（ 并行 ） ... "                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     # 构造平台键：Apple Silicon 带前缀，Intel 不带前缀
     platform_key=""
@@ -2471,14 +2471,14 @@ EOF
     brew_formula_reinstall_exit=false
     brew_formula_reinstall_force_exit=false
 
-    # 第 3 步：串行安装（Homebrew formula）
+    # 第 3 步：串行安装（Homebrew Formula）
     if [ ${#packages_brew_formulas[@]} -ne 0 ] ; then
         echo -e ""                                                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         printf "\033[1;34m[Install]\033[0m "
         printf "[Install] "                                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-        echo -e "开始更新：HomeBrew formula（ 串行 ） ... "                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "开始更新：Homebrew Formula（ 串行 ） ... "                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
-        # 循环逐个处理每个过期的 Homebrew formula
+        # 循环逐个处理每个过期的 Homebrew Formula
         for pkg_brew_formula in "${packages_brew_formulas[@]}"; do
 
             # 如果在并行下载阶段检测到该 formula 下载失败，则直接跳过升级
@@ -2653,7 +2653,7 @@ EOF
         echo -e ""                                                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         printf "\033[1;34m[Install]\033[0m "
         printf "[Install] "                                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-        echo -e "无需更新：HomeBrew formula ... "                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "无需更新：Homebrew Formula ... "                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         #echo -e ""                                                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     fi
@@ -2667,12 +2667,12 @@ EOF
     brew_cask_reinstall_exit=false
     brew_cask_reinstall_force_exit=false
 
-    # 第 4 步：串行安装（Homebrew cask）
+    # 第 4 步：串行安装（Homebrew Cask）
     if [ ${#packages_brew_casks[@]} -ne 0 ] ; then
         echo -e ""                                                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         printf  "\033[1;34m[Install]\033[0m "
         printf  "[Install] "                                                                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-        echo -e "开始更新：HomeBrew cask（ 串行 ） ... "                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "开始更新：Homebrew Cask（ 串行 ） ... "                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
         # 存储需要关闭和重启的应用程序
         #brew_cask_apps_to_restart=()
@@ -3017,7 +3017,7 @@ EOF
         echo -e ""                                                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         printf  "\033[1;34m[Install]\033[0m "   
         printf  "[Install] "                                                                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  > /dev/null
-        echo -e "无需更新：HomeBrew cask ... "                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "无需更新：Homebrew Cask ... "                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     fi    
@@ -3029,8 +3029,8 @@ EOF
 
 else    
 
-    echo -e "✓  未检测到新版本 ：HomeBrew formula ... "                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    echo -e "✓  未检测到新版本 ：HomeBrew cask ... "                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✓  未检测到新版本 ：Homebrew Formula ... "                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✓  未检测到新版本 ：Homebrew Cask ... "                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     echo -e ""                                                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     printf  "\033[1;34m[Download & Install]\033[0m "    
@@ -3942,14 +3942,14 @@ echo -e "-------------------------------------------"                           
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     
 gui_app_count=$(($brew_cask_count+$mas_app_count))
-echo -e "✅  APP 数量（ Homebrew formula   ） ：$brew_formula_count  "                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-echo -e "✅  APP 数量（ Homebrew Cask      ） ：$brew_cask_count  "                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-echo -e "✅  APP 数量（ Mac AppStore       ） ：$mas_app_count   "                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e "✅  APP 数量（ Homebrew Formula    ） ：$brew_formula_count  "                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e "✅  APP 数量（ Homebrew Cask       ） ：$brew_cask_count  "                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e "✅  APP 数量（ Mac AppStore        ） ：$mas_app_count   "                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 if [ "${MacUpdater_ENABLE:-false}" != "true" ]; then  
-    echo -e "✅  APP 数量（ MAS + HomebrewCask ） ：$gui_app_count "                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✅  APP 数量（ MAS + Homebrew Cask ） ：$gui_app_count "                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 else
-    echo -e "✅  APP 数量（ MacUpdater         ） ：$macupdater_app_count  （ $gui_app_count = MAS + HomebrewCask ）"                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✅  APP 数量（ MacUpdater          ） ：$macupdater_app_count  （ $gui_app_count = MAS + Homebrew Cask ）"                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 fi
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
