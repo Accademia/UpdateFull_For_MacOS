@@ -6,7 +6,7 @@ elif [[ -x /usr/local/bin/bash && "$BASH" != "/usr/local/bin/bash" ]]; then
   exec /usr/local/bin/bash "$0" "$@"
 fi
 
-# 自动执行的批处理：HomeBrew \ Mas \ MacPorts \ TopGrade \ MacUpdater
+# 自动执行的批处理：HomeBrew \ MAS \ MacPorts \ TopGrade \ MacUpdater
 
 #设置执行所需的 环境变量！
 export PATH="/usr/local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/opt/local/bin:/opt/local/sbin:$PATH"
@@ -215,7 +215,7 @@ trap 'last_cmd=$BASH_COMMAND; code=$?; line=${BASH_LINENO[0]}; \
 # 定义：被测试的外网网址（需要翻墙的网址）
 TARGET_1="github.com"                                       # 测试 主流开源软件下载库 的连通性
 TARGET_2="formulae.brew.sh/api/formula.jws.json"            # 测试 homebrew 的主站 连通性 (brew.sh)
-TARGET_3="apps.apple.com/us/app/apple-store/id375380948"    # 测试 Mac AppStore 连通性 （本链接是 苹果官方 Apple Store ）
+TARGET_3="apps.apple.com/us/app/apple-store/id375380948"    # 测试 Mac App Store 连通性 （本链接是 苹果官方 Apple Store ）
 TARGET_4="macupdater.com"                                   # 测试 MacUpdater 连通性
 # 如果不能访问上述网站，会导致很多软件都 更新失败。
 
@@ -1247,7 +1247,7 @@ fi
 
 
 # -----------------------------------------------
-# 检查 3 ：Mas 是否安装（并更新）
+# 检查 3 ：MAS 是否安装（并更新）
 # -----------------------------------------------
 
 # 调用检查时间范围函数
@@ -1271,11 +1271,11 @@ mas_installed=false
 if [ "$mas_installed" = true ]; then
 
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    echo -e "\033[1;36m 更新 Mas 工具 \033[0m"
+    echo -e "\033[1;36m 更新 MAS 工具 \033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
 
     echo -e "-------------------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "更新 Mas 工具"                                                             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "更新 MAS 工具"                                                             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e "-------------------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
     echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
@@ -1285,13 +1285,13 @@ if [ "$mas_installed" = true ]; then
     if [ "$(id -u)" -eq 0 ]; then
         # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
         targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
-        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 Mas 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 MAS 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 以目标用户身份执行 Homebrew 命令
         sudo -n -H -u "$targetUser" brew upgrade mas 2>&1 |
             tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         mas_update_rc=${PIPESTATUS[0]}
     else
-        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 Mas 自更新 ... "            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 MAS 自更新 ... "            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
         brew upgrade mas 2>&1 |
             tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         mas_update_rc=${PIPESTATUS[0]}
@@ -1299,46 +1299,46 @@ if [ "$mas_installed" = true ]; then
 
     echo -e  "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
-    # 输出 Mas 更新结果：只有当更新命令返回 0 时标记为成功
+    # 输出 MAS 更新结果：只有当更新命令返回 0 时标记为成功
     if [ $mas_update_rc -eq 0 ]; then
         # 打印绿色 [OK] 提示（彩色输出仅在控制台显示）
-        echo -e  '\033[1;36m[OK] 更新 Mas 工具 已完成\033[0m '
+        echo -e  '\033[1;36m[OK] 更新 MAS 工具 已完成\033[0m '
         # 在日志中记录 [OK] 状态但不重复显示到控制台
-        echo -e  '[OK] 更新 Mas 工具 已完成' | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+        echo -e  '[OK] 更新 MAS 工具 已完成' | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     else
         # 打印红色 [ERROR] 提示（彩色输出仅在控制台显示）
-        echo -e  '\033[1;31m[ERROR] 更新 Mas 工具 失败 ❌\033[0m '
+        echo -e  '\033[1;31m[ERROR] 更新 MAS 工具 失败 ❌\033[0m '
         # 在日志中记录 [ERROR] 状态但不重复显示到控制台
-        echo -e  '[ERROR] 更新 Mas 工具 失败 ❌' | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+        echo -e  '[ERROR] 更新 MAS 工具 失败 ❌' | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     fi
 
 else
 
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    echo -e "\033[1;36m Mas 未安装，开始安装 \033[0m"
+    echo -e "\033[1;36m MAS 未安装，开始安装 \033[0m"
     echo -e "\033[1;36m-----------------------------------------------\033[0m" 
     echo -e "-------------------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "Mas 未安装，开始安装"                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "MAS 未安装，开始安装"                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e "-------------------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
     # 检查是否以 root 身份运行
     if [ "$(id -u)" -eq 0 ]; then
         # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
         targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
-        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 Mas 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 MAS 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 以目标用户身份执行 Homebrew 命令
         sudo -n -H -u "$targetUser" bash -c 'brew reinstall --force mas 2>&1'              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     else
-        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 Mas 安装 ... "                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 MAS 安装 ... "                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
         brew reinstall --force mas 2>&1                                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     fi
 
     echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
     if [ $? -eq 0 ]; then
-        echo -e "Mas 安装成功。"                                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+        echo -e "MAS 安装成功。"                                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     else
-        echo -e "Mas 安装失败。"                                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+        echo -e "MAS 安装失败。"                                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     fi
 
 fi
@@ -3164,21 +3164,21 @@ echo -e ""                                                                      
 
 
 # ----------------------------------
-# 开始执行：Mas
+# 开始执行：MAS
 # ----------------------------------
 
-export Mas_NO_INTERACTIVE=1
+export MAS_NO_INTERACTIVE=1
 
 # 配置 MAS 最大重试次数和重试间隔（可根据需要调整或通过环境变量设置）
 MAS_MAX_RETRIES=3                                                                       # 最多重试3次（超时重试次数，可配置）
 MAS_RETRY_DELAY=5                                                                       # 每次重试之间等待5秒
 
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
-echo -e "\033[1;32m 运行 Mas                                   \033[0m"
+echo -e "\033[1;32m 运行 MAS                                   \033[0m"
 echo -e "\033[1;32m-----------------------------------------------\033[0m" 
 
 echo -e "-------------------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "运行 Mas"                                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "运行 MAS"                                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "-------------------------------------------"                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
   
 
@@ -3231,7 +3231,7 @@ fi
 
 # 统计 App 数量并输出结果
 mas_app_count=$((mas_app_count+0))
-echo -e "✅  APP 数量（ Mac AppStore ）：$mas_app_count  "                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e "✅  APP 数量（ Mac App Store ）：$mas_app_count  "                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -3288,7 +3288,7 @@ echo -e "MAS 下载安装 ... "                                                 
 
 # 根据扫描结果决定是否进行安装更新
 if [ "$mas_success" = true ]; then
-    # 开始执行：Mas 更新（并捕获输出）
+    # 开始执行：MAS 更新（并捕获输出）
     # 获取过时应用程序的ID
     mas_app_ids=$(echo -e "$outdated_mas_apps" | awk '{print $1}'  | grep -E '^[0-9]+$')
     
@@ -3381,8 +3381,8 @@ if [ "$mas_success" = true ]; then
     #else
     #fi
 
-    echo -e "\033[1;32m[OK] Mac AppStore upgrade  运行已完成已完成 ，APP 已重启 ✅ \033[1;32m"   
-    echo -e "[OK]  Mac AppStore upgrade  运行已完成已完成 ，APP 已重启 ✅ "                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "\033[1;32m[OK] Mac App Store upgrade  运行已完成已完成 ，APP 已重启 ✅ \033[1;32m"   
+    echo -e "[OK]  Mac App Store upgrade  运行已完成已完成 ，APP 已重启 ✅ "                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 else
 
@@ -3628,7 +3628,7 @@ echo -e ""                                                                      
 
 
 # ----------------------------------
-# 开始执行： 其他更新（ 对 Topgreade 更新 补充 ）
+# 开始执行： 其他更新（ 对 TopGrade 更新 补充 ）
 # ----------------------------------
 
 #########  更新 TeX Live 管理器 (tlmgr)  ########
@@ -3944,7 +3944,7 @@ echo -e ""                                                                      
 gui_app_count=$(($brew_cask_count+$mas_app_count))
 echo -e "✅  APP 数量（ Homebrew Formula    ） ：$brew_formula_count  "                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 echo -e "✅  APP 数量（ Homebrew Cask       ） ：$brew_cask_count  "                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-echo -e "✅  APP 数量（ Mac AppStore        ） ：$mas_app_count   "                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e "✅  APP 数量（ Mac App Store       ） ：$mas_app_count   "                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 if [ "${MacUpdater_ENABLE:-false}" != "true" ]; then  
     echo -e "✅  APP 数量（ MAS + Homebrew Cask ） ：$gui_app_count "                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
