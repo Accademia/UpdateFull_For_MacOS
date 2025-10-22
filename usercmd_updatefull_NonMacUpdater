@@ -3491,8 +3491,8 @@ else
 
     echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     
-    echo -e "\033[1;32m[OK] MacPorts upgrade  运行已完成  ✅\033[0m"
-    echo -e "[OK]  MacPorts upgrade  运行已完成  ✅"                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "\033[1;32m[OK] MacPorts Upgrade  运行已完成  ✅\033[0m"
+    echo -e "[OK]  MacPorts Upgrade  运行已完成  ✅"                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 fi
 
 
