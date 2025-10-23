@@ -3431,6 +3431,7 @@ else
     echo "MacPorts 扫描迁移 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     if macports_should_migrate; then
+        echo -e "✓  使用Root权限(sudo命令), 运行 port migrate ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         MIGRATE_LOG="$(__get_migrate_log_file)"
         /bin/mkdir -p "${MIGRATE_LOG%/*}" 2>/dev/null || true
         if yes | sudo $SUDO_N_FLAG /opt/local/bin/port -q migrate 2>&1 \
@@ -3453,7 +3454,7 @@ else
     outdated_list="$(sudo $SUDO_N_FLAG /opt/local/bin/port -q outdated -N 2>/dev/null || true)"
 
     if [ -z "$outdated_list" ]; then
-        echo -e "无需升级任何端口" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  无需升级任何端口 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         echo "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     else
