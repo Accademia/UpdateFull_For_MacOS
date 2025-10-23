@@ -1370,6 +1370,7 @@ if command -v /opt/local/bin/port >/dev/null 2>&1; then
     # 保证 CLT 收据存在，否则跳过 MacPorts 更新
     macports_update_rc=0
     if ensure_clt_or_skip_macports; then
+        echo -e "✓  使用Root权限(sudo命令), 运行 MacPorts 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # MacPorts 基础更新：仅运行自更新以更新 MacPorts base 和 ports 树
         sudo $SUDO_N_FLAG /opt/local/bin/port selfupdate 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         macports_update_rc=${PIPESTATUS[0]}
@@ -2438,6 +2439,7 @@ EOF
         success_formula=$(( total_formula_count - failed_formula ))
         success_cask=$(( total_cask_count - failed_cask ))
         # 输出成功统计 [INFO]
+        echo -e "------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         printf "\033[1;34m[INFO]\033[0m "
         printf "[INFO] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
         echo -e "下载完成 [formula]：$success_formula/$total_formula_count" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -3447,11 +3449,13 @@ else
     printf "\033[1;34m[Scan]\033[0m "
     printf "[Scan] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null 
     echo "MacPorts 扫描更新 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✓  使用Root权限(sudo命令), 运行 port outdated ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     outdated_list="$(sudo $SUDO_N_FLAG /opt/local/bin/port -q outdated -N 2>/dev/null || true)"
+
     if [ -z "$outdated_list" ]; then
-        echo -e "✓ 未检测到过期端口" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        # 仍然运行一次 rev-upgrade 摘要
-        macports_rev_upgrade_quiet
+        echo -e "无需升级任何端口" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
     else
         echo -e "【过期端口】" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         echo "$outdated_list" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -3464,6 +3468,7 @@ else
         printf "\033[1;34m[Clean]\033[0m "
         printf "[Clean] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
         echo "MacPorts 清理残留 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  使用Root权限(sudo命令), 运行 port reclaim ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 官方 reclaim 命令会删除日志、旧档和 distfiles，并尝试卸载非活动版本
         sudo $SUDO_N_FLAG /opt/local/bin/port -q reclaim
         
@@ -3471,23 +3476,27 @@ else
         printf "\033[1;34m[Uninstall]\033[0m "
         printf "[Uninstall] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
         echo "MacPorts 卸载非活动旧版本 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  使用Root权限(sudo命令), 运行 port uninstall inactive ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         sudo $SUDO_N_FLAG /opt/local/bin/port uninstall inactive
         
         # 删除无人依赖的叶子端口
         printf "\033[1;34m[Leaves]\033[0m "
         printf "[Leaves] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
         echo "MacPorts 移除无人依赖的叶子端口 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  使用Root权限(sudo命令), 运行 port uninstall leaves ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         sudo $SUDO_N_FLAG /opt/local/bin/port echo leaves | xargs sudo $SUDO_N_FLAG /opt/local/bin/port uninstall
 
         echo "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
-        # （5）链接自检（摘要）
-        printf "\033[1;34m[Verify]\033[0m "
-        printf "[Verify] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-        echo "MacPorts 验证结果 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        macports_rev_upgrade_quiet
-
     fi
+
+    # （5）链接自检（摘要）
+    printf "\033[1;34m[Verify]\033[0m "
+    printf "[Verify] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo "MacPorts 验证结果 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✓  重新检测 是否有过期端口 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✓  使用Root权限(sudo命令), 运行 port rev-upgrade ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    macports_rev_upgrade_quiet
 
     echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     
@@ -3625,104 +3634,6 @@ fi
 
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-
-
-# ----------------------------------
-# 开始执行： 其他更新（ 对 TopGrade 更新 补充 ）
-# ----------------------------------
-
-#########  更新 TeX Live 管理器 (tlmgr)  ########
-#if command -v tlmgr > /dev/null 2>&1; then
-#
-#    errorFlag=0
-#    echo -e "\033[1;32m更新 TeX Live 管理器 ...     \033[0m"
-#    echo -e "更新 TeX Live 管理器"         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-#
-#    #—— 更新 TeX Live 模块 ——#
-#    #if [[ $(id -u) -eq 0 ]]; then
-#    #    #—— root 环境：降权到桌面用户 ——#
-#    #    echo -e "✓  Root 权限，降权至普通用户 ( $targetUser ) ，运行 tlmgr init-usertree ..."   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-#    #    sudo -H -u "$targetUser" tlmgr init-usertree 2>&1   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-#    #    [ ${PIPESTATUS[0]} -ne 0 ] && errorFlag=1
-#    #    echo -e "✓  Root 权限，降权至普通用户 ( $targetUser ) ，运行 tlmgr update --self --all ..."  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-#    #    sudo -H -u "$targetUser" tlmgr update --self --all 2>&1   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-#    #    [ ${PIPESTATUS[0]} -ne 0 ] && errorFlag=1
-#    #    echo -e "✓  Root 权限，降权至普通用户 ( $targetUser ) ，运行 tlmgr backup --clean --all ..."   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-#    #    sudo -H -u "$targetUser" tlmgr backup --clean --all 2>&1   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-#    #    [ ${PIPESTATUS[0]} -ne 0 ] && errorFlag=1
-#    #else
-#    #    #—— 非 root 环境 ——#
-#    #    echo -e "✓  当前用户 '$USER' ，运行 tlmgr init-usertree ..."   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-#    #    tlmgr init-usertree 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-#    #    [ ${PIPESTATUS[0]} -ne 0 ] && errorFlag=1
-#    #    echo -e "✓  当前用户 '$USER' ，运行 tlmgr update --self --all ..."  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-#    #    tlmgr update --self --all 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-#    #    [ ${PIPESTATUS[0]} -ne 0 ] && errorFlag=1
-#    #    echo -e "✓  当前用户 '$USER' ，运行 tlmgr backup --clean --all ..."    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-#    #    tlmgr backup --clean --all 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-#    #    [ ${PIPESTATUS[0]} -ne 0 ] && errorFlag=1
-#    #fi
-#
-#    echo -e "✓  当前用户 '$USER' ，运行 sudo tlmgr init-usertree ..."   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-#    sudo tlmgr init-usertree 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-#    [ ${PIPESTATUS[0]} -ne 0 ] && errorFlag=1
-#    echo -e "✓  当前用户 '$USER' ，运行 sudo tlmgr update --self --all ..."  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-#    sudo tlmgr update --self --repository https://mirror.ctan.org/systems/texlive/tlnet 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-#    sudo tlmgr update --self --repository https://mirror.ctan.org/systems/texlive/tlnet --all 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-#    [ ${PIPESTATUS[0]} -ne 0 ] && errorFlag=1
-#    echo -e "✓  当前用户 '$USER' ，运行 sudo tlmgr backup --clean --all ..."    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-#    sudo tlmgr backup --clean --all 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-#    [ ${PIPESTATUS[0]} -ne 0 ] && errorFlag=1
-#
-#    # 输出最终结果
-#    if [ $errorFlag -eq 0 ]; then
-#        echo -e "✅  TeX Live 更新  运行已完成 !!! " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-#    else
-#        echo -e "⚠️  TeX Live 更新  完成，但出现错误 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-#    fi
-#else
-#    printf "\033[1;34m[INFO]\033[0m "
-#    printf "[INFO] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-#    echo -e "tlmgr 未安装，跳过 TeX Live 更新 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-#fi
-#
-#echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-
-
-########  更新 PowerShell  ########
-#if command -v pwsh > /dev/null 2>&1; then
-#    errorFlag=0
-#
-#    echo -e "\033[1;32m更新 PowerShell ...    \033[0m"
-#    echo -e "更新 PowerShell"            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-#
-#    #—— 更新 PowerShell 模块 ——#
-#    #if [[ $(id -u) -eq 0 ]]; then
-#    #    #—— root 环境：降权到桌面用户 ——#
-#    #    sudo pwsh -NoProfile -NonInteractive -Command 'Get-InstalledModule | ForEach-Object { try { Update-Module -Name $_.Name -Force -ErrorAction Stop } catch { Write-Output $_.Exception.Message; $global:LastExitCode = 1 } }' 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-#    #    [ ${PIPESTATUS[0]} -ne 0 ] && errorFlag=1
-#    #else
-#    #    #—— 非 root 环境 ——#
-#    #    echo -e "✓  当前用户 '$USER' ，使用 pwsh 更新所有模块 ..."   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-#    #    /usr/local/bin/pwsh -NoProfile -NonInteractive -Command  'Get-InstalledModule | ForEach-Object { try { Update-Module -Name $_.Name -Force -ErrorAction Stop } catch { Write-Output $_.Exception.Message; $global:LastExitCode = 1 } }' 2>&1   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-#    #    [ ${PIPESTATUS[0]} -ne 0 ] && errorFlag=1
-#    #fi   
-#    sudo pwsh -NoProfile -NonInteractive -Command 'Get-InstalledModule | ForEach-Object { try { Update-Module -Name $_.Name -Force -ErrorAction Stop } catch { Write-Output $_.Exception.Message; $global:LastExitCode = 1 } }' 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-#    [ ${PIPESTATUS[0]} -ne 0 ] && errorFlag=1
-#
-#    # 输出最终结果
-#    if [ $errorFlag -eq 0 ]; then
-#        echo -e "✅  PowerShell 更新  运行已完成 " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-#    else
-#        echo -e "⚠️  PowerShell 更新  运行已完成，但出现错误 " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-#    fi
-#else
-#    printf "\033[1;34m[INFO]\033[0m "
-#    printf "[INFO] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-#    echo -e "HomeBrew 未安装，跳过 PowerShell 更新 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-#fi
-#
-#echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 echo -e "\033[1;32m[OK] TopGrade Upgrade  运行已完成  ✅ \033[1;32m"   
 echo -e "[OK]  TopGrade Upgrade  运行已完成  ✅ "                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
