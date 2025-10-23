@@ -3495,7 +3495,6 @@ else
     printf "\033[1;34m[Verify]\033[0m "
     printf "[Verify] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo "MacPorts 验证结果 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    echo -e "✓  重新检测 是否有过期端口 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     echo -e "✓  使用Root权限(sudo命令), 运行 port rev-upgrade ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     macports_rev_upgrade_quiet
 
