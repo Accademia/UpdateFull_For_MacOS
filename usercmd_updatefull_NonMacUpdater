@@ -3054,22 +3054,24 @@ echo -e "HomeBrew 清理残留 ... "                                            
 if [ "$(id -u)" -eq 0 ]; then
     # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
     targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
+    # 使用辅助函数 run_as_normal_user 保留环境并执行 brew cleanup 
     echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 brew cleanup ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    # 使用辅助函数 run_as_normal_user 保留环境并执行 brew cleanup / cleanup -s / autoremove / missing
-    run_as_normal_user brew cleanup --prune=all 2>&1       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    # 使用 -s 参数彻底清理下载缓存，包括最新版本的下载文件
-    run_as_normal_user brew cleanup -s 2>&1                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    run_as_normal_user brew cleanup -s --prune=all 2>&1       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     # 自动移除不再依赖的“孤儿”包
+    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 brew autoremove ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     run_as_normal_user brew autoremove 2>&1                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     # 列出缺失依赖，仅提示，不影响退出码
+    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 brew missing ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     run_as_normal_user brew missing || true                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 else
+    # 执行清理
     echo -e "✓  当前用户'$USER'，为普通权限，直接运行 brew cleanup ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-    brew cleanup --prune=all 2>&1                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    # 使用 -s 参数彻底清理下载缓存，包括最新版本的下载文件
-    brew cleanup -s 2>&1                                                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    brew cleanup -s --prune=all 2>&1                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    # 自动移除不再依赖的“孤儿”包
+    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 brew autoremove ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     brew autoremove 2>&1                                                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     # 列出缺失依赖，仅提示，不影响退出码
+    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 brew missing ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     brew missing || true                                                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 fi
 
