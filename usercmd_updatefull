@@ -1936,9 +1936,9 @@ fi
 brew_cask_count=$((( brew_cask_count * 2 ) /2 ))
 brew_formula_count=$((( brew_formula_count *2 ) /2 ))
 brew_app_count=$(( brew_formula_count + brew_cask_count ))
-echo -e "✅  APP 数量（ HomeBrew Formula ）：$brew_formula_count  "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-echo -e "✅  APP 数量（ HomeBrew Cask    ）：$brew_cask_count  "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-echo -e "✅  APP 数量（ HomeBrew         ）：$brew_app_count  "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e "✅  APP 数量（ HomeBrew Formula ） ：$brew_formula_count  "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e "✅  APP 数量（ HomeBrew Cask    ） ：$brew_cask_count  "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e "✅  APP 数量（ HomeBrew         ） ：$brew_app_count  "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 
 echo -e ""                                                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
@@ -3246,8 +3246,8 @@ echo -e ""                                                                      
 # 开始执行：Sparkle
 # ----------------------------------
 
-# 如果在更新阶段 Sparkle 不可用，则跳过运行阶段
 if [ "${sparkle_available:-false}" != "true" ]; then
+    # 如果 Sparkle 工具不可用，则直接打印提示并跳过
     echo -e "\033[1;32m-----------------------------------------------\033[0m"
     echo -e "\033[1;32m 运行 Sparkle                                \033[0m"
     echo -e "\033[1;32m-----------------------------------------------\033[0m"
@@ -3263,7 +3263,7 @@ if [ "${sparkle_available:-false}" != "true" ]; then
     echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 else
-    # 可用，开始执行 Sparkle 扫描和更新
+    # Sparkle 可用，开始执行应用扫描与更新
     echo -e "\033[1;32m-----------------------------------------------\033[0m"
     echo -e "\033[1;32m 运行 Sparkle                                \033[0m"
     echo -e "\033[1;32m-----------------------------------------------\033[0m"
@@ -3277,7 +3277,7 @@ else
 
     echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
-    # 确定 Sparkle CLI 路径（若未在 PATH 中，则尝试常见安装位置）
+    # 确定 Sparkle CLI 路径
     SPARKLE_CLI="$(command -v sparkle 2>/dev/null || true)"
     if [ -z "$SPARKLE_CLI" ] && [ -x "/Applications/sparkle.app/Contents/MacOS/sparkle" ]; then
         SPARKLE_CLI="/Applications/sparkle.app/Contents/MacOS/sparkle"
@@ -3292,20 +3292,16 @@ else
 
     sparkle_app_paths=""
     if [ "$(id -u)" -eq 0 ]; then
-        # root: 降权
         targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
         echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 Sparkle 应用扫描 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        sparkle_app_paths=$(sudo -n -H -u "$targetUser" bash -lc 'find /Applications "$HOME"/Applications -maxdepth 2 -type d -name "*.app" -print0 | \
-          while IFS= read -r -d "" app; do
+        sparkle_app_paths=$(sudo -n -H -u "$targetUser" bash -lc 'find /Applications "$HOME"/Applications -maxdepth 2 -type d -name "*.app" -print0 | while IFS= read -r -d "" app; do
             if [[ -d "$app/Contents/Frameworks/Sparkle.framework" ]] || [[ -d "$app/Contents/SharedFrameworks/Sparkle.framework" ]] || /usr/libexec/PlistBuddy -c "Print :SUFeedURL" "$app/Contents/Info.plist" >/dev/null 2>&1; then
               echo "$app"
             fi
           done')
     else
-        # 普通用户
         echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 Sparkle 应用扫描 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        sparkle_app_paths=$(find /Applications "$HOME"/Applications -maxdepth 2 -type d -name "*.app" -print0 | \
-          while IFS= read -r -d '' app; do
+        sparkle_app_paths=$(find /Applications "$HOME"/Applications -maxdepth 2 -type d -name "*.app" -print0 | while IFS= read -r -d '' app; do
             if [[ -d "$app/Contents/Frameworks/Sparkle.framework" ]] || [[ -d "$app/Contents/SharedFrameworks/Sparkle.framework" ]] || /usr/libexec/PlistBuddy -c "Print :SUFeedURL" "$app/Contents/Info.plist" >/dev/null 2>&1; then
               echo "$app"
             fi
@@ -3314,7 +3310,110 @@ else
 
     # 计算 Sparkle 应用数量
     sparkle_app_count=$(echo "$sparkle_app_paths" | sed '/^\s*$/d' | wc -l | tr -d ' ')
-    echo -e "✅  APP 数量（ Sparkle ）：$sparkle_app_count  " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
+    # 统计无法通过 Homebrew 升级的 Sparkle 应用数量（基于应用名称匹配）
+    sparkle_non_brew_count=0
+    # 获取已安装的 Homebrew Cask 名单
+    if [ "$(id -u)" -eq 0 ]; then
+        tmp_target="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+        brew_tokens=$(sudo -n -H -u "$tmp_target" bash -lc 'brew list --cask -1 2>/dev/null' || true)
+    else
+        brew_tokens=$(brew list --cask -1 2>/dev/null || true)
+    fi
+    if [ -n "$sparkle_app_paths" ]; then
+        # 构建归一化后的 HomeBrew cask 名称列表（含去尾数字和最后一段）
+        brew_tokens_norm=""
+        if [ -n "$brew_tokens" ]; then
+            while IFS= read -r token; do
+                # 全部小写、去除非字母数字字符
+                norm=$(echo "$token" | tr 'A-Z' 'a-z' | tr -dc '[:alnum:]')
+                [ -n "$norm" ] && brew_tokens_norm="${brew_tokens_norm}"$'\n'"$norm"
+                # 去除尾部数字形成第二个变体
+                norm_nd=$(echo "$norm" | sed -E 's/[0-9]+$//')
+                [ -n "$norm_nd" ] && brew_tokens_norm="${brew_tokens_norm}"$'\n'"$norm_nd"
+                # 取 token 的最后一段（以 - 分割）并归一化
+                last_seg=$(echo "$token" | awk -F'-' '{print $NF}')
+                last_norm=$(echo "$last_seg" | tr 'A-Z' 'a-z' | tr -dc '[:alnum:]')
+                [ -n "$last_norm" ] && brew_tokens_norm="${brew_tokens_norm}"$'\n'"$last_norm"
+                # 将 token 按 "-" 分段，并添加每个部分的归一化变体
+                for part in $(echo "$token" | tr '-' ' '); do
+                    part_norm=$(echo "$part" | tr 'A-Z' 'a-z' | tr -dc '[:alnum:]')
+                    [ -n "$part_norm" ] && brew_tokens_norm="${brew_tokens_norm}"$'\n'"$part_norm"
+                    part_norm_nd=$(echo "$part_norm" | sed -E 's/[0-9]+$//')
+                    [ -n "$part_norm_nd" ] && brew_tokens_norm="${brew_tokens_norm}"$'\n'"$part_norm_nd"
+                done
+            done <<< "$brew_tokens"
+        fi
+        # 构建归一化后的 MAS 名称列表（含去尾数字）
+        mas_tokens_norm=""
+        # 如果 mas 命令存在，则尝试获取当前登录用户的 MAS 应用
+        if command -v mas >/dev/null 2>&1; then
+            mas_output=""
+            if [ "$(id -u)" -eq 0 ]; then
+                # root 情况：使用 SUDO_USER 或控制台用户执行 mas list
+                targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+                if [ -n "$targetUser" ]; then
+                    mas_output=$(sudo -n -H -u "$targetUser" bash -lc 'mas list' 2>/dev/null || true)
+                fi
+            else
+                mas_output=$(mas list 2>/dev/null || true)
+            fi
+            if [ -n "$mas_output" ]; then
+                echo "$mas_output" | while read -r line; do
+                    # mas list 的输出格式: <app_id> <app_name> (<version>)
+                    # 取应用名列（忽略第一个字段）
+                    name=$(echo "$line" | awk '{$1=""; sub(/^  */, ""); print}')
+                    # 去除括号和内部内容，去除非字母数字
+                    name_clean=$(echo "$name" | sed -E 's/ \([^)]+\)$//' | sed -E 's/[^[:alnum:]]+//g')
+                    norm=$(echo "$name_clean" | tr 'A-Z' 'a-z' | tr -dc '[:alnum:]')
+                    [ -n "$norm" ] && mas_tokens_norm="${mas_tokens_norm}"$'\n'"$norm"
+                    norm_nd=$(echo "$norm" | sed -E 's/[0-9]+$//')
+                    [ -n "$norm_nd" ] && mas_tokens_norm="${mas_tokens_norm}"$'\n'"$norm_nd"
+                done
+            fi
+        fi
+
+        while IFS= read -r app_path; do
+            base="$(basename "$app_path")"
+            # 检查是否为 MAS 安装（存在收据）
+            if [ -e "$app_path/Contents/_MASReceipt/receipt" ]; then
+                continue
+            fi
+            # 归一化应用名称，生成两个变体（含数字和去尾数字）
+            base_no_ext="${base%.app}"
+            base_norm=$(echo "$base_no_ext" | tr 'A-Z' 'a-z' | tr -dc '[:alnum:]')
+            base_norm_nd=$(echo "$base_norm" | sed -E 's/[0-9]+$//')
+            # 如果在 MAS 名单中，跳过
+            if [ -n "$mas_tokens_norm" ]; then
+                if echo "$mas_tokens_norm" | grep -qw "$base_norm" || echo "$mas_tokens_norm" | grep -qw "$base_norm_nd"; then
+                    continue
+                fi
+            fi
+            # 如果在 HomeBrew 名单中，跳过
+            skip_brew=false
+            if [ -n "$brew_tokens_norm" ]; then
+                if echo "$brew_tokens_norm" | grep -qw "$base_norm" || echo "$brew_tokens_norm" | grep -qw "$base_norm_nd"; then
+                    skip_brew=true
+                fi
+            fi
+            # 如果 app_path 是符号链接且指向 Caskroom，也认为是 HomeBrew 管理
+            if [ "$skip_brew" = false ] && [ -L "$app_path" ]; then
+                resolved=$(readlink "$app_path")
+                case "$resolved" in
+                    *Caskroom*|*caskroom*) skip_brew=true ;;
+                esac
+            fi
+            if [ "$skip_brew" = false ]; then
+                sparkle_non_brew_count=$((sparkle_non_brew_count+1))
+                # 新增：打印每个不在 HomeBrew 或 MAS 管理中的 Sparkle 应用名称
+               #echo -e "✅  Sparkle 应用不在 HomeBrew 或 MAS 中：$base"
+            fi
+        done <<< "$sparkle_app_paths"
+    fi
+
+    # 新增打印：提示当前用户权限下如何获取 HomeBrew 应用列表
+    echo -e "✅  APP 数量（ Sparkle              ） ：$sparkle_app_count  " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✅  APP 数量（ Sparkle_Non_Homebrew ） ：$sparkle_non_brew_count  " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
@@ -3364,18 +3463,17 @@ else
     echo -e "Sparkle 下载安装 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     if [ ${#sparkle_updates_list[@]} -gt 0 ] && [ -n "$SPARKLE_CLI" ]; then
-        for app in "${sparkle_updates_list[@]}"; do
-            app_name="$(basename "$app")"
+        for update_path in "${sparkle_updates_list[@]}"; do
+            app_name="$(basename "$update_path")"
             if [ "$(id -u)" -eq 0 ]; then
                 targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
                 echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 Sparkle 更新 : $app_name" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                sudo -n -H -u "$targetUser" bash -lc "\"$SPARKLE_CLI\" --check-immediately --allow-major-upgrades \"$app\"" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                sudo -n -H -u "$targetUser" bash -lc "\"$SPARKLE_CLI\" --check-immediately --allow-major-upgrades \"$update_path\"" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             else
                 echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 Sparkle 更新 : $app_name" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                "$SPARKLE_CLI" --check-immediately --allow-major-upgrades "$app" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                "$SPARKLE_CLI" --check-immediately --allow-major-upgrades "$update_path" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             fi
             echo -e "✅  更新成功 [Sparkle]   : $app_name" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-            echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         done
     else
         echo -e "✓  所有APP已经是 最新版本 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -3458,7 +3556,7 @@ fi
 
 # 统计 App 数量并输出结果
 mas_app_count=$((mas_app_count+0))
-echo -e "✅  APP 数量（ Mac App Store ）：$mas_app_count  "                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e "✅  APP 数量（ Mac App Store ） ：$mas_app_count  "                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -4077,15 +4175,16 @@ echo -e "-------------------------------------------"                           
     
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     
-gui_app_count=$(($brew_cask_count+$mas_app_count))
-echo -e "✅  APP 数量（ HomeBrew Formula    ） ：$brew_formula_count  "                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-echo -e "✅  APP 数量（ HomeBrew Cask       ） ：$brew_cask_count  "                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-echo -e "✅  APP 数量（ Mac App Store       ） ：$mas_app_count   "                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+gui_app_count=$(($brew_cask_count+$mas_app_count+$sparkle_non_brew_count))
+echo -e "✅  APP 数量（ HomeBrew Formula              ） ：$brew_formula_count  "                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e "✅  APP 数量（ HomeBrew Cask                 ） ：$brew_cask_count  "                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e "✅  APP 数量（ Mac App Store                 ） ：$mas_app_count   "                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e "✅  APP 数量（ Sparkle                       ） ：$sparkle_app_count  "                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 if [ "${MacUpdater_ENABLE:-false}" != "true" ]; then  
-    echo -e "✅  APP 数量（ MAS + HomeBrew Cask ） ：$gui_app_count "                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✅  APP 数量（ MAS + Sparkle + HomeBrew Cask ） ：$gui_app_count "                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 else
-    echo -e "✅  APP 数量（ MacUpdater          ） ：$macupdater_app_count  （ $gui_app_count = MAS + HomeBrew Cask ）"                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✅  APP 数量（ MacUpdater                    ） ：$macupdater_app_count  （ $gui_app_count = MAS + Sparkle + HomeBrew Cask ）"                  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 fi
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
