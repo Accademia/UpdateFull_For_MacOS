@@ -487,7 +487,7 @@ attempt_quit_app() {
 
     else
 
-        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 osascript 立刻退出进程。 ... "     
+        echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 osascript 立刻退出进程。 ... "     
         echo -e "✓  注意：在退出 '$brew_process_name' 进程时，如果程序弹窗，阻止程序退出（需用户手动确认退）。本脚本将等待30秒，然后发起 强制退出，并强制关闭本进程所有窗口 ... "       
 
         # 非 root 情况，直接运行 AppleScript 优雅退出
@@ -510,7 +510,7 @@ attempt_quit_app() {
             local targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
             sudo -n -u "$targetUser" /usr/bin/pkill -x "$brew_process_name"
         else
-            echo -e "...  （已完成30秒等待）当前用户'$USER'，为普通权限，直接运行 pkill 强制退出 '$brew_process_name' 进程 ，以便执行 后续更新 ... "     
+            echo -e "...  （已完成30秒等待）当前用户 '$USER' 为普通权限，直接运行 pkill 强制退出 '$brew_process_name' 进程 ，以便执行 后续更新 ... "     
             /usr/bin/pkill -x "$brew_process_name"
         fi
     else
@@ -1063,7 +1063,7 @@ if [ "$architecture" = "arm64" ]; then
            #echo -e "✓  执行 brew doctor 自检" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
            #sudo -H -u "$targetUser" brew doctor || true                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         else
-            echo -e "✓   当前用户'$USER'，为普通权限，直接运行 HomeBrew 自更新 ... "             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            echo -e "✓   当前用户 '$USER' 为普通权限，直接运行 HomeBrew 自更新 ... "             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             brew update --force 2>&1 |
                 tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             brew_update_rc=${PIPESTATUS[0]}
@@ -1247,6 +1247,81 @@ fi
 
 
 # -----------------------------------------------
+# 更新 Sparkle 工具
+# -----------------------------------------------
+
+# 调用检查时间范围函数
+check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
+
+# 判断 Sparkle 是否已安装（cask）
+sparkle_installed=false
+{
+    sparkle_list_output=""
+    if [ "$(id -u)" -eq 0 ]; then
+        sparkle_targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+        sparkle_list_output=$(sudo -n -E -H -u "$sparkle_targetUser" env PATH="/opt/homebrew/bin:/usr/local/bin:$PATH" brew list --cask 2>/dev/null || true)
+    else
+        sparkle_list_output=$(brew list --cask 2>/dev/null || true)
+    fi
+    if echo "$sparkle_list_output" | grep -q '^sparkle$'; then
+        sparkle_installed=true
+    fi
+}
+
+echo -e "\033[1;36m-----------------------------------------------\033[0m"
+echo -e "\033[1;36m 更新 Sparkle 工具 \033[0m"
+echo -e "\033[1;36m-----------------------------------------------\033[0m"
+
+echo -e "-------------------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "更新 Sparkle 工具 " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "-------------------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+
+echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
+# 初始化 Sparkle 工具更新退出码
+sparkle_update_rc=0
+
+if [ "$sparkle_installed" = true ]; then
+    # 已安装，执行更新
+    if [ "$(id -u)" -eq 0 ]; then
+        targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 Sparkle 自更新 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        sudo -n -H -u "$targetUser" brew upgrade --greedy --cask sparkle 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        sparkle_update_rc=${PIPESTATUS[0]}
+    else
+        echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 Sparkle 自更新 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        brew upgrade --greedy --cask sparkle 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        sparkle_update_rc=${PIPESTATUS[0]}
+    fi
+else
+    # 未安装，执行安装
+    if [ "$(id -u)" -eq 0 ]; then
+        targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+        echo -e "✓  Sparkle 未安装, Root权限 降权至 普通权限 ( $targetUser ) 后 , 运行 brew reinstall --cask --force sparkle 进行安装 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        sudo -n -H -u "$targetUser" brew reinstall --cask --force sparkle 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        sparkle_update_rc=${PIPESTATUS[0]}
+    else
+        echo -e "✓  Sparkle 未安装, 当前用户 '$USER' 为普通权限, 运行 brew reinstall --cask --force sparkle 进行安装 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        brew reinstall --cask --force sparkle 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        sparkle_update_rc=${PIPESTATUS[0]}
+    fi
+fi
+
+echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+if [ $sparkle_update_rc -eq 0 ]; then
+    echo -e '\033[1;36m[OK] 更新 Sparkle 工具 已完成\033[0m '
+    echo -e '[OK] 更新 Sparkle 工具 已完成' | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    sparkle_available=true
+else
+    echo -e '\033[1;31m[ERROR] 更新 Sparkle 工具 失败 ❌\033[0m '
+    echo -e '[ERROR] 更新 Sparkle 工具 失败 ❌' | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    sparkle_available=false
+fi
+
+echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
+# -----------------------------------------------
 # 检查 3 ：MAS 是否安装（并更新）
 # -----------------------------------------------
 
@@ -1291,7 +1366,7 @@ if [ "$mas_installed" = true ]; then
             tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         mas_update_rc=${PIPESTATUS[0]}
     else
-        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 MAS 自更新 ... "            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+        echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 MAS 自更新 ... "            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
         brew upgrade mas 2>&1 |
             tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         mas_update_rc=${PIPESTATUS[0]}
@@ -1329,7 +1404,7 @@ else
         # 以目标用户身份执行 HomeBrew 命令
         sudo -n -H -u "$targetUser" bash -c 'brew reinstall --force mas 2>&1'              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     else
-        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 MAS 安装 ... "                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+        echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 MAS 安装 ... "                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
         brew reinstall --force mas 2>&1                                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     fi
 
@@ -1480,7 +1555,7 @@ if [ "$topgrade_installed" = true ]; then
             tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         topgrade_update_rc=${PIPESTATUS[0]}
     else
-        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 TopGrade 自更新 ... "       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+        echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 TopGrade 自更新 ... "       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
         brew upgrade --greedy --force topgrade 2>&1 |
             tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         topgrade_update_rc=${PIPESTATUS[0]}
@@ -1520,7 +1595,7 @@ else
         # 以目标用户身份执行 HomeBrew 命令
         sudo -n -H -u "$targetUser" bash -c 'brew reinstall --force topgrade 2>&1'         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     else
-        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 topgrade 安装 ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+        echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 topgrade 安装 ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
         brew reinstall --force topgrade 2>&1                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     fi
     
@@ -1584,7 +1659,7 @@ if [ "$macupdater_installed" = true ]; then
             tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         macupdater_update_rc=${PIPESTATUS[0]}
     else
-        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 MacUpdater 自更新 ... "     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+        echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 MacUpdater 自更新 ... "     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
         env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew upgrade --greedy --cask macupdater 2>&1 |
             tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         macupdater_update_rc=${PIPESTATUS[0]}
@@ -1623,7 +1698,7 @@ else
         # 显式传递语言配置，避免 sudo 环境丢失 HOMEBREW_CASK_OPTS
         sudo -n -H -u "$targetUser" env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew reinstall --cask --force macupdater 2>&1       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     else
-        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 MacUpdater 安装 ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+        echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 MacUpdater 安装 ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
         env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew reinstall --cask --force macupdater 2>&1                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     fi
     
@@ -1706,7 +1781,7 @@ userTmpDir=$(sudo -n -H -u "$targetUser" getconf DARWIN_USER_TEMP_DIR)
 
 else
 
-    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 获取 启动台布局 所需的 \$TMPDIR \$TMPDIR ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 获取 启动台布局 所需的 \$TMPDIR \$TMPDIR ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     USER_NAME="$USER"
     userTmpDir="$TMPDIR"
 
@@ -1848,7 +1923,7 @@ brew_cask_count=$(sudo -n -H -u "$targetUser" bash -lc 'brew list --cask -1 | wc
 
 else
 
-    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 brew list ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 brew list ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
     # 所有项目（公式 + Cask）
     brew_formula_count=$(brew list --formula -1 | wc -l)
@@ -1886,7 +1961,7 @@ if [ "$(id -u)" -eq 0 ]; then
     sudo -n -H -u "$targetUser" bash -lc 'brew outdated --cask --greedy' 2>/dev/null | awk '{print $1}'
   )
 else
-  echo -e "✓  当前用户'$USER'，为普通权限，直接运行 brew outdated --greedy ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+  echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 brew outdated --greedy ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
   brew_outdated=$(
     brew outdated --greedy 2>/dev/null | awk '{print $1}'
   )
@@ -2003,7 +2078,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                 json=$(sudo -n -H -u "$targetUser" /bin/bash -lc "brew info --json=v2 \"$pkg_brew_formula\"" 2>/dev/null)
             else
                 # ------- 已是普通用户 -------
-                echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $pkg_brew_formula 的 SHA256 查询 ... " \
+                echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 $pkg_brew_formula 的 SHA256 查询 ... " \
                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
                 # 在当前用户环境中执行 brew info 获取 JSON
@@ -2075,7 +2150,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                 json=$(sudo -n -H -u "$targetUser" /bin/bash -lc "brew info --json=v2 \"$pkg_brew_cask\"" 2>/dev/null)
             else
                 # ------- 已是普通用户 -------
-                echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $pkg_brew_cask 的 SHA256 查询 ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 $pkg_brew_cask 的 SHA256 查询 ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
                 # 在当前用户环境中执行 brew info 获取 JSON
                 json=$(brew info --json=v2 "$pkg_brew_cask" 2>/dev/null)
@@ -2120,7 +2195,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
               # 以目标用户身份执行 HomeBrew 命令
               sudo -n -H -u "$targetUser" bash -c 'brew reinstall --force parallel 2>&1'         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
           else
-              echo -e "✓  当前用户'$USER'，为普通权限，直接运行 parallel 安装 ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+              echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 parallel 安装 ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
               brew reinstall --force parallel 2>&1                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
           fi
 
@@ -2506,7 +2581,7 @@ EOF
                 # 以目标用户身份执行 HomeBrew 命令
                 sudo -n -H -u "$targetUser" bash -c "brew upgrade $pkg_brew_formula 2>&1" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_formula_tmpfile"
             else
-                echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $pkg_brew_formula 升级 ( brew upgrade $pkg_brew_formula --verbose --debug ) ... "                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+                echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 $pkg_brew_formula 升级 ( brew upgrade $pkg_brew_formula --verbose --debug ) ... "                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
                 brew upgrade "$pkg_brew_formula" 2>&1                                                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_formula_tmpfile" 
             fi
 
@@ -2548,7 +2623,7 @@ EOF
                         # 以目标用户身份执行 HomeBrew 命令
                         sudo -n -H -u "$targetUser" bash -c "brew link --overwrite $pkg_brew_formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     else
-                        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $pkg_brew_formula 重装 ( brew link --overwrite $pkg_brew_formula ) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 $pkg_brew_formula 重装 ( brew link --overwrite $pkg_brew_formula ) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                         brew link --overwrite "$pkg_brew_formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     fi
 
@@ -2592,7 +2667,7 @@ EOF
                     # 以目标用户身份执行 HomeBrew 命令
                     sudo -n -H -u "$targetUser" bash -c "brew reinstall $pkg_brew_formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 else
-                    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $pkg_brew_formula 重装 ( brew reinstall $pkg_brew_formula --verbose --debug ) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 $pkg_brew_formula 重装 ( brew reinstall $pkg_brew_formula --verbose --debug ) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     brew reinstall "$pkg_brew_formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 fi
 
@@ -2610,7 +2685,7 @@ EOF
                         # 以目标用户身份执行 HomeBrew 命令
                         sudo -n -H -u "$targetUser" bash -c "brew reinstall --force $pkg_brew_formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     else
-                        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $pkg_brew_formula 强制重装 ( brew reinstall --force $pkg_brew_formula --verbose --debug ) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 $pkg_brew_formula 强制重装 ( brew reinstall --force $pkg_brew_formula --verbose --debug ) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                         brew reinstall --force "$pkg_brew_formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     fi
                     brew_formula_reinstall_force_exit=${PIPESTATUS[0]}  # 取 brew reinstall 的退出码
@@ -2708,13 +2783,13 @@ EOF
             if [[ $(id -u) -eq 0 ]]; then
                 # 1) 如果是 root，降权至目标普通用户执行 brew info
                 targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
-                echo -e "✓  Root权限降权至普通权限 ($targetUser) 后，查询 cask 信息..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "✓  Root权限降权至普通权限 ($targetUser) 后，查询 cask 信息  ( brew info --cask $pkg_brew_cask )  ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 # 使用 run_as_normal_user 保留 PATH/HOMEBREW_CASK_OPTS 环境并降权执行 brew info
-                brew_cask_info_output=$(run_as_normal_user brew info --cask "$pkg_brew_cask" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE")
+                brew_cask_info_output=$(run_as_normal_user brew info --cask "$pkg_brew_cask")
             else
                 # 2) 如果已是普通用户，直接执行 brew info
-                echo -e "✓  当前用户 '$USER' 为普通权限，直接查询 cask 信息..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                brew_cask_info_output=$(brew info --cask "$pkg_brew_cask" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE")
+                echo -e "✓  当前用户 '$USER' 为普通权限，直接查询 cask 信息  ( brew info --cask $pkg_brew_cask )  ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                brew_cask_info_output=$(brew info --cask "$pkg_brew_cask")
             fi
 
 
@@ -2730,7 +2805,7 @@ EOF
               # 使用辅助函数 run_as_normal_user 保留环境并执行 brew upgrade
               run_as_normal_user brew upgrade --cask --greedy "$pkg_brew_cask" 2>&1         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_cask_tmpfile"
             else
-              echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $pkg_brew_cask 升级 ( brew upgrade --cask --greedy $pkg_brew_cask --verbose --debug ) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+              echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 $pkg_brew_cask 升级 ( brew upgrade --cask --greedy $pkg_brew_cask --verbose --debug ) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
               brew upgrade --cask --greedy "$pkg_brew_cask" 2>&1                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_cask_tmpfile"
             fi
 
@@ -2766,7 +2841,7 @@ EOF
                     # 使用辅助函数 run_as_normal_user 保留环境并执行 brew reinstall
                     run_as_normal_user brew reinstall --cask  "$pkg_brew_cask" 2>&1       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 else
-                    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $pkg_brew_cask 重装 ( brew reinstall --cask $pkg_brew_cask --verbose --debug ) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+                    echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 $pkg_brew_cask 重装 ( brew reinstall --cask $pkg_brew_cask --verbose --debug ) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
                     brew reinstall --cask "$pkg_brew_cask" 2>&1                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 fi
    
@@ -2928,7 +3003,7 @@ EOF
                           # 使用辅助函数 run_as_normal_user 保留环境并执行 brew reinstall --force
                           run_as_normal_user brew reinstall --cask --force "$pkg_brew_cask" 2>&1       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                       else
-                          echo -e "✓  当前用户'$USER'，为普通权限，直接运行 $pkg_brew_cask 强制覆盖安装 ( brew reinstall --cask --force $pkg_brew_cask --verbose --debug ) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+                          echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 $pkg_brew_cask 强制覆盖安装 ( brew reinstall --cask --force $pkg_brew_cask --verbose --debug ) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
                           brew reinstall --cask --force "$pkg_brew_cask" 2>&1                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                       fi
        
@@ -3065,13 +3140,13 @@ if [ "$(id -u)" -eq 0 ]; then
     run_as_normal_user brew missing || true                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 else
     # 执行清理
-    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 brew cleanup ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-    brew cleanup -s --prune=all 2>&1                     
-    # 自动移除不再依赖的“孤儿”包                                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 brew autoremove ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 brew cleanup ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    brew cleanup -s --prune=all 2>&1                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    # 自动移除不再依赖的“孤儿”包
+    echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 brew autoremove ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     brew autoremove 2>&1                                                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     # 列出缺失依赖，仅提示，不影响退出码
-    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 brew missing ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 brew missing ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     brew missing || true                                                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 fi
 
@@ -3168,6 +3243,154 @@ echo -e ""                                                                      
 
 
 # ----------------------------------
+# 开始执行：Sparkle
+# ----------------------------------
+
+# 如果在更新阶段 Sparkle 不可用，则跳过运行阶段
+if [ "${sparkle_available:-false}" != "true" ]; then
+    echo -e "\033[1;32m-----------------------------------------------\033[0m"
+    echo -e "\033[1;32m 运行 Sparkle                                \033[0m"
+    echo -e "\033[1;32m-----------------------------------------------\033[0m"
+
+    echo -e "-------------------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "运行 Sparkle" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "-------------------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+
+    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    printf  "\033[1;34m[ERROR]\033[0m "
+    printf  "[ERROR] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "未找到 Sparkle CLI，可执行文件缺失。跳过 Sparkle 更新。 ❌" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+else
+    # 可用，开始执行 Sparkle 扫描和更新
+    echo -e "\033[1;32m-----------------------------------------------\033[0m"
+    echo -e "\033[1;32m 运行 Sparkle                                \033[0m"
+    echo -e "\033[1;32m-----------------------------------------------\033[0m"
+
+    echo -e "-------------------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "运行 Sparkle" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "-------------------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+
+    # 调用检查时间范围函数
+    check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
+
+    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
+    # 确定 Sparkle CLI 路径（若未在 PATH 中，则尝试常见安装位置）
+    SPARKLE_CLI="$(command -v sparkle 2>/dev/null || true)"
+    if [ -z "$SPARKLE_CLI" ] && [ -x "/Applications/sparkle.app/Contents/MacOS/sparkle" ]; then
+        SPARKLE_CLI="/Applications/sparkle.app/Contents/MacOS/sparkle"
+    elif [ -z "$SPARKLE_CLI" ] && [ -x "/Applications/Sparkle.app/Contents/MacOS/sparkle" ]; then
+        SPARKLE_CLI="/Applications/Sparkle.app/Contents/MacOS/sparkle"
+    fi
+
+    # [List] 阶段：列出支持 Sparkle 的应用
+    printf  "\033[1;34m[List]\033[0m "
+    printf  "[List] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "Sparkle 应用列表 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
+    sparkle_app_paths=""
+    if [ "$(id -u)" -eq 0 ]; then
+        # root: 降权
+        targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 Sparkle 应用扫描 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        sparkle_app_paths=$(sudo -n -H -u "$targetUser" bash -lc 'find /Applications "$HOME"/Applications -maxdepth 2 -type d -name "*.app" -print0 | \
+          while IFS= read -r -d "" app; do
+            if [[ -d "$app/Contents/Frameworks/Sparkle.framework" ]] || [[ -d "$app/Contents/SharedFrameworks/Sparkle.framework" ]] || /usr/libexec/PlistBuddy -c "Print :SUFeedURL" "$app/Contents/Info.plist" >/dev/null 2>&1; then
+              echo "$app"
+            fi
+          done')
+    else
+        # 普通用户
+        echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 Sparkle 应用扫描 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        sparkle_app_paths=$(find /Applications "$HOME"/Applications -maxdepth 2 -type d -name "*.app" -print0 | \
+          while IFS= read -r -d '' app; do
+            if [[ -d "$app/Contents/Frameworks/Sparkle.framework" ]] || [[ -d "$app/Contents/SharedFrameworks/Sparkle.framework" ]] || /usr/libexec/PlistBuddy -c "Print :SUFeedURL" "$app/Contents/Info.plist" >/dev/null 2>&1; then
+              echo "$app"
+            fi
+          done)
+    fi
+
+    # 计算 Sparkle 应用数量
+    sparkle_app_count=$(echo "$sparkle_app_paths" | sed '/^\s*$/d' | wc -l | tr -d ' ')
+    echo -e "✅  APP 数量（ Sparkle ）：$sparkle_app_count  " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
+    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
+    # [Scan] 阶段：检测可更新的应用
+    printf  "\033[1;34m[Scan]\033[0m "
+    printf  "[Scan] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "Sparkle 扫描更新 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
+    sparkle_updates_list=()
+    if [ "$sparkle_app_count" -gt 0 ] && [ -n "$SPARKLE_CLI" ]; then
+        if [ "$(id -u)" -eq 0 ]; then
+            targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+            echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 Sparkle 更新检查 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            while IFS= read -r app; do
+                app_name="$(basename "$app")"
+                sudo -n -H -u "$targetUser" bash -lc "\"$SPARKLE_CLI\" --check-immediately --probe \"$app\"" >/dev/null 2>&1
+                rc=$?
+                if [ "$rc" -eq 0 ]; then
+                    sparkle_updates_list+=("$app")
+                    echo -e "✅  检测到新版本 : $app_name " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                fi
+            done <<< "$sparkle_app_paths"
+        else
+            echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 Sparkle 更新检查 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            while IFS= read -r app; do
+                app_name="$(basename "$app")"
+                "$SPARKLE_CLI" --check-immediately --probe "$app" >/dev/null 2>&1
+                rc=$?
+                if [ "$rc" -eq 0 ]; then
+                    sparkle_updates_list+=("$app")
+                    echo -e "✅  检测到新版本 : $app_name " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                fi
+            done <<< "$sparkle_app_paths"
+        fi
+    fi
+
+    # 如果没有检测到更新
+    if [ ${#sparkle_updates_list[@]} -eq 0 ]; then
+        echo -e "✓  未检测到新版本 ：Sparkle 应用 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    fi
+
+    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
+    # [Install] 阶段：下载安装更新
+    printf  "\033[1;34m[Install]\033[0m "
+    printf  "[Install] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "Sparkle 下载安装 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
+    if [ ${#sparkle_updates_list[@]} -gt 0 ] && [ -n "$SPARKLE_CLI" ]; then
+        for app in "${sparkle_updates_list[@]}"; do
+            app_name="$(basename "$app")"
+            if [ "$(id -u)" -eq 0 ]; then
+                targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+                echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 Sparkle 更新 : $app_name" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                sudo -n -H -u "$targetUser" bash -lc "\"$SPARKLE_CLI\" --check-immediately --allow-major-upgrades \"$app\"" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            else
+                echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 Sparkle 更新 : $app_name" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                "$SPARKLE_CLI" --check-immediately --allow-major-upgrades "$app" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            fi
+            echo -e "✅  更新成功 [Sparkle]   : $app_name" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        done
+    else
+        echo -e "✓  所有APP已经是 最新版本 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    fi
+
+    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
+    echo -e "\033[1;32m[OK] Sparkle 运行已完成  ✅ \033[0m"
+    echo -e "[OK]   Sparkle 运行已完成  ✅ " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+
+    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+fi
+
+# ----------------------------------
 # 开始执行：MAS
 # ----------------------------------
 
@@ -3221,7 +3444,7 @@ if [ "$(id -u)" -eq 0 ]; then
     mas_installed_apps=$(launchctl asuser "$uid" sudo -n -u "$currentUser" /opt/homebrew/bin/mas list)
     #mas_app_count=$(launchctl asuser "$uid" sudo -u "$currentUser" /opt/homebrew/bin/mas list | wc -l)
 else
-    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 mas list ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 mas list ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     # 非 root 直接运行 mas list
     mas_installed_apps=$(/opt/homebrew/bin/mas list)
     #mas_app_count=$(/opt/homebrew/bin/mas list | wc -l)
@@ -3251,7 +3474,7 @@ while [ $mas_attempt -le $MAS_MAX_RETRIES ]; do
         targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
         mas_output=$(sudo -n -H -u "$targetUser" /bin/bash -lc 'mas outdated' 2>/dev/null )
     else
-        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 mas outdated ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
+        echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 mas outdated ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
         mas_output=$( /bin/bash -lc 'mas outdated' 2>/dev/null )
     fi
     mas_status=$?   
@@ -3353,7 +3576,7 @@ if [ "$mas_success" = true ]; then
         targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
         mas_output=$(sudo -n -H -u "$targetUser" /bin/bash -lc 'mas upgrade' 2>/dev/null )
     else
-        echo -e "✓  当前用户'$USER'，为普通权限，直接运行 mas upgrade ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
+        echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 mas upgrade ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
         mas_output=$( /bin/bash -lc 'mas upgrade' 2>/dev/null )
     fi
     
@@ -3628,7 +3851,7 @@ if [[ $(id -u) -eq 0 ]]; then
 
 else
     #—— 非 root 环境：直接执行 ——#
-    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 topgrade 进行升级 ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 topgrade 进行升级 ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     topgrade --disable brew_formula --disable brew_cask --disable mas --disable system --disable macports --disable node --disable pnpm --disable powershell --disable tldr --disable tlmgr --disable ruby_gems --disable gem --cleanup 2>&1   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
@@ -3691,7 +3914,7 @@ if [ "$(id -u)" -eq 0 ]; then
 
 else
 
-    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 MacUpdater list ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 MacUpdater list ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     macupdater_app_count=$("/Applications/MacUpdater.app/Contents/Resources/macupdater_client" list | wc -l)
 
 fi
@@ -3733,7 +3956,7 @@ if [ "$(id -u)" -eq 0 ]; then
     
 else
 
-    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 MacUpdater scan ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 MacUpdater scan ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     MACUPDATER_COMMAND="/Applications/MacUpdater.app/Contents/Resources/macupdater_client scan"
     
 fi
@@ -3765,7 +3988,7 @@ if [ "$(id -u)" -eq 0 ]; then
 
 else
 
-    echo -e "✓  当前用户'$USER'，为普通权限，直接运行 MacUpdater update ... "          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 MacUpdater update ... "          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
    #"/Applications/MacUpdater.app/Contents/Resources/macupdater_client" update --force-quit-running-apps --force-major-version-update 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     macupdater_output=$(bash -c ' "/Applications/MacUpdater.app/Contents/Resources/macupdater_client" update --force-quit-running-apps --force-major-version-update' 2>&1)
     echo -e "$macupdater_output"                                                           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
