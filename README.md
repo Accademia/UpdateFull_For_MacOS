@@ -25,6 +25,8 @@
 被聚合的 更新软件包括：
   - HomeBrew	
     - 更新 Homebrew 下载的APP
+  - Sparkle
+    - 更新 Sparkle 下载的APP
   - Mas		
     - 更新 App Store 下载的APP
   - MacPorts	
