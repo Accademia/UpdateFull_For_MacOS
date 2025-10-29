@@ -86,7 +86,7 @@ fi
 
 # 设置 ：本脚本拒绝执行的时间范围
 STOP_TIME="03:00"       # 拒绝执行 的 结束时间（这个时间后任务正常运行）
-DURATION_MINUTES=10     # 拒绝执行结束前 的 时间长度（10分钟，意味着从 2:50 - 3:00 , 本脚本拒绝执行） 注意，单位：分钟（注意，单位不是秒！！！）
+DURATION_MINUTES=1     # 拒绝执行结束前 的 时间长度（10分钟，意味着从 2:50 - 3:00 , 本脚本拒绝执行） 注意，单位：分钟（注意，单位不是秒！！！）
 
 # 路径：保存日志文件的路径
 # ICLOUD_PATH="$HOME/Library/Mobile Documents/com~apple~CloudDocs"            # 获取 iCloud 云盘路径，
@@ -2017,13 +2017,18 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
 
     # 构造平台键：Apple Silicon 带前缀，Intel 不带前缀
     platform_key=""
-    if [ -n "$os_name" ]; then
-      if [ "$cpu_isa" = "arm64" ]; then
-        platform_key="${cpu_isa}_${os_name}"   # 例如 "arm64_sonoma"
-      else
-        platform_key="$os_name"            # 例如 "sonoma"
-      fi
-    fi
+        if [ -n "$os_name" ]; then
+          if [ "$cpu_isa" = "arm64" ]; then
+            platform_key="${cpu_isa}_${os_name}"   # 例如 "arm64_sonoma"
+          else
+            platform_key="$os_name"            # 例如 "sonoma"
+          fi
+        fi
+        
+        # 为保证并行下载环境获取正确的平台键，需将 platform_key 导出到环境中。
+        # 否则在非 root 用户并行执行 fetch_brew_formula 时，platform_key 会丢失，
+        # 导致 brew_expected_sha 使用错误的 fallback 值，从而出现校验码不匹配的警告。
+        export platform_key
 
 
 
@@ -3753,16 +3758,44 @@ else
     printf "[Migrate] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null 
     echo "MacPorts 扫描迁移 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
+    MIGRATE_LOG="$(__get_migrate_log_file)"
+    /bin/mkdir -p "${MIGRATE_LOG%/*}" 2>/dev/null || true
+    # 在写入之前先清空迁移日志，确保每次执行使用新的日志内容
+    : > "$MIGRATE_LOG"
+
     if macports_should_migrate; then
         echo -e "✓  使用Root权限(sudo命令), 运行 port migrate ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        MIGRATE_LOG="$(__get_migrate_log_file)"
-        /bin/mkdir -p "${MIGRATE_LOG%/*}" 2>/dev/null || true
-        if yes | sudo $SUDO_N_FLAG /opt/local/bin/port -q migrate 2>&1 \
-            | /usr/bin/tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$MIGRATE_LOG" > /dev/null; then
+
+        # 执行迁移并捕获各阶段的退出码。使用子 shell 保存各个子进程退出状态
+        {
+            # 使用 -d -v -N 以便生成详细日志到 MIGRATE_LOG。只写入 MIGRATE_LOG，避免普通日志膨胀
+           #yes | sudo $SUDO_N_FLAG /opt/local/bin/port -d -v -N migrate 2>&1  | /usr/bin/tee -a "$MIGRATE_LOG" > /dev/null
+            yes | sudo $SUDO_N_FLAG /opt/local/bin/port -N migrate 2>&1  | /usr/bin/tee -a "$MIGRATE_LOG" > /dev/null
+            # 捕获每个子进程的退出码，使用默认值防止未定义导致 unbound variable
+            __yes_rc=${PIPESTATUS[0]-}
+            __port_rc=${PIPESTATUS[1]-}
+            __tee_rc=${PIPESTATUS[2]-}
+        } || true
+        # 调试迁移管道返回值，可设置环境变量 DEBUG_MIGRATE=1
+        if [ -n "${DEBUG_MIGRATE:-}" ]; then
+            echo "    [DEBUG] yes_rc=${__yes_rc} port_rc=${__port_rc} tee_rc=${__tee_rc}" \
+                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        fi
+        # 若 port 命令返回 0 或 1，则视为迁移成功（非零但无明显错误）
+        if [ "${__port_rc}" = "0" ] || [ "${__port_rc}" = "1" ]; then
             macports_mark_migrated
             echo -e "✓ 迁移完成" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         else
-            echo -e "❌ 迁移失败（请检查日志）" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_ERROR_FILE"
+            # 若日志中含有 Migration finished，则视为成功
+            if grep -q "Migration finished" "$MIGRATE_LOG" 2>/dev/null; then
+                macports_mark_migrated
+                echo -e "✓ 迁移完成（日志标识完成）" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            else
+                # 其他退出码视为失败，提示用户查看日志；MIGRATE_LOG 已保证存在
+                log_path="${MIGRATE_LOG:-$(__get_migrate_log_file)}"
+                echo -e "❌ 迁移失败 ｜ 请检查日志：${log_path}" \
+                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_ERROR_FILE"
+            fi
         fi
     else
         echo -e "✓ 无需迁移（已处于当前 Darwin/架构/base）" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
