@@ -1,9 +1,9 @@
 
 # 功能与目的：
 
- 1. 实现 一键更新 所有第三方 MacOS APP 
+ 1. 实现 一键更新 ，MacOS 上 ，所有第三方 Mac APP 
  
- 2. 实现 无人值守 更新 所有第三方 MacOSAPP 
+ 2. 实现 无人值守 更新 ，MacOS 上 ，所有第三方 Mac APP 
     - 配合 Lingon 和 Generate_Homebrew_Sudoers ： https://github.com/Accademia/Generate_Homebrew_Sudoers
 
 
