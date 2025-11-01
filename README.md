@@ -111,31 +111,23 @@
 .
 
 
-# 出现Error的应对
+# 可管理的应用太少，怎么办？
 
-如果出现如下错误：
+ - 可以将本地已经安装的，迁移到homebrew安装包。迁移命令：
+    ~~~
+    ./usercmd_migrate_macapp_to_homebrew
+    ~~~
+    
+ -  生成如下文件
+    ~~~
+    ./brew_install_commands.txt	# ✅ 此文件为 可以迁移的软件列表
+    ./non_brew_non_mas_apps.txt	
+    ./ambiguous_matches.txt
+    ~~~
 
-```
-/opt/homebrew/etc/bash_completion.d/ipfs: line 5526: complete: nosort: invalid option name
-/opt/homebrew/etc/bash_completion.d/mycli: line 25: complete: nosort: invalid option name
-/opt/homebrew/etc/bash_completion.d/wg: line 99: complete: nosort: invalid option name
-/opt/homebrew/etc/bash_completion.d/wg-quick: line 43: complete: nosort: invalid option name
-```
-
-则执行此脚本解决问题：
-
-```
-uesrcmd_fix_nosort
-```
-
-在执行后，使用如下命令进行验证：   
-
-```
-grep -R "nosort" /opt/homebrew/etc/bash_completion.d
-```
+    brew_install_commands.txt 内含了所有迁移所需的命令，直接多行一起整体拷贝，粘贴到命令行执行。此过程会触发多次密码请求。
 
 .
-
 
 # 如何避免密码请求？
 
@@ -244,6 +236,33 @@ grep -R "nosort" /opt/homebrew/etc/bash_completion.d
    ```
    root            ALL = (ALL) ALL
    ```
+
+.
+
+
+
+# 出现Error的应对
+
+如果出现如下错误：
+
+```
+/opt/homebrew/etc/bash_completion.d/ipfs: line 5526: complete: nosort: invalid option name
+/opt/homebrew/etc/bash_completion.d/mycli: line 25: complete: nosort: invalid option name
+/opt/homebrew/etc/bash_completion.d/wg: line 99: complete: nosort: invalid option name
+/opt/homebrew/etc/bash_completion.d/wg-quick: line 43: complete: nosort: invalid option name
+```
+
+则执行此脚本解决问题：
+
+```
+uesrcmd_fix_nosort
+```
+
+在执行后，使用如下命令进行验证：   
+
+```
+grep -R "nosort" /opt/homebrew/etc/bash_completion.d
+```
 
 
 

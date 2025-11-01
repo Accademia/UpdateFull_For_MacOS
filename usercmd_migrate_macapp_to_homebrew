@@ -1,0 +1,922 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+usercmd_migrate_macapp_to_homebrew
+----------------------------------
+把本机“非 MAS、非 Homebrew 安装”的 .app 迁移到通过 Homebrew cask 安装（仅给出建议命令，默认不自动重装）。
+
+核心策略
+- 以 CFBundleIdentifier 作为唯一主键，避免依赖可被用户修改的 .app 文件名。
+- 已安装 Homebrew cask：扫描 Caskroom 解析 Info.plist，构建 本机权威 映射（bundle_id -> cask token）。
+- 候选 cask 二次核实：联网读取 Homebrew 官方 API（formulae.brew.sh）单 cask 元数据，匹配 uninstall.quit/pkgutil/bundle_id 与本地 bundle id。
+- 冲突检测：尊重 conflicts_with，已安装冲突项时不输出建议。
+- 默认并行、稳健降级：可脱网运行但将降低置信度、减少建议，杜绝“强行猜测”的误报。
+
+输出文件
+- non_brew_non_mas_apps.txt
+- brew_install_commands.txt
+- ambiguous_matches.txt
+"""
+
+from __future__ import annotations
+import concurrent.futures as futures
+import functools
+import json
+import math
+import os
+import plistlib
+import re
+import shutil
+import subprocess
+import sys
+import time
+from pathlib import Path
+from urllib.request import urlopen, Request
+from urllib.error import URLError, HTTPError
+from typing import Dict, List, Optional, Set, Tuple
+
+# ----------------------------- 配置 -----------------------------
+API_BASE = "https://formulae.brew.sh/api/cask"
+CASKROOM_DIRS = [Path("/opt/homebrew/Caskroom"), Path("/usr/local/Caskroom")]
+# 枚举 .app 的基准目录。
+# 仅扫描 /Applications 顶层目录，不递归子文件夹，也不扫描 ~/Applications 等。
+APPLICATION_DIRS = [
+    Path("/Applications"),
+]
+# 不再遍历 /Users 或其他目录，避免枚举缓存和占位文件夹；如需额外目录可按需添加。
+EXTRA_SEARCH_DIRS: List[Path] = []
+# 并发度：提高并行度，尽可能利用多核 CPU
+DEFAULT_JOBS = max(4, (os.cpu_count() or 4) * 8)
+
+# 当前脚本版本号，方便用户确认是否为最新版
+SCRIPT_VERSION = "1.0.5-postfix"
+
+# 允许输出的最大候选数（避免网络过多）
+# 默认上限较高，以免候选列表过早截断导致漏检（例如搜索结果中目标 token 排名靠后）。
+MAX_CANDIDATES_PER_APP = 15
+
+# 相似度阈值（当没有 bundle id 明确命中时）
+NAME_SIM_THRESHOLD_STRICT = 0.90  # 高置信度（直接输出建议）
+NAME_SIM_THRESHOLD_LOOSE  = 0.80  # 较接近（进入 ambiguous 列表）
+
+# 仅作为“最后兜底”的映射（极少数著名异名）
+FALLBACK_BID_TO_TOKEN = {
+    # 例：AltTab 与 alt-tab
+    # "com.lwouis.alt-tab-macos": "alt-tab",
+    # ABBYY FineReader
+    # "com.abbyy.FineReaderPDF": "abbyy-finereader-pdf",
+    # Stash
+    # "com.StashApp.Stash": "stash",
+}
+
+# 永不迁移的 bundle id 前缀（系统或特殊）
+NEVER_MIGRATE_PREFIXES = (
+    "com.apple.",
+    "com.microsoft.",  # 交给官方安装器与 MAU 维护
+)
+
+# 某些 cask token 名称虽然与本地应用同名或供应商类似，但属于不同的软件或用途，容易误报。列在此处的 cask
+# 将不会被自动推荐，可在 ambiguous 列表中人工确认。
+BLOCKLIST_TOKENS = {
+    "adguard-vpn",  # AdGuard VPN 与 AdGuard 本体用途不同
+    "cemu",         # CEmu / Cemu 名称冲突，可能不同供应商
+    "gemini",       # MacPaw Gemini 与 Google Gemini 名称冲突
+    "focus",        # Focus 与 FocuSee 名称冲突
+    "messenger",    # Messenger 与 Mesen 名称冲突
+}
+
+# ----------------------------- 工具函数 -----------------------------
+def print_step(msg: str) -> None:
+    print(msg, flush=True)
+
+def run(cmd: List[str], check=True, capture=True, text=True, timeout=None) -> subprocess.CompletedProcess:
+    return subprocess.run(cmd, check=check, capture_output=capture, text=text, timeout=timeout)
+
+def which(name: str) -> Optional[str]:
+    p = shutil.which(name)
+    return p
+
+# 检查某个 cask token 是否存在于 Homebrew 仓库。
+# 通过调用 `brew search --casks` 判断返回列表中是否包含该 token。
+def brew_cask_exists(token: str) -> bool:
+    """
+    检查指定 cask token 是否存在于本地可用的 Homebrew 仓库。
+
+    优先使用 `brew info --cask --json=v2 token` 判断，如果失败或无输出，再回退到
+    `brew search --casks token`。这样在网络受限或仓库信息缺失时也能较可靠地判断
+    某个 token 是否存在。
+    """
+    if not which("brew"):
+        return False
+    # 首先尝试 `brew info --cask --json=v2`
+    try:
+        cp = run(["brew", "info", "--cask", "--json=v2", token], check=False)
+        if cp.returncode == 0 and cp.stdout and cp.stdout.strip():
+            return True
+    except Exception:
+        pass
+    # 若 info 失败或无输出，则使用 search 进一步确认
+    try:
+        cp = run(["brew", "search", "--casks", token], check=False)
+        # 每行可能包含一个 cask token；取第一列
+        for line in cp.stdout.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            # 分割出 token 名称（忽略末尾勾选标记或描述）
+            t = line.split()[0]
+            if t == token:
+                return True
+    except Exception:
+        pass
+    return False
+
+def safe_read_info_plist(app_path: Path) -> Dict:
+    """读取 Contents/Info.plist，失败则返回 {}"""
+    info = app_path / "Contents" / "Info.plist"
+    try:
+        with open(info, "rb") as f:
+            return plistlib.load(f) or {}
+    except Exception:
+        return {}
+
+def get_bundle_meta(app_path: Path) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    """返回 (bundle_id, bundle_name, display_name)"""
+    info = safe_read_info_plist(app_path)
+    bid = info.get("CFBundleIdentifier")
+    name = info.get("CFBundleName")
+    disp = info.get("CFBundleDisplayName") or name
+    return (bid, name, disp)
+
+def has_mas_receipt(app_path: Path) -> bool:
+    receipt = app_path / "Contents" / "_MASReceipt" / "receipt"
+    return receipt.exists()
+
+def is_app_dir(p: Path) -> bool:
+    return p.suffix.lower() == ".app" and p.is_dir()
+
+def normalize_name(s: str) -> str:
+    s = s.lower()
+    s = re.sub(r"[\s_+\-\.]+", "", s)
+    s = re.sub(r"[^\w]", "", s)
+    return s
+
+# 补充函数：将名称 slug 化为类似 Homebrew cask token 的形式
+def slugify_name(s: str) -> str:
+    """
+    将应用名称规范化为 Homebrew cask token：
+    - 转小写；
+    - 非字母数字字符用连字符代替；
+    - 连续连字符合并；
+    - 去除首尾连字符。
+
+    例如："4K Image Compressor" -> "4k-image-compressor"。
+    """
+    if not s:
+        return ""
+    s = s.lower()
+    import re as _re
+    s = _re.sub(r"[^a-z0-9]+", "-", s)
+    s = _re.sub(r"-+", "-", s)
+    return s.strip("-")
+
+def jaro_winkler(s1: str, s2: str) -> float:
+    # 简洁实现，足够用于相似度排序（避免引第三方库）
+    s1, s2 = s1 or "", s2 or ""
+    if not s1 and not s2:
+        return 1.0
+    if not s1 or not s2:
+        return 0.0
+    s1, s2 = s1.lower(), s2.lower()
+    max_dist = int(max(len(s1), len(s2))/2) - 1
+    match1 = [False]*len(s1)
+    match2 = [False]*len(s2)
+    m = 0
+    t = 0
+    # matches
+    for i,ch in enumerate(s1):
+        start = max(0, i-max_dist)
+        end   = min(i+max_dist+1, len(s2))
+        for j in range(start, end):
+            if not match2[j] and s2[j]==ch:
+                match1[i]=True; match2[j]=True; m+=1
+                break
+    if m==0: return 0.0
+    # transpositions
+    k=0
+    for i in range(len(s1)):
+        if match1[i]:
+            while not match2[k]: k+=1
+            if s1[i]!=s2[k]: t+=1
+            k+=1
+    t/=2
+    jw = (m/len(s1)+m/len(s2)+(m-t)/m)/3
+    # winkler prefix
+    l=0
+    for i in range(min(4, len(s1), len(s2))):
+        if s1[i]==s2[i]: l+=1
+        else: break
+    return jw + 0.1*l*(1-jw)
+
+def http_get_json(url: str, timeout: float = 8.0) -> Optional[Dict]:
+    try:
+        req = Request(url, headers={"User-Agent": "migrate-macapps/1.0"})
+        with urlopen(req, timeout=timeout) as resp:
+            if resp.status == 200:
+                return json.loads(resp.read().decode("utf-8"))
+    except (URLError, HTTPError, TimeoutError, json.JSONDecodeError):
+        return None
+    return None
+
+def guess_vendor_from_bid(bid: str) -> str:
+    # com.adobe.Photoshop -> adobe
+    if not bid or "." not in bid: return ""
+    parts = bid.split(".")
+    if len(parts)>=2:
+        return parts[1]
+    return ""
+
+def is_never_migrate(bid: Optional[str]) -> bool:
+    if not bid:
+        return False
+    return any(bid.startswith(p) for p in NEVER_MIGRATE_PREFIXES)
+
+# ----------------------------- 数据结构 -----------------------------
+class LocalApp:
+    __slots__ = ("path", "bid", "name", "disp", "is_mas")
+    def __init__(self, path: Path, bid: Optional[str], name: Optional[str], disp: Optional[str], is_mas: bool):
+        self.path = path
+        self.bid  = bid
+        self.name = name or ""
+        self.disp = disp or self.name
+        self.is_mas = is_mas
+
+class CaskMeta:
+    __slots__ = ("token", "names", "app_artifacts", "bundle_ids", "pkg_ids", "conflicts_with", "homepage", "artifact_names")
+    def __init__(self, token: str):
+        self.token = token
+        self.names: List[str] = []
+        self.app_artifacts: List[str] = []
+        self.bundle_ids: Set[str] = set()
+        self.pkg_ids: Set[str] = set()
+        self.conflicts_with: Set[str] = set()
+        self.homepage: str = ""
+        # 预处理后的 artifact 名称（不含扩展名），用于精确匹配
+        self.artifact_names: List[str] = []
+        # 额外记录每个 app_artifact 的简化名称，以便后续做精确匹配
+        # (strip 掉扩展名及多余字符)
+
+# ----------------------------- 枚举本机已安装应用 -----------------------------
+def enumerate_all_apps() -> List[Path]:
+    """枚举本机安装应用：仅扫描 /Applications 顶层的 .app，并过滤掉名称含 helper 的辅助程序。"""
+    apps: Set[Path] = set()
+    for base in APPLICATION_DIRS:
+        if not base.exists():
+            continue
+        try:
+            for child in base.iterdir():
+                if child.is_dir() and child.suffix.lower() == ".app":
+                    stem = child.stem.lower()
+                    # 排除名称中含有 helper 的辅助程序
+                    if "helper" in stem:
+                        continue
+                    apps.add(child)
+        except Exception:
+            pass
+    # 不扫描 EXTRA_SEARCH_DIRS，也不使用 Spotlight
+    return sorted(apps)
+
+def build_local_app_index(jobs: int) -> List[LocalApp]:
+    apps = enumerate_all_apps()
+    out: List[LocalApp] = []
+    def worker(p: Path) -> Optional[LocalApp]:
+        if not is_app_dir(p): return None
+        bid, name, disp = get_bundle_meta(p)
+        mas = has_mas_receipt(p)
+        return LocalApp(p, bid, name, disp, mas)
+    with futures.ThreadPoolExecutor(max_workers=jobs) as ex:
+        for r in ex.map(worker, apps):
+            if r: out.append(r)
+    return out
+
+# ----------------------------- 已安装 Homebrew cask -> bundle id 映射 -----------------------------
+def collect_installed_cask_tokens() -> Set[str]:
+    tokens: Set[str] = set()
+    # brew list --cask -1
+    if which("brew"):
+        try:
+            cp = run(["brew", "list", "--cask", "-1"], check=False)
+            for line in cp.stdout.splitlines():
+                t = line.strip()
+                if t: tokens.add(t)
+        except Exception:
+            pass
+    return tokens
+
+def bundle_ids_from_caskroom(token: str) -> Set[str]:
+    bids: Set[str] = set()
+    for base in CASKROOM_DIRS:
+        cdir = base / token
+        if not cdir.exists():
+            continue
+        # 版本目录下寻找 .app
+        for version_dir in sorted(cdir.iterdir()):
+            if not version_dir.is_dir(): continue
+            for app in version_dir.rglob("*.app"):
+                info = safe_read_info_plist(app)
+                bid = info.get("CFBundleIdentifier")
+                if bid: bids.add(bid)
+    return bids
+
+def build_installed_cask_bid_index(tokens: Set[str], jobs: int) -> Tuple[Dict[str, str], Dict[str, Set[str]]]:
+    """返回 (bundle_id -> token, token -> set(bundle_id))"""
+    bid2token: Dict[str, str] = {}
+    token2bids: Dict[str, Set[str]] = {}
+    def worker(tk: str) -> Tuple[str, Set[str]]:
+        return tk, bundle_ids_from_caskroom(tk)
+    with futures.ThreadPoolExecutor(max_workers=jobs) as ex:
+        for tk, bids in ex.map(worker, sorted(tokens)):
+            token2bids[tk] = bids
+            for b in bids:
+                bid2token.setdefault(b, tk)
+    return bid2token, token2bids
+
+# ----------------------------- 远程读取 cask 元数据并抽取 bundle ids / 冲突 -----------------------------
+def fetch_cask_meta(token: str, net_ok: bool) -> Optional[CaskMeta]:
+    meta = CaskMeta(token)
+    j: Optional[Dict] = None
+    # 首先尝试从网络获取 JSON
+    if net_ok:
+        j = http_get_json(f"{API_BASE}/{token}.json")
+
+    # 如果网络不可用或请求失败，尝试使用本地 brew 提供的 JSON 数据
+    if not j and which("brew"):
+        try:
+            cp = run(["brew", "info", "--cask", "--json=v2", token], check=False)
+            if cp.stdout:
+                # brew info 返回的顶层通常是一个列表或包含 "casks" 键的字典
+                import json as _json
+                data = _json.loads(cp.stdout)
+                item = None
+                if isinstance(data, dict):
+                    arr = data.get("casks")
+                    if isinstance(arr, list) and arr:
+                        item = arr[0]
+                elif isinstance(data, list) and data:
+                    item = data[0]
+                if item and isinstance(item, dict):
+                    # 构建一个简化的类似 API 的 JSON 对象，仅包含我们需要的字段
+                    j = {
+                        "name": item.get("name") or [],
+                        "homepage": item.get("homepage") or "",
+                        "artifacts": item.get("artifacts") or [],
+                        "uninstall": item.get("uninstall") or {},
+                        "conflicts_with": item.get("conflicts_with") or {},
+                    }
+        except Exception:
+            pass
+
+    # 若仍无数据，返回 None
+    if not j:
+        return None
+
+    # names
+    names = j.get("name") or []
+    meta.names = [str(x) for x in names if isinstance(x, str)]
+    meta.homepage = j.get("homepage") or ""
+
+    # artifacts -> "app": ["XXX.app"]
+    for art in j.get("artifacts") or []:
+        if isinstance(art, dict) and "app" in art:
+            apps = art["app"]
+            if isinstance(apps, list):
+                for a in apps:
+                    if isinstance(a, str):
+                        meta.app_artifacts.append(a)
+            elif isinstance(apps, str):
+                meta.app_artifacts.append(apps)
+
+    # 预处理 artifact 名称：去掉路径与后缀，仅保留文件名 stem
+    meta.artifact_names = []
+    for art in meta.app_artifacts:
+        # 有些 artifact 可能带有选项，如 ['AppName.app', {"target":...}]，这里只取字符串部分
+        if isinstance(art, str):
+            # 去掉可能包含“/”的路径以及扩展名
+            try:
+                name = Path(art).name
+            except Exception:
+                name = art
+            if name.lower().endswith(".app"):
+                name_noext = name[:-4]
+            else:
+                name_noext = name
+            if name_noext:
+                meta.artifact_names.append(name_noext)
+
+    # uninstall.quit / bundle_id
+    uninstall = j.get("uninstall") or {}
+    # 多种 schema 可能出现字符串或数组
+    def _as_list(v):
+        if isinstance(v, list): return [str(x) for x in v]
+        if isinstance(v, str):  return [v]
+        return []
+    for key in ("quit", "signal", "kext", "launchctl", "bundle_id"):
+        for s in _as_list(uninstall.get(key)):
+            if isinstance(s, str) and s.startswith("com."):
+                meta.bundle_ids.add(s)
+
+    # pkgutil 常是安装包标识，不等同 bundle id，但可以拿前缀做供应商佐证
+    for s in _as_list(uninstall.get("pkgutil")):
+        if isinstance(s, str) and "." in s:
+            meta.pkg_ids.add(s)
+
+    # 解析 zap 清理规则中的路径，提取潜在的 bundle id 前缀
+    # cask 的 JSON 结构中 artifacts 可能包含一个 'zap' 键，其值是列表，
+    # 每个元素可能含有 'trash' 数组，里面的路径里经常带有 "com.xxx" 或 "net.xxx" 等 bundle id 前缀。
+    for art in j.get("artifacts") or []:
+        if isinstance(art, dict) and "zap" in art:
+            zap_items = art.get("zap")
+            # zap_items 可能是列表，其中每个元素都是字典；我们只关注其中的 'trash' 列表
+            if isinstance(zap_items, list):
+                for item in zap_items:
+                    if isinstance(item, dict):
+                        trash = item.get("trash")
+                        if isinstance(trash, list):
+                            for path in trash:
+                                if not isinstance(path, str):
+                                    continue
+                                # 用正则提取形如 "net.blip.macos" 或 "com.google.chrome" 的段落
+                                import re as _re
+                                for match in _re.findall(r"[A-Za-z0-9]+(?:\.[A-Za-z0-9]+)+", path):
+                                    # 过滤过短或明显不是 bundle id 的片段（少于2个点）
+                                    if match.count(".") >= 1:
+                                        meta.bundle_ids.add(match)
+
+    # conflicts_with
+    cf = j.get("conflicts_with") or {}
+    for k in ("cask", "formula"):
+        v = cf.get(k)
+        if isinstance(v, list):
+            for t in v:
+                if isinstance(t, str): meta.conflicts_with.add(t)
+
+    return meta
+
+# ----------------------------- 候选匹配与打分 -----------------------------
+def score_candidate(app: LocalApp, meta: CaskMeta, installed_tokens: Set[str]) -> Tuple[float, Dict]:
+    """返回 (score, reasons)；高分 = 高置信度"""
+    reasons = {}
+    score = 0.0
+    bid = (app.bid or "").strip()
+    app_norms = {normalize_name(app.disp), normalize_name(app.name)}
+    app_norms.discard("")
+
+    # 1) Bundle ID 强一致
+    if bid and bid in meta.bundle_ids:
+        score += 100.0
+        reasons["bundle_id_match"] = True
+
+    # Bundle ID 前缀匹配：某些 cask 的 bundle id 仅提供一部分（例如 net.blip.macos vs net.blip.macos.share）
+    if bid and not reasons.get("bundle_id_match") and meta.bundle_ids:
+        # 提取本地和远端 bundle id 的前两段（如 com.adguard）
+        bid_parts = bid.split(".")
+        local_prefix = ".".join(bid_parts[:2]) if len(bid_parts) >= 2 else ""
+        for b in meta.bundle_ids:
+            if not isinstance(b, str):
+                continue
+            b_parts = b.split(".")
+            remote_prefix = ".".join(b_parts[:2]) if len(b_parts) >= 2 else ""
+            # 前缀完全一致，且完整串有前后包含关系
+            if local_prefix and remote_prefix and local_prefix == remote_prefix and (bid.startswith(b) or b.startswith(bid)):
+                reasons["bundle_id_prefix"] = True
+                break
+
+    # 记录该 cask 是否提供了 bundle id 信息（用于后续置信度判定）
+    reasons["has_bundle_id"] = bool(meta.bundle_ids)
+    # 记录 cask 的 token 的规范化形式，供后续比对文件名
+    if meta.token:
+        reasons["token_norm"] = normalize_name(meta.token)
+
+    # 2) 名称近似（CFBundleName / DisplayName vs app_artifacts/names/token）
+    cands = set(meta.artifact_names + meta.names + [meta.token])
+    cands_norm = [normalize_name(x) for x in cands if x]
+    best_sim = 0.0
+    for an in app_norms:
+        for cn in cands_norm:
+            if an and cn:
+                best_sim = max(best_sim, jaro_winkler(an, cn))
+    reasons["name_similarity"] = round(best_sim, 4)
+    # 始终提供较低的权重，避免误报
+    score += best_sim * 30.0  # 名称相似度最多贡献 30 分
+
+    # 3) artifact 名称匹配：若 brew cask 的 app 名称与本地 app 的名称极度相似（如同一名字），给予更高得分
+    best_artifact_sim = 0.0
+    for art in meta.artifact_names:
+        art_norm = normalize_name(art)
+        for an in app_norms:
+            if an and art_norm:
+                best_artifact_sim = max(best_artifact_sim, jaro_winkler(an, art_norm))
+    if best_artifact_sim > 0:
+        reasons["artifact_similarity"] = round(best_artifact_sim, 4)
+        # 高度相似时权重更高（例如 0.95 相似 * 50 -> 47.5 分）
+        score += best_artifact_sim * 50.0
+
+    # 4) 供应商前缀（bundle id 的二段前缀）与 homepage 域名/ pkgutil 前缀的匹配
+    vendor = guess_vendor_from_bid(bid)
+    vendor_points = 0.0
+    if vendor:
+        # 官网域名包含供应商
+        if meta.homepage and re.search(rf"\b{re.escape(vendor)}\b", meta.homepage, re.I):
+            vendor_points += 8.0
+        # pkgutil 前缀包含供应商
+        for pkg in meta.pkg_ids:
+            if f".{vendor}." in pkg:
+                vendor_points += 6.0
+                break
+        # cask token 或名称包含供应商（例如 blip.app -> blip）
+        vendor_norm = normalize_name(vendor)
+        for name_candidate in [meta.token] + meta.names:
+            if not isinstance(name_candidate, str):
+                continue
+            # 直接词边界匹配
+            if re.search(rf"\b{re.escape(vendor)}\b", name_candidate, re.I):
+                vendor_points += 6.0
+                break
+            # 使用规范化名称匹配（去除连字符等）
+            candidate_norm = normalize_name(name_candidate)
+            if vendor_norm and candidate_norm and (vendor_norm == candidate_norm or vendor_norm in candidate_norm or candidate_norm in vendor_norm):
+                vendor_points += 6.0
+                break
+    # 降低供应商权重，避免供应商前缀相同导致误报
+    if vendor_points:
+        score += vendor_points * 0.5  # 供应商匹配最多贡献 7 分
+        reasons["vendor_ok"] = True
+
+    # 5) 冲突惩罚
+    if meta.conflicts_with & installed_tokens:
+        score -= 80.0
+        reasons["conflicts_with_installed"] = True
+
+    return (score, reasons)
+
+# ----------------------------- 主流程 -----------------------------
+def main():
+    os.environ.setdefault("LC_ALL", "C.UTF-8")
+    os.environ.setdefault("LANG", "C.UTF-8")
+    jobs = int(os.environ.get("M2H_JOBS") or DEFAULT_JOBS)
+    net_ok = (os.environ.get("M2H_NO_NET") != "1")
+
+    # 输出脚本版本号，便于用户确认是否为最新版本
+    print_step(f"脚本版本：{SCRIPT_VERSION}")
+
+    # 1) 强制更新 Spotlight（不依赖其结果，失败忽略）
+    print_step("正在强制更新 Spotlight 索引...")
+    if which("mdutil"):
+        try:
+            run(["mdutil", "-E", "/"], check=False, capture=True)
+        except Exception:
+            pass
+
+    # 2) 枚举应用
+    print_step("正在查找所有已安装的应用程序...")
+    apps = build_local_app_index(jobs=jobs)
+
+    # 3) 系统应用信息（仅用于排除）
+    print_step("正在获取系统应用信息...")
+    sys_apps_bids: Set[str] = set()
+    for a in apps:
+        if a.bid and (str(a.path).startswith("/System/") or a.bid.startswith("com.apple.")):
+            sys_apps_bids.add(a.bid)
+
+    # 4) MAS 列表（冗余校验）
+    print_step("正在获取通过 Mac App Store 安装的应用列表...")
+    mas_ids: Set[str] = set()
+    if which("mas"):
+        try:
+            cp = run(["mas", "list"], check=False)
+            for line in cp.stdout.splitlines():
+                # 形如：123456789 AppName (1.2.3)
+                # 只能拿到名字；仍以 _MASReceipt 为准，这里仅做计数参考
+                pass
+        except Exception:
+            pass
+
+    # 5) Homebrew 已装 cask
+    print_step("正在查找通过 Homebrew 安装的应用程序...")
+    installed_tokens = collect_installed_cask_tokens()
+
+    # 6) 基于 Caskroom 解析“本机权威” bundle_id 映射
+    print_step(f"正在并行获取 {len(installed_tokens):6d} 个已安装 cask 的详细信息...")
+    bid2token, token2bids = build_installed_cask_bid_index(installed_tokens, jobs=jobs)
+
+    # 7) 统计分类：系统 / MAS / Brew / 其他
+    brew_apps: List[LocalApp] = []
+    mas_apps: List[LocalApp]  = []
+    other_apps: List[LocalApp] = []
+    for a in apps:
+        if not a.bid:
+            # 无 bundle id 的小工具、辅助程序：暂归入 other
+            other_apps.append(a)
+            continue
+        if is_never_migrate(a.bid) or a.bid in sys_apps_bids:
+            # 系统/内建，不纳入迁移
+            continue
+        if a.is_mas:
+            mas_apps.append(a)
+        elif a.bid in bid2token:
+            brew_apps.append(a)
+        else:
+            other_apps.append(a)
+
+    # 8) 为待迁移集合做“二次核实”并给出迁移建议
+    #    - 首先尝试：FALLBACK_BID_TO_TOKEN（极少数已知异名）
+    #    - 再：基于 cask API 的名字/artifact 名称检索（不依赖 .app 文件名）
+    # 远端索引：为了控制网络流量，这里“按需”请求单 cask 的 JSON
+    def pick_candidates(app: LocalApp) -> List[str]:
+        # 强规则：手工兜底
+        if app.bid in FALLBACK_BID_TO_TOKEN:
+            return [FALLBACK_BID_TO_TOKEN[app.bid]]
+
+        # 启发式：用 CFBundleName、显示名以及供应商作为查询词调用 `brew search --casks`，
+        # 返回的 token 用作候选，但仅供后续筛选，不直接决定结果。
+        tokens: Set[str] = set()
+        if which("brew"):
+            query_terms = set([
+                (app.disp or ""),
+                (app.name or ""),
+                guess_vendor_from_bid(app.bid or ""),
+            ])
+            # 过滤空字符串和过短查询词
+            query_terms = {q for q in query_terms if q and len(q) >= 2}
+            for q in sorted(query_terms):
+                try:
+                    cp = run(["brew", "search", "--casks", q], check=False)
+                    for line in cp.stdout.splitlines():
+                        t = line.strip()
+                        if t and re.fullmatch(r"[a-z0-9][a-z0-9\-\+\.]*", t):
+                            tokens.add(t)
+                            if len(tokens) >= MAX_CANDIDATES_PER_APP:
+                                break
+                except Exception:
+                    pass
+                if len(tokens) >= MAX_CANDIDATES_PER_APP:
+                    break
+        # 始终将文件名的规范化形式加入候选，作为最后兜底
+        stem = normalize_name(app.path.stem)
+        slug = slugify_name(app.path.stem)
+        # 若 slug 非空，则使用 slug 形式作为候选；仅当 slug 与 stem 相同（无连字符）时才加入 stem，避免误将
+        # hyphen 去掉后的形态作为独立 token（例如 "GOG Galaxy" -> "gog-galaxy"，不再加入 "goggalaxy"）。
+        if slug and re.fullmatch(r"[a-z0-9][a-z0-9\-\+\.]*", slug):
+            tokens.add(slug)
+            if slug == stem:
+                tokens.add(stem)
+        else:
+            # slug 为空时，退回使用 stem
+            if re.fullmatch(r"[a-z0-9][a-z0-9\-\+\.]*", stem):
+                tokens.add(stem)
+        # 若 CFBundleName 或显示名存在，也将其 slug 化加入候选
+        for maybe_name in (app.disp, app.name):
+            if maybe_name:
+                s2 = slugify_name(maybe_name)
+                if s2 and re.fullmatch(r"[a-z0-9][a-z0-9\-\+\.]*", s2):
+                    tokens.add(s2)
+        # 对于不以 "-app" 结尾的 slug，额外加入 "-app" 后缀的变体，如 "ollama" -> "ollama-app"
+        if slug:
+            app_variant = f"{slug}-app"
+            if re.fullmatch(r"[a-z0-9][a-z0-9\-\+\.]*", app_variant):
+                # 仅当该 cask 在 Homebrew 中存在时才添加，如 "ollama-app"
+                if brew_cask_exists(app_variant):
+                    tokens.add(app_variant)
+        return sorted(tokens)
+
+    # 校验候选（bundle id/冲突/相似度）
+    recommendations: List[Tuple[str, Path]] = []  # (cask_token, app_path)
+    ambiguous: List[Tuple[str, Path, Dict]] = []  # (cask_token, app_path, reasons)
+
+    def verify_one(app: LocalApp):
+        # 跳过缺少关键信息者
+        if not app.bid and not app.disp and not app.name:
+            return
+        cand_tokens = [tk for tk in pick_candidates(app) if tk not in BLOCKLIST_TOKENS]
+        if not cand_tokens:
+            return
+        # 并行获取候选 cask 的元数据并评分
+        def fetch_and_score(tk: str) -> Optional[Tuple[str, float, Dict, bool]]:
+            # 如果该 cask 已安装，则忽略
+            if tk in installed_tokens:
+                return None
+            meta = fetch_cask_meta(tk, net_ok=net_ok)
+            if not meta:
+                return None
+            score, reasons = score_candidate(app, meta, installed_tokens)
+            has_conflict = bool(reasons.get("conflicts_with_installed"))
+            return (tk, score, reasons, has_conflict)
+
+        # 使用线程池并行处理候选
+        results: List[Tuple[str, float, Dict, bool]] = []
+        with futures.ThreadPoolExecutor(max_workers=min(len(cand_tokens), DEFAULT_JOBS)) as ex2:
+            for r in ex2.map(fetch_and_score, cand_tokens):
+                if r:
+                    results.append(r)
+        if not results:
+            return
+
+        # 计算文件名的规范化形式，用于与 cask token 对比
+        stem_norm = normalize_name(app.path.stem)
+
+        # 判断候选项是否可信的函数
+        def is_confident(item: Tuple[str, float, Dict, bool]) -> bool:
+            tk, sc, reasons, has_conflict = item
+            # 完全匹配 bundle id
+            if reasons.get("bundle_id_match"):
+                return True
+            vendor_ok = reasons.get("vendor_ok", False)
+            art_sim = reasons.get("artifact_similarity", 0.0)
+            name_sim = reasons.get("name_similarity", 0.0)
+            sim = art_sim if art_sim >= 0.01 else name_sim
+            has_bid = reasons.get("has_bundle_id", False)
+            # 前缀匹配且名称极度匹配
+            if reasons.get("bundle_id_prefix") and sim >= 0.95:
+                return True
+            # 供应商匹配且名称极度匹配
+            if vendor_ok and sim >= 0.95:
+                return True
+            token_norm = reasons.get("token_norm")
+            if token_norm:
+                # 标准 slug 匹配
+                if token_norm == stem_norm and sim >= 0.95:
+                    if vendor_ok or reasons.get("bundle_id_prefix"):
+                        return True
+                    if has_bid:
+                        return True
+                    # 若 token 含数字或连字符，也可接受（减小误报）
+                    import re as _re
+                    if _re.search(r"[\d\-]", token_norm):
+                        return True
+                # 处理 token 以 "app" 结尾的情况，例如 "ollama-app"
+                if token_norm.endswith("app"):
+                    prefix = token_norm[:-3]
+                    # 如果去掉 "app" 后与文件名规范化一致
+                    import re as _re
+                    if prefix == stem_norm and sim >= 0.90:
+                        # 避免同名误报：要求供应商匹配、前缀匹配或 cask 有 bundle id
+                        if vendor_ok or reasons.get("bundle_id_prefix") or has_bid or _re.search(r"[\d\-]", token_norm):
+                            return True
+            return False
+
+        # 按得分降序排序候选
+        results.sort(key=lambda x: x[1], reverse=True)
+        chosen_token: Optional[str] = None
+        chosen_reasons: Optional[Dict] = None
+        # 优先挑选无冲突且可信的候选
+        for tk, sc, reasons, has_conflict in results:
+            if has_conflict:
+                continue
+            if is_confident((tk, sc, reasons, has_conflict)):
+                chosen_token = tk
+                chosen_reasons = reasons
+                break
+        # 若无无冲突可信项，再考虑有冲突可信项
+        if not chosen_token:
+            for tk, sc, reasons, has_conflict in results:
+                if is_confident((tk, sc, reasons, has_conflict)):
+                    chosen_token = tk
+                    chosen_reasons = reasons
+                    break
+        # 如果找到可信项
+        if chosen_token:
+            meta2 = fetch_cask_meta(chosen_token, net_ok=net_ok)
+            if meta2 and (meta2.conflicts_with & installed_tokens):
+                ambiguous.append((chosen_token, app.path, {"reason": "conflicts_with_installed"}))
+            else:
+                if chosen_token not in installed_tokens:
+                    recommendations.append((chosen_token, app.path))
+        else:
+            # 如果没有可信候选，先尝试基于 token 名称的兜底匹配（适用于网络不可用或 cask 元数据缺失的情况）
+            # 将已处理过的 token 记下
+            processed_tokens: Set[str] = {tk for tk, *_ in results}
+            added_fallback = False
+            for tk in cand_tokens:
+                if tk in processed_tokens or tk in installed_tokens or tk in BLOCKLIST_TOKENS:
+                    continue
+                # 规范化 token
+                token_norm = normalize_name(tk)
+                # 直接 slug 匹配或去除 "app" 后缀匹配
+                match_slug = False
+                if token_norm == stem_norm:
+                    match_slug = True
+                elif token_norm.endswith("app") and token_norm[:-3] == stem_norm:
+                    match_slug = True
+                if not match_slug:
+                    continue
+                # 允许兜底安装的条件：
+                # - token 中包含数字或连字符（如 4k-image-compressor），
+                # - 或以 "-app" 结尾（如 ollama-app），
+                # - 或 token 的规范化形式与本地应用文件名完全一致（如 blip、oversight 等）。
+                import re as _re
+                if (_re.search(r"[\d\-]", tk)
+                        or tk.endswith("-app")
+                        or token_norm == stem_norm):
+                    # 进一步检查该 token 是否在 Homebrew 仓库中存在
+                    if brew_cask_exists(tk):
+                        recommendations.append((tk, app.path))
+                        added_fallback = True
+                        break
+            # 如果未能通过 fallback 识别，再根据最高得分决定是否放入 ambiguous
+            if not added_fallback:
+                tk0, sc0, reasons0, _ = results[0]
+                if sc0 >= 55.0:
+                    ambiguous.append((tk0, app.path, reasons0))
+
+    print_step("正在比较应用列表（并行核实，含 bundle id / 冲突 / 云端校验）...")
+    with futures.ThreadPoolExecutor(max_workers=jobs) as ex:
+        list(ex.map(verify_one, other_apps))
+
+    # 去重：避免同一 App 多条命令
+    seen_paths: Set[Path] = set()
+    dedup_reco: List[Tuple[str, Path]] = []
+    for tk, ap in recommendations:
+        if ap not in seen_paths:
+            dedup_reco.append((tk, ap))
+            seen_paths.add(ap)
+    recommendations = dedup_reco
+
+    # 额外过滤：剔除已经安装的 cask 或仓库中不存在的 token，避免输出无效或重复的建议
+    filtered_reco: List[Tuple[str, Path]] = []
+    for tk, ap in recommendations:
+        # 跳过已安装的 cask
+        if tk in installed_tokens:
+            continue
+        # 仅当 token 在 Homebrew 仓库中存在时才保留
+        try:
+            if brew_cask_exists(tk):
+                filtered_reco.append((tk, ap))
+        except Exception:
+            # 如果检查过程中出现异常，保守起见不加入
+            pass
+    recommendations = filtered_reco
+
+    # 9) 打印非 Brew 非 MAS 应用清单（仅路径，减少干扰）
+    print_step("找到以下非 Homebrew 非 Mac App Store 安装的应用程序:")
+    print("="*60)
+    # 这里仅输出路径；详细命令写到文件里
+    for a in other_apps[:0]:  # 控制台不再刷屏，这里按需打印；默认关闭
+        print(str(a.path))
+
+    # 10) 写文件
+    out_non_brew = Path("non_brew_non_mas_apps.txt")
+    out_cmds     = Path("brew_install_commands.txt")
+    out_amb      = Path("ambiguous_matches.txt")
+
+    with out_non_brew.open("w", encoding="utf-8") as f:
+        for a in other_apps:
+            f.write(f"{a.path}\n")
+        f.write("\n# END OF FILE\n")
+        f.write(f"# COUNT = {len(other_apps)}\n")
+
+    with out_cmds.open("w", encoding="utf-8") as f:
+        f.write("# 可通过 Homebrew 重新安装的应用程序安装命令（高置信度，已二次核实）\n")
+        f.write("# 运行方法：逐行复制以下命令到终端，或将整个文件作为脚本执行\n\n")
+        for tk, ap in recommendations:
+            f.write(f"brew install --cask {tk}  # 对应 {ap}\n")
+        f.write("\n# END OF FILE\n")
+        f.write(f"# COUNT = {len(recommendations)}\n")
+
+    with out_amb.open("w", encoding="utf-8") as f:
+        f.write("# 需要人工确认的“可能匹配”，脚本不会据此重装\n\n")
+        for tk, ap, rsn in ambiguous:
+            f.write(f"# {json.dumps(rsn, ensure_ascii=False)}\n")
+            f.write(f"brew install --cask {tk}  # 可能对应 {ap}\n")
+        f.write("\n# END OF FILE\n")
+        f.write(f"# COUNT = {len(ambiguous)}\n")
+
+    # 11) 统计并对齐输出
+    # 统计：仅统计可操作的应用（排除系统和永不迁移的应用）
+    total_all = len(mas_apps) + len(brew_apps) + len(other_apps)
+    total_mas = len(mas_apps)
+    total_brew = len(brew_apps)
+    total_other = len(other_apps)
+    total_migratable = len(recommendations)
+
+    labels = [
+        ("Total", total_all),
+        ("Mac App Store", total_mas),
+        ("Homebrew", total_brew),
+        ("非 Brew 非 MAS 应用", total_other),
+        ("可迁移的应用", total_migratable),
+    ]
+    # 列对齐（冒号对齐）
+    max_label = max(len(x[0]) for x in labels)
+    print_step("="*60)
+    for (k, v) in labels:
+        print(f"✅ {k:{max_label}s} ： {v:>8d}")
+    print_step("结果已保存至 non_brew_non_mas_apps.txt / brew_install_commands.txt / ambiguous_matches.txt")
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        # 统一的中断提示，避免误判“执行完毕”
+        print("\n[中断] 用户取消。部分输出文件可能不完整。", file=sys.stderr)
+        sys.exit(130)
