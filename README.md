@@ -113,7 +113,8 @@
 
 # 可管理的应用太少，怎么办？
 
- - 可以将本地已经安装的，迁移到homebrew安装包。迁移命令：
+ - 可以将本地已经安装的APP，自动化的迁移到homebrew。
+    迁移命令：
     ~~~
     ./usercmd_migrate_macapp_to_homebrew
     ~~~
@@ -125,7 +126,7 @@
     ./ambiguous_matches.txt
     ~~~
 
-    brew_install_commands.txt 内含了所有迁移所需的命令，直接多行一起整体拷贝，粘贴到命令行执行。此过程会触发多次密码请求。
+    brew_install_commands.txt 内含了所有迁移所需的命令，直接多行一起整体拷贝，粘贴到命令行执行。开始执行后，会触发多次密码请求。
 
 .
 
