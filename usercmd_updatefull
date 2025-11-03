@@ -192,7 +192,7 @@ export SHA_MISMATCH_MAX_RETRIES
 # ---------------------------------------
 
 # 定义：日志文件
-LOG_FULL_LAST="$LOG_PATH/--UpdateFull.--Last--.log"
+LOG_FULL_LAST="$LOG_PATH/--UpdateFull-Last--.log"
 LOG_FILE="$LOG_PATH/Update_Auto.log"
 LOG_FULL_FILE="$LOG_PATH/UpdateFull.$(date +%Y-%m).log"
 LOG_ERROR_FILE="$LOG_PATH/Update_Error.log"
