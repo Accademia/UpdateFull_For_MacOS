@@ -784,7 +784,7 @@ echo -e "MacUpdater 执行日志 - $(date)" | tee "$LOG_MACUPDATER_FILE" > /dev/
 # 检测：外网是否能正常访问
 # ---------------------------------------
 
-echo $PWD
+#echo $PWD
 
 echo -e ""                                                                              | tee -a "$LOG_ERROR_FILE"
 echo -e "-------------------------------------------------------------------"           | tee -a "$LOG_ERROR_FILE" > /dev/null
