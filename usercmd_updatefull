@@ -124,11 +124,52 @@ else
     # 非 root 情况直接使用 USER 环境变量，若不存在则使用当前控制台登录用户
     USER_NAME="${USER:-$(stat -f '%Su' /dev/console)}"
 fi
+
+# 如果以 root 身份运行，则对 tee 命令做降权处理，使所有日志写入操作在登录用户上下文中执行。
+if [ "$(id -u)" -eq 0 ]; then
+    __targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+    __uid="$(id -u "$__targetUser" 2>/dev/null || echo "")"
+    if [ -n "$__uid" ]; then
+        __original_tee="$(command -v tee)"
+        tee() {
+            launchctl asuser "$__uid" sudo -n -u "$__targetUser" "$__original_tee" "$@"
+        }
+        # 定义安全 touch 函数：在 root 下通过登录用户身份创建文件
+        safe_touch() {
+            local __file="$1"
+            launchctl asuser "$__uid" sudo -n -u "$__targetUser" /usr/bin/touch "$__file"
+        }
+    else
+        # 如果无法获取 uid，则回退使用普通 touch
+        safe_touch() {
+            local __file="$1"
+            /usr/bin/touch "$__file"
+        }
+    fi
+else
+    # 非 root 身份运行时，safe_touch 直接调用系统 touch
+    safe_touch() {
+        local __file="$1"
+        /usr/bin/touch "$__file"
+    }
+fi
 DEVICE_DIR="${MODEL_NAME_CLEAN}-${CPU_BRAND_CLEAN}-${SERIAL_NUMBER_CLEAN}"
 # 清理多余的连字符
 DEVICE_DIR=$(echo "$DEVICE_DIR" | sed 's/--*/-/g; s/^-//; s/-$//')
-LOG_PATH="$ICLOUD_PATH/LOG/${DEVICE_DIR}/${USER_NAME}"
-mkdir -p "$LOG_PATH"                                                        # 创建目录到 iCloud
+
+
+    # 尝试创建日志目录并设置 LOG_PATH。优先使用 iCloud 路径，创建失败则回退到主目录路径
+    tmp_log="$ICLOUD_PATH/LOG/${DEVICE_DIR}/${USER_NAME}"
+    if mkdir -p "$tmp_log" 2>/dev/null; then
+        LOG_PATH="$tmp_log"
+        log_created_in_icloud=1
+    else
+        fallback_home="${targetHome:-$HOME}"
+        LOG_PATH="$fallback_home/LOG/${DEVICE_DIR}/${USER_NAME}"
+        mkdir -p "$LOG_PATH"
+        log_created_in_icloud=0
+    fi
+
 # 保留原有 COMPUTER_NAME 变量以供其他逻辑使用
 COMPUTER_NAME=$(scutil --get ComputerName)
 
@@ -198,7 +239,7 @@ LOG_FULL_FILE="$LOG_PATH/UpdateFull.$(date +%Y-%m).log"
 LOG_ERROR_FILE="$LOG_PATH/Update_Error.log"
 LOG_MACUPDATER_FILE="$LOG_PATH/Update_MacUpdater.log"
 
-echo -e "" > "$LOG_MACUPDATER_FILE"
+echo -e "" | tee "$LOG_MACUPDATER_FILE" > /dev/null
 
 # 开启严格模式与统一错误处理。
 # 使用 set -Eeuo pipefail 让脚本在遇到未捕获的错误时立即退出，
@@ -700,41 +741,42 @@ __get_migrate_log_file() {
 # -----------------------------------------------
 
 # 重置LOG_FULL_LAST日志文件
-cat /dev/null > "$LOG_FULL_LAST"
+cat /dev/null | tee "$LOG_FULL_LAST" > /dev/null
 
 # 检查LOG_FILE日志文件是否存在
 if [ ! -f "$LOG_FILE" ]; then
     # 文件不存在，创建文件
-    touch "$LOG_FILE"
+    safe_touch "$LOG_FILE"
 fi
 
 # 检查LOG_ERROR_FILE日志文件是否存在
 if [ ! -f "$LOG_ERROR_FILE" ]; then
     # 文件不存在，创建文件
-    touch "$LOG_ERROR_FILE"
+    safe_touch "$LOG_ERROR_FILE"
 fi
 
 # 检查LOG_FULL_FILE日志文件是否存在
 if [ ! -f "$LOG_FULL_FILE" ]; then
     # 文件不存在，创建文件
-    touch "$LOG_FULL_FILE"
+    safe_touch "$LOG_FULL_FILE"
 else
     # 文件存在，检查文件大小
     FILE_SIZE=$(stat -f%z "$LOG_FULL_FILE") # macOS 使用 stat -f%z
 
     if [ "$FILE_SIZE" -gt 10 ]; then
         # 如果文件大小超过100字节，执行以下操作
-        echo -e "" >> "$LOG_FULL_FILE"
-        echo -e "" >> "$LOG_FULL_FILE"
-        echo -e "" >> "$LOG_FULL_FILE"
-        echo -e "" >> "$LOG_FULL_FILE"
-        echo -e "" >> "$LOG_FULL_FILE"
-        echo -e "" >> "$LOG_FULL_FILE"
+        # 使用 tee 写入空行，借助上方的 tee 函数（当 root 运行时自动降权）
+        echo -e "" | tee -a "$LOG_FULL_FILE" > /dev/null
+        echo -e "" | tee -a "$LOG_FULL_FILE" > /dev/null
+        echo -e "" | tee -a "$LOG_FULL_FILE" > /dev/null
+        echo -e "" | tee -a "$LOG_FULL_FILE" > /dev/null
+        echo -e "" | tee -a "$LOG_FULL_FILE" > /dev/null
+        echo -e "" | tee -a "$LOG_FULL_FILE" > /dev/null
     fi
 fi
 
-# 初始化 MacUpdater 日志文件
-echo -e "MacUpdater 执行日志 - $(date)" > "$LOG_MACUPDATER_FILE"
+# 初始化 MacUpdater 日志文件（使用 tee 降权写入）
+echo -e "MacUpdater 执行日志 - $(date)" | tee "$LOG_MACUPDATER_FILE" > /dev/null
 
 
 
@@ -746,7 +788,7 @@ echo $PWD
 
 echo -e ""                                                                              | tee -a "$LOG_ERROR_FILE"
 echo -e "-------------------------------------------------------------------"           | tee -a "$LOG_ERROR_FILE" > /dev/null
-echo -e "" >> "$LOG_ERROR_FILE"
+echo -e "" | tee -a "$LOG_ERROR_FILE" > /dev/null
 echo -e "[自动更新]  $(date '+%Y-%m-%d %H:%M:%S')  "                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_ERROR_FILE" 
 echo -e "======================================================================="       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 printf  "测试网络（海外 HTTPS 连接） ...  ｜  "                                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_ERROR_FILE" 
