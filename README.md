@@ -303,7 +303,16 @@ uesrcmd_fix_nosort
 grep -R "nosort" /opt/homebrew/etc/bash_completion.d
 ```
 
+.
 
+
+# Mac App Store 更新错误怎么办 ？
+
+对于MAS应用更新 出错的情况。往往是因为，MacOS系统更新后，苹果修改了MAS升级接口导致的。由于mas-cli逆向出来的苹果接口，不是公开的接口。所以跟进修改需要大量开发时间。
+
+你能做的就是，等待mac-cli作者更新。而本脚本 ，在每次升级前，会自动拉取 mas-cli 最新版本的更新。无需你手工干预。
+
+也就是说，你什么都不做。坐等mas-cli开发者修复，就可以了.
 
 .
 
