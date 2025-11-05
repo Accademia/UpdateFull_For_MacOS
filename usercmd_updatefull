@@ -1,5 +1,5 @@
-#!/usr/bin/env bash       # Apple Silicon
-# 自动切换到 HomeBrew 或 /usr/local 安装的 bash（若存在），保证脚本在较新版本的 bash 中运行。
+#!/usr/bin/env bash
+# Apple Silicon: 自动切换到 HomeBrew 或 /usr/local 安装的 bash（若存在），保证脚本在较新版本的 bash 中运行。
 if [[ -x /opt/homebrew/bin/bash && "$BASH" != "/opt/homebrew/bin/bash" ]]; then
   exec /opt/homebrew/bin/bash "$0" "$@"
 elif [[ -x /usr/local/bin/bash && "$BASH" != "/usr/local/bin/bash" ]]; then
@@ -1339,12 +1339,12 @@ else
     # 未安装，执行安装
     if [ "$(id -u)" -eq 0 ]; then
         targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
-        echo -e "✓  Sparkle 未安装, Root权限 降权至 普通权限 ( $targetUser ) 后 , 运行 brew reinstall --cask --force sparkle 进行安装 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        sudo -n -H -u "$targetUser" brew reinstall --cask --force sparkle 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  Sparkle 未安装, Root权限 降权至 普通权限 ( $targetUser ) 后 , 运行 brew install --cask sparkle 进行安装 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        sudo -n -H -u "$targetUser" brew install --cask sparkle 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         sparkle_update_rc=${PIPESTATUS[0]}
     else
-        echo -e "✓  Sparkle 未安装, 当前用户 '$USER' 为普通权限, 运行 brew reinstall --cask --force sparkle 进行安装 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        brew reinstall --cask --force sparkle 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  Sparkle 未安装, 当前用户 '$USER' 为普通权限, 运行 brew install --cask sparkle 进行安装 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        brew install --cask sparkle 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         sparkle_update_rc=${PIPESTATUS[0]}
     fi
 fi
@@ -1439,20 +1439,23 @@ else
     echo -e "-------------------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
     # 检查是否以 root 身份运行
+    mas_install_rc=0
     if [ "$(id -u)" -eq 0 ]; then
         # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
         targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
         echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 MAS 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 以目标用户身份执行 HomeBrew 命令
-        sudo -n -H -u "$targetUser" bash -c 'brew reinstall --force mas 2>&1'              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        sudo -n -H -u "$targetUser" bash -c 'brew install mas 2>&1'              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        mas_install_rc=${PIPESTATUS[0]}
     else
         echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 MAS 安装 ... "                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-        brew reinstall --force mas 2>&1                                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        brew install mas 2>&1                                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        mas_install_rc=${PIPESTATUS[0]}
     fi
 
     echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
-    if [ $? -eq 0 ]; then
+    if [ $mas_install_rc -eq 0 ]; then
         echo -e "MAS 安装成功。"                                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     else
         echo -e "MAS 安装失败。"                                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
@@ -1630,20 +1633,23 @@ else
     echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
     # 检查是否以 root 身份运行
+    topgrade_install_rc=0
     if [ "$(id -u)" -eq 0 ]; then
         # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
         targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
         echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 topgrade 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 以目标用户身份执行 HomeBrew 命令
-        sudo -n -H -u "$targetUser" bash -c 'brew reinstall --force topgrade 2>&1'         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        sudo -n -H -u "$targetUser" bash -c 'brew install topgrade 2>&1'         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        topgrade_install_rc=${PIPESTATUS[0]}
     else
         echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 topgrade 安装 ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-        brew reinstall --force topgrade 2>&1                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        brew install topgrade 2>&1                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        topgrade_install_rc=${PIPESTATUS[0]}
     fi
     
     echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
-    if [ $? -eq 0 ]; then
+    if [ $topgrade_install_rc -eq 0 ]; then
         echo -e "✅ TopGrade 安装成功。"                                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
         echo -e ""                                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     else
@@ -1732,21 +1738,24 @@ else
     echo -e "-------------------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     
     # 检查是否以 root 身份运行
+    macupdater_install_rc=0
     if [ "$(id -u)" -eq 0 ]; then
         # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
         targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
         echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 MacUpdater 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 以目标用户身份执行 HomeBrew 命令
         # 显式传递语言配置，避免 sudo 环境丢失 HOMEBREW_CASK_OPTS
-        sudo -n -H -u "$targetUser" env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew reinstall --cask --force macupdater 2>&1       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        sudo -n -H -u "$targetUser" env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew install --cask macupdater 2>&1       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        macupdater_install_rc=${PIPESTATUS[0]}
     else
         echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 MacUpdater 安装 ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-        env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew reinstall --cask --force macupdater 2>&1                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew install --cask macupdater 2>&1                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        macupdater_install_rc=${PIPESTATUS[0]}
     fi
     
     echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
-    if [ $? -eq 0 ]; then
+    if [ $macupdater_install_rc -eq 0 ]; then
         echo -e "✅ MacUpdater 安装成功。"                                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
     else
         echo -e "❌ MacUpdater 安装失败。"                                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
@@ -2317,10 +2326,10 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
               targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
               echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 parallel 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
               # 以目标用户身份执行 HomeBrew 命令
-              sudo -n -H -u "$targetUser" bash -c 'brew reinstall --force parallel 2>&1'         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+              sudo -n -H -u "$targetUser" bash -c 'brew install parallel 2>&1'         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
           else
               echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 parallel 安装 ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-              brew reinstall --force parallel 2>&1                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+              brew install parallel 2>&1                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
           fi
 
     fi
@@ -4275,7 +4284,3 @@ echo -e ""                                                                      
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-
-
-
-
