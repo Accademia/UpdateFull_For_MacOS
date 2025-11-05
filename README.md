@@ -1,13 +1,13 @@
 
 # 功能与目的：
 
- 1. 实现 一键更新 ，MacOS 上 ，所有第三方 Mac APP 
+ 1. 一键更新 ，所有第三方 Mac APP 
  
- 2. 实现 每日静默更新 ，MacOS 上 ，所有第三方 Mac APP （配合 Lingon Pro 软件）
+ 2. 每日静默更新 ，所有第三方 Mac APP （配合 Lingon Pro 软件）
 
- 3. 在更新过程中，无需输入任何密码 （配合 Generate_Homebrew_Sudoers 项目）
+ 3. 更新过程中，无需输入 管理员密码 （配合 Generate_Homebrew_Sudoers 项目）
     
- 4. 更新结束后，不打乱启动台布局（LaunchPad Layout）
+ 4. 更新结束后，不打乱 启动台布局（LaunchPad Layout）
 
 .
 
