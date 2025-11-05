@@ -1,9 +1,9 @@
 
 # 功能与目的：
 
- 1. 一键更新 ，所有第三方 Mac APP 
+ 1. 一键更新 ， Mac OS 系统中的 APP 
  
- 2. 每日静默更新 ，所有第三方 Mac APP （配合 Lingon Pro 软件）
+ 2. 每日静默更新 ， Mac OS 系统中的 APP （配合 Lingon Pro 软件）
 
  3. 更新过程中，无需输入 管理员密码 （配合 Generate_Homebrew_Sudoers 项目）
     
