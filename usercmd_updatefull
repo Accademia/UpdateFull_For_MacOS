@@ -3813,16 +3813,35 @@ if [ "$mas_success" = true ]; then
     
     echo -e "$mas_output"                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
-    # （3）根据升级结果打印“更新成功”或“已最新”提示
+    # （3）根据升级结果打印“更新成功”或“更新失败”提示
+    # 解析 mas upgrade 输出，提取已更新的应用名称列表（如果任何）
+    updated_mas_app_names=""
     if echo "$mas_output" | grep -q "Installed"; then
-        # 解析 mas upgrade 输出，提取已更新的应用名称列表
         updated_mas_app_names=$(echo "$mas_output"  | grep -E "Installed"  | sed -E 's/^==> Installed //; s/ *\([^)]*\)//g')
-        # 遍历每个已更新应用名称，输出日志
-        while IFS= read -r app_line; do
-            [[ -n "$app_line" ]] && echo -e "✅  更新成功    : $app_line"  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        done <<< "$updated_mas_app_names"
-    else
+    fi
+    # 解析 mas outdated 结果，提取所有需要更新的应用名称列表
+    outdated_mas_app_names=""
+    if [ -n "$outdated_mas_apps" ]; then
+        outdated_mas_app_names=$(echo "$outdated_mas_apps" | sed -E 's/^[0-9]+[[:space:]]+//; s/ *\([^)]*\)//g; s/ *->.*//g')
+    fi
+    # 如果没有任何待更新的应用，直接提示无需更新并跳过后续逻辑
+    if [ -z "$outdated_mas_app_names" ]; then
         echo -e "✓  应用已是最新版本，无需更新。" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    else
+        # 首先输出更新成功的应用
+        while IFS= read -r app_line; do
+            if [[ -n "$app_line" ]]; then
+                echo -e "✅  更新成功    : $app_line" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            fi
+        done <<< "$updated_mas_app_names"
+        # 然后针对需要更新但未在成功列表中的应用，标记为更新失败
+        while IFS= read -r app_line; do
+            if [[ -n "$app_line" ]]; then
+                if ! grep -Fxq "$app_line" <<< "$updated_mas_app_names"; then
+                    echo -e "❌  更新失败    : $app_line" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                fi
+            fi
+        done <<< "$outdated_mas_app_names"
     fi
 
     # 重新启动之前关闭的应用程序
@@ -4035,6 +4054,7 @@ else
     echo -e "✓  不参与更新的模块 ：brew_formula \ brew_cask \ sparkle \ mas \ macports \ system \ tlmgr \ ruby_gems \ gem \ containers ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     topgrade --disable brew_formula --disable brew_cask --disable sparkle --disable mas --disable macports --disable system --disable tlmgr --disable ruby_gems --disable gem --disable containers --cleanup 2>&1   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 fi
+
 
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
