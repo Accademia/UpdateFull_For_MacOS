@@ -185,7 +185,7 @@
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port clean*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port outdated*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port rev-upgrade*
-你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port uninstall inactive*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port uninstall*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port reclaim*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port -* selfupdate*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port -* sync*
@@ -193,7 +193,7 @@
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port -* clean*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port -* outdated*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port -* rev-upgrade*
-你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port -* uninstall inactive*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port -* uninstall*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port -* reclaim*
 
 
