@@ -4022,14 +4022,14 @@ targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
 if [[ $(id -u) -eq 0 ]]; then
     #—— root 环境：切换到桌面用户执行 ——#
     echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 topgrade 进行升级 ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    echo -e "✓  不参与更新的模块 ：brew_formula \ brew_cask \ Sparkle \ mas \ system \ macports \ node \ pnpm \ tldr \ tlmgr \ ruby_gems \ gem \ powershell ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✓  不参与更新的模块 ：brew_formula \ brew_cask \ sparkle \ mas \ system \ macports \ node \ pnpm \ tldr \ tlmgr \ ruby_gems \ gem \ powershell ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     topgrade_output=$(sudo -n -H -u "$targetUser"  /bin/bash -c 'topgrade --disable brew_formula --disable brew_cask --disable sparkle --disable mas --disable system --disable macports --disable node --disable pnpm --disable powershell --disable tldr --disable tlmgr --disable ruby_gems --disable gem --cleanup' 2>&1)
     printf "%s\n" "$topgrade_output"        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 else
     #—— 非 root 环境：直接执行 ——#
     echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 topgrade 进行升级 ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    echo -e "✓  不参与更新的模块 ：brew_formula \ brew_cask \ Sparkle \ mas \ system \ macports \ node \ pnpm \ tldr \ tlmgr \ ruby_gems \ gem \ powershell ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✓  不参与更新的模块 ：brew_formula \ brew_cask \ sparkle \ mas \ system \ macports \ node \ pnpm \ tldr \ tlmgr \ ruby_gems \ gem \ powershell ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     topgrade --disable brew_formula --disable brew_cask --disable sparkle --disable mas --disable system --disable macports --disable node --disable pnpm --disable powershell --disable tldr --disable tlmgr --disable ruby_gems --disable gem --cleanup 2>&1   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 fi
