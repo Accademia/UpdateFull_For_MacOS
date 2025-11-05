@@ -196,6 +196,12 @@
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port -* uninstall*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port -* reclaim*
 
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f /tmp/macports*.pkg
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/local/bin/port -* reclaim
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/bin/touch /tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /bin/rm -f /tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress
+
+
 
 # --------------------------------
 # 免密更新 Homebrew 
@@ -207,6 +213,19 @@
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/homebrew/bin/brew upgrade*
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/local/bin/brew upgrade*
 
+
+# --------------------------------
+# 免密更新 其他模块 
+# --------------------------------
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /Library/TeX/texbin/tlmgr update *
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/homebrew/opt/ruby/bin/gem update *
+
+
+# ---------------------------
+# 免密修改：计算机名称
+# ---------------------------
+你的用户名 ALL=(root) NOPASSWD: /usr/sbin/scutil --set ComputerName *
+你的用户名 ALL=(root) NOPASSWD: /usr/sbin/scutil --set LocalHostName *
 
 
 # -------------------------------
