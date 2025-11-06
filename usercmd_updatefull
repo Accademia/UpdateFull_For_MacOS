@@ -3596,22 +3596,55 @@ else
     echo -e "Sparkle 下载安装 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     if [ ${#sparkle_updates_list[@]} -gt 0 ] && [ -n "$SPARKLE_CLI" ]; then
+        # 初始化 Sparkle 更新结果列表
+        sparkle_result_list=()
         for update_path in "${sparkle_updates_list[@]}"; do
             app_name="$(basename "$update_path")"
             if [ "$(id -u)" -eq 0 ]; then
                 targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
                 echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 Sparkle 更新 : $app_name" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 sudo -n -H -u "$targetUser" bash -lc "\"$SPARKLE_CLI\" --check-immediately --allow-major-upgrades \"$update_path\"" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                rc=${PIPESTATUS[0]}
             else
                 echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 Sparkle 更新 : $app_name" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 "$SPARKLE_CLI" --check-immediately --allow-major-upgrades "$update_path" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                rc=${PIPESTATUS[0]}
             fi
-            echo -e "✅  更新成功 [Sparkle]   : $app_name" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            # 根据退出状态记录结果
+            if [ "$rc" -eq 0 ]; then
+                sparkle_result_list+=("success|$app_name")
+            else
+                sparkle_result_list+=("failure|$app_name")
+            fi
         done
     else
+        # 如果没有任何应用需要更新
         echo -e "✓  所有APP已经是 最新版本 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        # 同样初始化为空列表，方便后续判断
+        sparkle_result_list=()
     fi
 
+    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
+    # 输出 Sparkle 更新结果，使用类似 HomeBrew/MAS 的风格
+    printf "\033[1;34m[Final]\033[0m "
+    printf "[Final] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "Sparkle 更新结果 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    if [ ${#sparkle_result_list[@]} -eq 0 ]; then
+        echo -e "✓  没有APP被更新 !!! " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    else
+        for __entry in "${sparkle_result_list[@]}"; do
+            IFS='|' read -r __status __name <<< "$__entry"
+            if [ "$__status" = "success" ]; then
+                __symbol="✅"
+                __status_text="成功"
+            else
+                __symbol="❌"
+                __status_text="失败"
+            fi
+            echo -e "$__symbol  更新$__status_text [sparkle]   : $__name" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        done
+    fi
     echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     echo -e "\033[1;32m[OK] Sparkle 运行已完成  ✅ \033[0m"
@@ -4191,30 +4224,74 @@ if [ "$(id -u)" -eq 0 ]; then
 
     # 获取目标普通用户（优先使用 SUDO_USER，其次获取当前登录控制台用户）
     echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 MacUpdater update ...（当前用户是 root）" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    macupdater_output=$(sudo -n -H -u "$targetUser" bash -c ' "/Applications/MacUpdater.app/Contents/Resources/macupdater_client" update --force-quit-running-apps --force-major-version-update' 2>&1)
-    echo -e "$macupdater_output"                                                           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    # 以目标用户身份执行更新命令，捕获输出和退出状态
+    macupdater_output=$(sudo -n -H -u "$targetUser" bash -c "\"/Applications/MacUpdater.app/Contents/Resources/macupdater_client\" update --force-quit-running-apps --force-major-version-update" 2>&1)
+    rc=$?
+    echo -e "$macupdater_output" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 else
 
     echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 MacUpdater update ... "          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
    #"/Applications/MacUpdater.app/Contents/Resources/macupdater_client" update --force-quit-running-apps --force-major-version-update 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    macupdater_output=$(bash -c ' "/Applications/MacUpdater.app/Contents/Resources/macupdater_client" update --force-quit-running-apps --force-major-version-update' 2>&1)
-    echo -e "$macupdater_output"                                                           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    # 直接执行更新命令，捕获输出和退出状态
+    macupdater_output=$(/Applications/MacUpdater.app/Contents/Resources/macupdater_client update --force-quit-running-apps --force-major-version-update 2>&1)
+    rc=$?
+    echo -e "$macupdater_output" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 fi
 
-echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
-# 检查是否以 root 身份运行
-#if [ "$(id -u)" -eq 0 ]; then
-#else
-#fi
-
-echo -e "\033[1;32m[OK] MacUpdater 运行已完成  ✅ \033[1;32m"   
-echo -e "[OK]  MacUpdater 运行已完成  ✅ "                                             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-
-echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    # 解析更新输出，构建结果列表
+    macupdater_result_list=()
+    current_app=""
+    app_name=""
+    while IFS= read -r line; do
+        if [[ "$line" =~ ^Updating[[:space:]]\'(.+)\' ]]; then
+            current_app="${BASH_REMATCH[1]}"
+            app_name="$(basename "$current_app")"
+        elif [[ "$line" =~ [Uu]pdate[[:space:]]success ]]; then
+            if [ -n "$app_name" ]; then
+                macupdater_result_list+=("success|$app_name")
+                app_name=""
+            fi
+        elif [[ "$line" =~ [Ff]ailed ]] || [[ "$line" =~ [Ee]rror ]]; then
+            if [ -n "$app_name" ]; then
+                macupdater_result_list+=("failure|$app_name")
+                app_name=""
+            fi
+        fi
+    done <<< "$macupdater_output"
+    if [ ${#macupdater_result_list[@]} -eq 0 ]; then
+        if [ "$rc" -ne 0 ]; then
+            macupdater_result_list+=("failure|MacUpdater")
+        fi
+    fi
+    # 输出 MacUpdater 更新结果
+    printf "\033[1;34m[Final]\033[0m "
+    printf "[Final] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "MacUpdater 更新结果 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    if [ ${#macupdater_result_list[@]} -eq 0 ]; then
+        echo -e "✓  没有APP被更新 !!! " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    else
+        for __entry in "${macupdater_result_list[@]}"; do
+            IFS='|' read -r __status __name <<< "$__entry"
+            if [ "$__status" = "success" ]; then
+                __symbol="✅"
+                __status_text="成功"
+            else
+                __symbol="❌"
+                __status_text="失败"
+            fi
+            echo -e "$__symbol  更新$__status_text [macupdater]   : $__name" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        done
+    fi
+    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    # 完成提示
+    echo -e "\033[1;32m[OK] MacUpdater 运行已完成  ✅ \033[1;32m"
+    echo -e "[OK]  MacUpdater 运行已完成  ✅ " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 
 
