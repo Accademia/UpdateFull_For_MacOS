@@ -91,6 +91,7 @@
 
 # 如何设置定时更新？
 
+ - 如何实现，类似AppStore一样，每天夜间，自动静默更新 所有 Mac APP ？ 请看如下：
  - 建议使用 Lingon Pro（或类似软件），将usercmd_updatefull挂载为循环任务（比如每天夜间3点钟执行）
     - https://lingon-x.macupdate.com/
 
@@ -124,17 +125,21 @@
 
 # 可管理的应用太少，怎么办？
 
+ - 我发现，通过本脚本升级的APP数量太少，只有总APP数量的1/3 ，怎么办 ？ 请看如下：
+
+ - 只要软件尽量通过homebrew和appstore这两个渠道去安装，哪怕在没有MacUpdater的参与下，更新覆盖率也能接近90%。请看，下述案例：
+ 
  - 以一台800多个软件的Mac为例：
      - Homebrew Cask ≈ 450
      - Mac AppStore  ≈ 250
      - Sparkle       ≈ 200（与homebrew去重后 ≈ 40）
      - MacUpdater    ≈ 800（与前三者去重后 ≈ 80）
 
- - 根据上述案例，只要软件尽量通过homebrew和appstore这两个渠道去安装，哪怕在没有MacUpdater的参与下，更新覆盖率也能接近90%。所以，核心 = 将APP迁移到homebrew
+ - 所以，核心 = 如何将APP迁移到 homebrew 、 Mac AppStpre
 
  - 最终，只要解决一个问题：
    ✅ 如何将 本地已经安装的APP，自动化的，将APP迁移到homebrew ？ 如下：
-    迁移命令：
+    迁移命令（可在本项目中下载此命令）：
     ~~~
     ./usercmd_migrate_macapp_to_homebrew
     ~~~
@@ -152,8 +157,8 @@
 
 # 如何避免密码请求？
 
- - 可以通过类似于（  brew upgrade --debug --verbose --greedy ）命令，查看是哪些程序触发了密码请求，
- - 然后将对应的命令行，加入到sudo visudo（或直接删除对应的无用程序）
+ - 如何让每次更新APP的时候，都不弹出管理员密码请求，全程能全自动更新 ？ 请看如下：
+ - 需要通过 sudo visudo，将要程序加入到免密列表当中
 
 傻瓜配置如下：（注意，用户名，不区分 大小写）
     可通过批量替换功能，将“你的用户名” 替换成 你登录的实际用户名/
@@ -249,10 +254,13 @@
 
 ```
 
-- ⚠️⚠️⚠️ 建议通过 generate_homebrew_sudoers.py 自动生成，更多免密配置规则（注意，生成的配置与上述配置不重叠，两者都要填入sudoers）
+- ⚠️⚠️⚠️全自动方式： 建议通过 generate_homebrew_sudoers.py 自动生成，更多免密配置规则（注意，生成的配置与上述配置不重叠，两者都要填入sudoers）
    - ✅ ✅ ✅ 项目：https://github.com/Accademia/Generate_Homebrew_Sudoers
-
-
+   
+- 手动方式：你也可以通过如下命令，手动查看是哪些程序触发了密码请求。然后将对应的命令行，加入到visudo
+     ```
+     brew upgrade --debug --verbose --greedy
+     ```
 
 - 如何编辑visudo配置文件 
 
