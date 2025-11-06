@@ -132,7 +132,8 @@
 
  - 根据上述案例，只要软件尽量通过homebrew和appstore这两个渠道去安装，哪怕在没有MacUpdater的参与下，更新覆盖率也能接近90%。所以，核心 = 将APP迁移到homebrew
 
- - 如何将 本地已经安装的APP，自动化的，将APP迁移到homebrew ？ 如下：
+ - 最终，只要解决一个问题：
+   ✅ 如何将 本地已经安装的APP，自动化的，将APP迁移到homebrew ？ 如下：
     迁移命令：
     ~~~
     ./usercmd_migrate_macapp_to_homebrew
@@ -140,7 +141,7 @@
     
  -  上述命令执行后，会生成如下文件
     ~~~
-    ./brew_install_commands.txt	# ✅ 此文件为 可以迁移的软件列表
+    ./brew_install_commands.txt	# ✅ ✅ ✅ 此文件为 可以迁移的软件列表
     ./non_brew_non_mas_apps.txt	
     ./ambiguous_matches.txt
     ~~~
@@ -249,8 +250,7 @@
 ```
 
 - ⚠️⚠️⚠️ 建议通过 generate_homebrew_sudoers.py 自动生成，更多免密配置规则（注意，生成的配置与上述配置不重叠，两者都要填入sudoers）
-   - 项目：https://github.com/Accademia/Generate_Homebrew_Sudoers
-
+   - ✅ ✅ ✅ 项目：https://github.com/Accademia/Generate_Homebrew_Sudoers
 
 
 
@@ -261,19 +261,19 @@
    ```
 
 
-- 在homebrew中需要手动更新的软件
-
-  ```
-   paragon-extfs
-   paragon-ntfs
-   ```
-
-
-
 - ⚠️⚠️ 在编辑visudoers时，一定 一定 一定 一定 不要修改(删除) 如下配置！！！ 不然不可能要要面临重装系统！
 
    ```
    root            ALL = (ALL) ALL
+   ```
+
+.
+   
+#  HomeBrew更新后，须 “手动更新” 的软件
+
+   ```
+   paragon-extfs
+   paragon-ntfs
    ```
 
 .
