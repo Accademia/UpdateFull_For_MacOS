@@ -89,6 +89,40 @@
 .
 
 
+# 可管理的应用太少，怎么办？
+
+ - 我发现，通过本脚本升级的APP数量太少，只有总APP数量的1/3 ，怎么办 ？ 请看如下：
+
+ - 只要软件尽量通过homebrew和appstore这两个渠道去安装，哪怕在没有MacUpdater的参与下，更新覆盖率也能接近90%。请看，下述案例：
+ 
+ - 以一台800多个软件的Mac为例：
+     - Homebrew Cask ≈ 450
+     - Mac AppStore  ≈ 250
+     - Sparkle       ≈ 200（与homebrew去重后 ≈ 40）
+     - MacUpdater    ≈ 800（与前三者去重后 ≈ 80）
+
+ - 所以，核心 = 如何将APP迁移到 homebrew 、 Mac AppStpre
+
+ - 最终，只要解决一个问题：
+   ✅ 如何将 本地已经安装的APP，自动化的，将APP迁移到homebrew ？ 如下：
+    迁移命令（可在本项目中下载此命令）：
+    ~~~
+    ./usercmd_migrate_macapp_to_homebrew
+    ~~~
+    
+ -  上述命令执行后，会生成如下文件
+    ~~~
+    ./brew_install_commands.txt	# ✅ ✅ ✅ 此文件为 可以迁移的软件列表
+    ./non_brew_non_mas_apps.txt	
+    ./ambiguous_matches.txt
+    ~~~
+
+    brew_install_commands.txt 内含了，迁移所需的全部命令。注意，迁移过程会触发多次密码请求。
+
+
+.
+
+
 # 如何设置定时更新？
 
  - 如何实现，类似AppStore一样，每天夜间，自动静默更新 所有 Mac APP ？ 请看如下：
@@ -122,42 +156,9 @@
 
 .
 
-
-# 可管理的应用太少，怎么办？
-
- - 我发现，通过本脚本升级的APP数量太少，只有总APP数量的1/3 ，怎么办 ？ 请看如下：
-
- - 只要软件尽量通过homebrew和appstore这两个渠道去安装，哪怕在没有MacUpdater的参与下，更新覆盖率也能接近90%。请看，下述案例：
- 
- - 以一台800多个软件的Mac为例：
-     - Homebrew Cask ≈ 450
-     - Mac AppStore  ≈ 250
-     - Sparkle       ≈ 200（与homebrew去重后 ≈ 40）
-     - MacUpdater    ≈ 800（与前三者去重后 ≈ 80）
-
- - 所以，核心 = 如何将APP迁移到 homebrew 、 Mac AppStpre
-
- - 最终，只要解决一个问题：
-   ✅ 如何将 本地已经安装的APP，自动化的，将APP迁移到homebrew ？ 如下：
-    迁移命令（可在本项目中下载此命令）：
-    ~~~
-    ./usercmd_migrate_macapp_to_homebrew
-    ~~~
-    
- -  上述命令执行后，会生成如下文件
-    ~~~
-    ./brew_install_commands.txt	# ✅ ✅ ✅ 此文件为 可以迁移的软件列表
-    ./non_brew_non_mas_apps.txt	
-    ./ambiguous_matches.txt
-    ~~~
-
-    brew_install_commands.txt 内含了，迁移所需的全部命令。注意，迁移过程会触发多次密码请求。
-
-.
-
 # 如何避免密码请求？
 
- - 如何让每次更新APP的时候，都不弹出管理员密码请求，全程能全自动更新 ？ 请看如下：
+ - 如何让每次执行本脚本 更新APP (包括定时更新) 的时候，都不弹出管理员密码请求，全程能全自动更新 ？ 请看如下：
  - 需要通过 sudo visudo，将要程序加入到免密列表当中
 
 傻瓜配置如下：（注意，用户名，不区分 大小写）
