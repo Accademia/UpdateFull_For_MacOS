@@ -3049,7 +3049,7 @@ EOF
                     sha_expected=$(sed -E 's/\x1B\[[0-9;]*[A-Za-z]//g' "$brew_cask_tmpfile" | grep -i 'Expected:' | head -n1 | sed -E 's/.*Expected:[[:space:]]*//I' || true)
                     sha_actual=$(sed -E 's/\x1B\[[0-9;]*[A-Za-z]//g' "$brew_cask_tmpfile" | grep -i 'Actual:' | head -n1 | sed -E 's/.*Actual:[[:space:]]*//I' || true)
                     echo -e "⚠️  检测到校验码不匹配 [cask]   $pkg_brew_cask ，停止后续尝试。实际校验码: ${sha_actual:-未知} ，期望校验码: ${sha_expected:-未知}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                    updated_list+=("failure|cask|$pkg_brew_cask|checksum_mismatch:${sha_actual:-unknown}:${sha_expected:-unknown}")
+                    updated_list+=("failure|cask|$pkg_brew_cask|sha256_mismatch:${sha_actual:-unknown}:${sha_expected:-unknown}")
                     echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     # 调试输出：发生校验不匹配，跳过当前 cask
                     if [ "${DEBUG_SCRIPT:-false}" = true ]; then
@@ -3073,7 +3073,7 @@ EOF
                     sha_expected=$(grep -i 'Expected:' "$brew_cask_tmpfile" | head -n1 | sed -E 's/.*Expected:[[:space:]]*//I' || true)
                     sha_actual=$(grep -i 'Actual:' "$brew_cask_tmpfile" | head -n1 | sed -E 's/.*Actual:[[:space:]]*//I' || true)
                     echo -e "⚠️  检测到校验码不匹配 [cask]   $pkg_brew_cask ，停止后续尝试。实际校验码: ${sha_actual:-未知} ，期望校验码: ${sha_expected:-未知}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                    updated_list+=("failure|cask|$pkg_brew_cask|checksum_mismatch:${sha_actual:-unknown}:${sha_expected:-unknown}")
+                    updated_list+=("failure|cask|$pkg_brew_cask|sha256_mismatch:${sha_actual:-unknown}:${sha_expected:-unknown}")
                     echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     if [ "${DEBUG_SCRIPT:-false}" = true ]; then
                         echo -e "[DEBUG] SHA-256 mismatch detected for $pkg_brew_cask via fallback check, skipping further install attempts" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
