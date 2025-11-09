@@ -11,6 +11,13 @@ fi
 #设置执行所需的 环境变量！
 export PATH="/usr/local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/opt/local/bin:/opt/local/sbin:$PATH"
 
+# 禁用 Homebrew 的彩色输出，以便于解析日志内容。设置该变量可以防止 brew 在非交互环境下插入 ANSI 颜色序列。
+export HOMEBREW_NO_COLOR=1
+
+# 脚本版本号：用于调试和确认是否使用最新脚本
+SCRIPT_VERSION="debug-2025-11-10-v2"
+echo -e "[Info] Script version: $SCRIPT_VERSION"
+
 # 预先解析 GNU Parallel 的绝对路径。在某些 sudo 环境下 PATH 可能被重置，导致找不到 parallel。
 if command -v parallel >/dev/null 2>&1; then
     PARALLEL_BIN="$(command -v parallel)"
@@ -240,6 +247,12 @@ LOG_ERROR_FILE="$LOG_PATH/Update_Error.log"
 LOG_MACUPDATER_FILE="$LOG_PATH/Update_MacUpdater.log"
 
 echo -e "" | tee "$LOG_MACUPDATER_FILE" > /dev/null
+
+# 打印脚本版本信息到日志，方便核对版本。仅在日志路径初始化后执行。
+echo -e "[Info] Script version: $SCRIPT_VERSION" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
+# 调试开关：设置为 true 时，会输出调试信息；运行稳定后可改为 false 以关闭调试输出。
+DEBUG_SCRIPT=false
 
 # 开启严格模式与统一错误处理。
 # 使用 set -Eeuo pipefail 让脚本在遇到未捕获的错误时立即退出，
@@ -1327,6 +1340,11 @@ run_fsinstaller_if_needed() {
     local __logfile="$3"
     local __installer_path=""
 
+    # 调试输出：记录函数调用及传入参数
+    if [ "${DEBUG_SCRIPT:-false}" = true ]; then
+        echo -e "[DEBUG] run_fsinstaller_if_needed: cask=\"${__cask_name}\", tmpfile=\"${__tmpfile}\", logfile=\"${__logfile}\"" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    fi
+
     # 尝试从临时文件中解析 FSInstaller 路径
     if [[ -n "$__tmpfile" && -f "$__tmpfile" ]]; then
         __installer_path=$(grep -oE "/[^ ]*/${__cask_name}/[^ ]*/FSInstaller\.app" "$__tmpfile" | head -n 1 || true)
@@ -1354,6 +1372,11 @@ run_fsinstaller_if_needed() {
             open -n "$__installer_path" >/dev/null 2>&1 &
         fi
         echo -e "⚠️  检测到 ${__cask_name} 需要手动安装，已尝试后台启动安装器：${__installer_path}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    else
+        # 调试输出：未找到手动安装器
+        if [ "${DEBUG_SCRIPT:-false}" = true ]; then
+            echo -e "[DEBUG] run_fsinstaller_if_needed: No FSInstaller.app found for ${__cask_name}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        fi
     fi
 }
 
@@ -2938,6 +2961,11 @@ EOF
         # 逐个安装 每个待更新的 cask app
         for pkg_brew_cask in "${packages_brew_casks[@]}"; do
 
+            # 调试输出：开始处理当前 cask
+            if [ "${DEBUG_SCRIPT:-false}" = true ]; then
+                echo -e "[DEBUG] Begin processing cask: $pkg_brew_cask" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            fi
+
             # 如果在并行下载阶段检测到该 cask 下载失败，则直接跳过升级
             if [[ -n "$FAILED_FETCH_CASKS_FILE" && -f "$FAILED_FETCH_CASKS_FILE" ]]; then
                 fail_line=$(grep -F "${pkg_brew_cask}|" "$FAILED_FETCH_CASKS_FILE" || true)
@@ -2979,29 +3007,54 @@ EOF
             # ---------- 升级 cask 应用 ----------   
 
             # 第一次尝试升级：通过 brew upgrade 升级 APP
-            if [ "$(id -u)" -eq 0 ]; then
-              # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
-              targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-              echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_cask 升级 ( brew upgrade --cask --greedy $pkg_brew_cask --verbose --debug ) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-              # 使用辅助函数 run_as_normal_user 保留环境并执行 brew upgrade
-              run_as_normal_user brew upgrade --cask --greedy "$pkg_brew_cask" 2>&1         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_cask_tmpfile"
-            else
-              echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 $pkg_brew_cask 升级 ( brew upgrade --cask --greedy $pkg_brew_cask --verbose --debug ) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-              brew upgrade --cask --greedy "$pkg_brew_cask" 2>&1                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_cask_tmpfile"
-            fi
+            # 调用 brew upgrade，并捕获其输出以供后续检测，同时仍输出到日志。
+            # 为确保能够准确检测 SHA 校验错误，将 brew upgrade 的输出保存在变量 upgrade_output 中，
+            # 结束后再写入临时文件供 run_fsinstaller_if_needed 查找 FSInstaller。
+            {
+                if [ "$(id -u)" -eq 0 ]; then
+                    # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
+                    targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
+                    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_cask 升级 ( brew upgrade --cask --greedy $pkg_brew_cask --verbose --debug ) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    upgrade_output=$( run_as_normal_user brew upgrade --cask --greedy "$pkg_brew_cask" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" )
+                    brew_cask_upgrade_exit=${PIPESTATUS[0]}
+                else
+                    echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 $pkg_brew_cask 升级 ( brew upgrade --cask --greedy $pkg_brew_cask --verbose --debug ) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    upgrade_output=$( brew upgrade --cask --greedy "$pkg_brew_cask" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" )
+                    brew_cask_upgrade_exit=${PIPESTATUS[0]}
+                fi
+            }  # end capture subshell
 
-            brew_cask_upgrade_exit=${PIPESTATUS[0]}        # 取 brew upgrade 的退出码
-            brew_cask_final_exit=$brew_cask_upgrade_exit             # 先假定最终状态 = 升级状态
+            brew_cask_final_exit=$brew_cask_upgrade_exit
+            # 将捕获到的输出写入临时文件，用于 run_fsinstaller_if_needed 分析。
+            echo "$upgrade_output" > "$brew_cask_tmpfile"
+
+            # 调试输出：打印 brew upgrade 的临时输出文件内容，帮助定位校验码检测失败的原因
+            if [ "${DEBUG_SCRIPT:-false}" = true ]; then
+                # 输出临时文件路径和权限以确认其正确创建
+                echo -e "[DEBUG] Temp file for $pkg_brew_cask: $brew_cask_tmpfile" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                ls -l "$brew_cask_tmpfile" 2>/dev/null | sed -e 's/^/>> /' | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "[DEBUG] Captured output for upgrade of $pkg_brew_cask (exit $brew_cask_upgrade_exit):" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                # 显示前几十行内容，防止日志过长
+                head -n 40 "$brew_cask_tmpfile" 2>/dev/null | sed -e 's/^/>> /' | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            fi
 
             # ---------- 新增：SHA-256 校验失败检测 ----------
             # 当首次升级失败且输出包含 SHA-256 mismatch 时，直接记录失败并跳过后续重装
             if [ "$brew_cask_upgrade_exit" -ne 0 ]; then
-                if grep -qiE 'sha[- ]?256 mismatch' "$brew_cask_tmpfile"; then
-                    sha_expected=$(grep -i 'Expected:' "$brew_cask_tmpfile" | head -n1 | sed -E 's/.*Expected:[[:space:]]*//I')
-                    sha_actual=$(grep -i 'Actual:' "$brew_cask_tmpfile" | head -n1 | sed -E 's/.*Actual:[[:space:]]*//I')
-                    echo -e "⚠️  检测到 SHA-256 校验失败 [cask]   $pkg_brew_cask ，停止后续尝试。实际校验码: ${sha_actual:-未知} ，期望校验码: ${sha_expected:-未知}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                    updated_list+=("failure|cask|$pkg_brew_cask|sha256_mismatch:${sha_actual:-unknown}:${sha_expected:-unknown}")
+                # 检测常见的校验失败提示，若匹配则直接记录失败并跳过后续尝试。
+                # 为避免 ANSI 颜色编码影响匹配结果，先移除输出中的转义序列。
+                # 使用 sed 删除 ESC[ 开头的终端控制序列，再用 grep 进行匹配。
+                if sed -E 's/\x1B\[[0-9;]*[A-Za-z]//g' "$brew_cask_tmpfile" | \
+                   grep -qiE 'sha[ -]*256[^[:alnum:]]*mismatch|checksum[^[:alnum:]]*mismatch|wrong checksum'; then
+                    sha_expected=$(sed -E 's/\x1B\[[0-9;]*[A-Za-z]//g' "$brew_cask_tmpfile" | grep -i 'Expected:' | head -n1 | sed -E 's/.*Expected:[[:space:]]*//I' || true)
+                    sha_actual=$(sed -E 's/\x1B\[[0-9;]*[A-Za-z]//g' "$brew_cask_tmpfile" | grep -i 'Actual:' | head -n1 | sed -E 's/.*Actual:[[:space:]]*//I' || true)
+                    echo -e "⚠️  检测到校验码不匹配 [cask]   $pkg_brew_cask ，停止后续尝试。实际校验码: ${sha_actual:-未知} ，期望校验码: ${sha_expected:-未知}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    updated_list+=("failure|cask|$pkg_brew_cask|checksum_mismatch:${sha_actual:-unknown}:${sha_expected:-unknown}")
                     echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    # 调试输出：发生校验不匹配，跳过当前 cask
+                    if [ "${DEBUG_SCRIPT:-false}" = true ]; then
+                        echo -e "[DEBUG] Checksum mismatch detected for $pkg_brew_cask, skipping further install attempts" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    fi
                     rm -f "$brew_cask_tmpfile"
                     continue   # 跳过后续重装
                 fi
@@ -3009,6 +3062,25 @@ EOF
 
             # ---------- 若升级失败则尝试重装 ----------
             if [ $brew_cask_upgrade_exit -ne 0 ] ; then
+
+                # 注意：若首次升级失败且未检测到校验码不匹配，则继续执行后续 reinstall 逻辑。
+                # 这里不再根据是否属于 MANUAL_INSTALL_CASKS 来决定是否跳过，
+                # 因为 reinstall / reinstall --force 可以解决因占用进程导致的升级失败。
+
+                # 额外检测：brew upgrade 输出中若包含显式的 "SHA-256 mismatch" 文本，则认为校验码错误并跳过后续安装。
+                # 某些情况下 ANSI 颜色影响前面的正则匹配，这里直接匹配关键字以增强鲁棒性。
+                if grep -qi 'SHA-256 mismatch' "$brew_cask_tmpfile"; then
+                    sha_expected=$(grep -i 'Expected:' "$brew_cask_tmpfile" | head -n1 | sed -E 's/.*Expected:[[:space:]]*//I' || true)
+                    sha_actual=$(grep -i 'Actual:' "$brew_cask_tmpfile" | head -n1 | sed -E 's/.*Actual:[[:space:]]*//I' || true)
+                    echo -e "⚠️  检测到校验码不匹配 [cask]   $pkg_brew_cask ，停止后续尝试。实际校验码: ${sha_actual:-未知} ，期望校验码: ${sha_expected:-未知}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    updated_list+=("failure|cask|$pkg_brew_cask|checksum_mismatch:${sha_actual:-unknown}:${sha_expected:-unknown}")
+                    echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    if [ "${DEBUG_SCRIPT:-false}" = true ]; then
+                        echo -e "[DEBUG] SHA-256 mismatch detected for $pkg_brew_cask via fallback check, skipping further install attempts" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    fi
+                    rm -f "$brew_cask_tmpfile"
+                    continue
+                fi
 
                 # 注意：⚠️ cask不需要 重新链接 ！
 
@@ -3228,13 +3300,6 @@ EOF
 
             fi  
 
-            # 在重新启动应用之前，检查是否需要后台启动手动安装器。
-            # 某些 cask（如 Paragon 系列）在安装完成后仍需运行 FSInstaller.app 才能真正完成安装。
-            # 如果当前 cask 不在手动安装列表中，则调用 run_fsinstaller_if_needed 尝试启动安装器。
-            if [[ " ${MANUAL_INSTALL_CASKS[*]} " != *" $pkg_brew_cask "* ]]; then
-              run_fsinstaller_if_needed "$pkg_brew_cask" "$brew_cask_tmpfile" "$LOG_FULL_LAST"
-            fi
-
             # ---------- 重新启动 APP（如果在本次升级中被关闭） ----------   
 
             # 如果之前关闭了应用，更新完成后重新打开 
@@ -3272,7 +3337,19 @@ EOF
 
             echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
+            # 在记录完结果后，检查是否需要后台启动手动安装器。
+            # 仅当该 cask 不在手动安装列表中时执行，并在后台运行
+            if [[ " ${MANUAL_INSTALL_CASKS[*]} " != *" $pkg_brew_cask "* ]]; then
+                # 将调用放入后台运行，避免由于解析或 open 命令阻塞导致主流程停滞
+                run_fsinstaller_if_needed "$pkg_brew_cask" "$brew_cask_tmpfile" "$LOG_FULL_LAST" &
+            fi
+
             rm -f "$brew_cask_tmpfile"  # 清理临时文件
+
+            # 调试输出：完成当前 cask 处理
+            if [ "${DEBUG_SCRIPT:-false}" = true ]; then
+                echo -e "[DEBUG] Finished processing cask: $pkg_brew_cask (final_exit=$brew_cask_final_exit)" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            fi
 
         done
 
