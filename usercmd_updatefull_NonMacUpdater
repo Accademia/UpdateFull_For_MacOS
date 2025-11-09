@@ -561,6 +561,59 @@ attempt_quit_app() {
 
 }
 
+################################################################################
+# 新增函数：run_fsinstaller_if_needed
+#
+# 部分 HomeBrew Cask（如 Paragon 系列）在安装或升级后仅提供手动安装器，
+# brew 会提示用户运行 “open .../FSInstaller.app” 以完成安装。为了自动化
+# 完成此步骤，本函数尝试根据输出记录或 Caskroom 目录寻找 FSInstaller.app，
+# 移除其隔离标记并在后台启动安装器。若未找到路径则静默跳过。
+#
+# 参数：
+#   $1 - Cask 名称
+#   $2 - 临时输出文件（可能包含安装器路径）
+#   $3 - 日志文件，用于回溯查找安装器路径
+run_fsinstaller_if_needed() {
+    local __cask_name="$1"
+    local __tmpfile="$2"
+    local __logfile="$3"
+    local __installer_path=""
+
+    # 优先从临时输出文件中解析 brew 输出中带有 FSInstaller.app 的路径
+    if [[ -n "$__tmpfile" && -f "$__tmpfile" ]]; then
+        __installer_path=$(grep -oE "/[^ ]*/${__cask_name}/[^ ]*/FSInstaller\.app" "$__tmpfile" | head -n 1 || true)
+    fi
+    # 其次尝试从主日志文件中提取
+    if [[ -z "$__installer_path" && -n "$__logfile" && -f "$__logfile" ]]; then
+        __installer_path=$(grep -oE "/[^ ]*/${__cask_name}/[^ ]*/FSInstaller\.app" "$__logfile" | tail -n 1 || true)
+    fi
+    # 如果输出中未找到，则检查 Caskroom 目录是否存在安装器
+    if [[ -z "$__installer_path" ]]; then
+        local __caskroom_base
+        __caskroom_base=$(brew --prefix)/Caskroom
+        if [[ -d "$__caskroom_base/${__cask_name}" ]]; then
+            __installer_path=$(find "$__caskroom_base/${__cask_name}" -maxdepth 3 -type d -name "FSInstaller.app" 2>/dev/null | sort -r | head -n 1 || true)
+        fi
+    fi
+    # 若找到安装器路径，则尝试在后台启动安装器
+    if [[ -n "$__installer_path" && -d "$__installer_path" ]]; then
+        # 移除隔离标记，以避免 Gatekeeper 阻止
+        if [[ $(id -u) -eq 0 ]]; then
+            local __targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+            # 先解除隔离标记
+            sudo -n -u "$__targetUser" xattr -dr com.apple.quarantine "$__installer_path" || true
+            # 以实际用户启动安装器，并在后台运行（非阻塞）
+            sudo -n -u "$__targetUser" open -n "$__installer_path" >/dev/null 2>&1 &
+        else
+            xattr -dr com.apple.quarantine "$__installer_path" || true
+            open -n "$__installer_path" >/dev/null 2>&1 &
+        fi
+        # 记录提示信息
+        echo -e "⚠️  检测到 ${__cask_name} 需要手动安装，已尝试后台启动安装器：${__installer_path}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    fi
+}
+export -f run_fsinstaller_if_needed
+
 
 
 # ************************* #
@@ -3163,11 +3216,12 @@ EOF
                       targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
                       # 使用非交互模式的 sudo 调用，避免在后台运行时等待密码
                       sudo -n -u "$targetUser" xattr -dr com.apple.quarantine "$manual_installer_app"
-                      # 以图形界面方式启动安装器并等待安装器退出
-                      sudo -n -u "$targetUser" open -n -W "$manual_installer_app"
+                      # 以图形界面方式启动安装器，后台运行不阻塞
+                      sudo -n -u "$targetUser" open -n "$manual_installer_app" >/dev/null 2>&1 &
                     else
                       xattr -dr com.apple.quarantine "$manual_installer_app"
-                      open -n -W "$manual_installer_app"
+                      # 启动安装器，后台运行不阻塞
+                      open -n "$manual_installer_app" >/dev/null 2>&1 &
                     fi
                   else
                     echo -e "❌ 未找到 $pkg_brew_cask 的安装器，请手动在 Finder 中运行 FSInstaller.app"
@@ -3178,6 +3232,11 @@ EOF
                 fi
 
             fi  
+
+            # 在开始重新启动应用之前，检查是否有需要后台运行的手动安装器
+            # 某些 cask（如 Paragon 系列）在安装完成后仍需运行 FSInstaller.app 才能真正完成安装。
+            # 这里通过 run_fsinstaller_if_needed 解析 brew 输出或 Caskroom 目录并尝试启动安装器。
+            run_fsinstaller_if_needed "$pkg_brew_cask" "$brew_cask_tmpfile" "$LOG_FULL_LAST"
 
             # ---------- 重新启动 APP（如果在本次升级中被关闭） ----------   
 
