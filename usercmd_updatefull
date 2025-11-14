@@ -15,8 +15,7 @@ export PATH="/usr/local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/opt/local/bin:
 export HOMEBREW_NO_COLOR=1
 
 # 脚本版本号：用于调试和确认是否使用最新脚本
-SCRIPT_VERSION="debug-2025-11-10-v2"
-echo -e "[Info] Script version: $SCRIPT_VERSION"
+SCRIPT_VERSION="2025.11.10.v2"
 
 # 预先解析 GNU Parallel 的绝对路径。在某些 sudo 环境下 PATH 可能被重置，导致找不到 parallel。
 if command -v parallel >/dev/null 2>&1; then
@@ -249,7 +248,7 @@ LOG_MACUPDATER_FILE="$LOG_PATH/Update_MacUpdater.log"
 echo -e "" | tee "$LOG_MACUPDATER_FILE" > /dev/null
 
 # 打印脚本版本信息到日志，方便核对版本。仅在日志路径初始化后执行。
-echo -e "[Info] Script version: $SCRIPT_VERSION" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+#echo -e "[Info] Script version : $SCRIPT_VERSION" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 # 调试开关：设置为 true 时，会输出调试信息；运行稳定后可改为 false 以关闭调试输出。
 DEBUG_SCRIPT=false
@@ -609,7 +608,11 @@ maybe_run_as_normal_user() {
 }
 export -f run_as_normal_user
 export -f maybe_run_as_normal_user
-export -f run_fsinstaller_if_needed
+##
+## 注：run_fsinstaller_if_needed 的定义在脚本稍后部分，为避免出现
+## `export: run_fsinstaller_if_needed: not a function` 的错误，这里不立即导出。
+## 该函数将在定义完成后再进行 export。
+
 
 
 
@@ -803,9 +806,10 @@ echo -e "MacUpdater 执行日志 - $(date)" | tee "$LOG_MACUPDATER_FILE" > /dev/
 echo -e ""                                                                              | tee -a "$LOG_ERROR_FILE"
 echo -e "-------------------------------------------------------------------"           | tee -a "$LOG_ERROR_FILE" > /dev/null
 echo -e "" | tee -a "$LOG_ERROR_FILE" > /dev/null
-echo -e "[自动更新]  $(date '+%Y-%m-%d %H:%M:%S')  "                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_ERROR_FILE" 
+echo -e "[Version]  $SCRIPT_VERSION "                                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_ERROR_FILE" 
+echo -e "[Running]  $(date '+%Y-%m-%d      %H:%M:%S')   "                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_ERROR_FILE" 
 echo -e "======================================================================="       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-printf  "测试网络（海外 HTTPS 连接） ...  ｜  "                                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_ERROR_FILE" 
+printf  "测试网络（海外 HTTPS 连接） ...   |   "                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_ERROR_FILE" 
 echo -e "当前工作目录 = '$PWD' "                                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_ERROR_FILE" 
 echo -e ""                                                                              | tee -a "$LOG_ERROR_FILE" > /dev/null
 
@@ -1379,6 +1383,11 @@ run_fsinstaller_if_needed() {
         fi
     fi
 }
+
+# 将 run_fsinstaller_if_needed 导出到子进程。
+# 由于函数定义在此处才出现，故需在此处导出，避免在脚本顶部导出时出现
+# "export: run_fsinstaller_if_needed: not a function" 的错误。
+export -f run_fsinstaller_if_needed
 
 
 echo -e "\033[1;36m-----------------------------------------------\033[0m"
