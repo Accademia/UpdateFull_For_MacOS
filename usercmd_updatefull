@@ -2235,12 +2235,12 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
         printf "\033[1;34m[INFO]\033[0m "
         printf "[INFO] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-        echo -e "Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 SHA256 检查" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 SHA256 检查 ，是否有 已缓存的安装包 ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     else
         printf "\033[1;34m[INFO]\033[0m "
         printf "[INFO] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
         # 普通用户直接运行 SHA256 检查
-        echo -e "当前用户 '$USER' 为普通权限 , 直接运行 SHA256 检查 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "当前用户 '$USER' 为普通权限 , 直接运行 SHA256 检查 ，是否有 已缓存的安装包 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     fi
 
     # 初始化缓存列表，用于后续汇总输出
@@ -2453,11 +2453,11 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
         printf "\033[1;34m[INFO]\033[0m "
         printf "[INFO] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-        echo -e "Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 并行下载（parallel download）安装包" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 并行下载（parallel download）安装包  ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     else
         printf "\033[1;34m[INFO]\033[0m "
         printf "[INFO] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-        echo -e "当前用户 '$USER' 为普通权限 , 直接运行 并行下载（parallel download）安装包" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "当前用户 '$USER' 为普通权限 , 直接运行 并行下载（parallel download）安装包  ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     fi
 
 
@@ -2853,7 +2853,7 @@ EOF
             for pkg in "${success_casks_list[@]}"; do
                 echo -e "✅  下载成功 [cask]   ：$pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             done
-            echo -e "------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+           #echo -e "------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         else
             # 无成功列表时仍插入分隔线，保证输出美观
             echo -e "------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
