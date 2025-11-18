@@ -15,7 +15,7 @@ export PATH="/usr/local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/opt/local/bin:
 export HOMEBREW_NO_COLOR=1
 
 # 脚本版本号：用于调试和确认是否使用最新脚本
-SCRIPT_VERSION="2025.11.10.v2"
+SCRIPT_VERSION="2025.11.19.v2"
 
 # 预先解析 GNU Parallel 的绝对路径。在某些 sudo 环境下 PATH 可能被重置，导致找不到 parallel。
 if command -v parallel >/dev/null 2>&1; then
@@ -2206,11 +2206,11 @@ done <<< "$brew_outdated_casks"
 # 分类打印（先判定 cask，再判定 formula）
 for pkg in "${packages_brew[@]}"; do
   if printf '%s\n' "${packages_brew_casks[@]}"     | grep -qxF -- "$pkg"; then
-    echo -e "✅  检测到新版本 [cask]    : $pkg"   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✔︎  检测到新版本 [cask]    : $pkg"   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
   elif printf '%s\n' "${packages_brew_formulas[@]}" | grep -qxF -- "$pkg"; then
-    echo -e "✅  检测到新版本 [formula] : $pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✔︎  检测到新版本 [formula] : $pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
   else
-    echo -e "✅  检测到新版本 [unknown] : $pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✔︎  检测到新版本 [unknown] : $pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
   fi
 done
 
@@ -2235,7 +2235,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
         printf "\033[1;34m[INFO]\033[0m "
         printf "[INFO] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-        echo -e "Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 SHA256 检查 ，是否有 已缓存的安装包 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 SHA256 检查 ，是否有 已缓存的安装包 ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     else
         printf "\033[1;34m[INFO]\033[0m "
         printf "[INFO] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
@@ -2457,7 +2457,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
     else
         printf "\033[1;34m[INFO]\033[0m "
         printf "[INFO] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-        echo -e "当前用户 '$USER' 为普通权限 , 直接运行 并行下载（parallel download）安装包 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "当前用户 '$USER' 为普通权限 , 直接运行 并行下载（parallel download）安装包  ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     fi
 
 
@@ -2616,7 +2616,12 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         else
             echo -e "❌  下载失败 [formula] ：$pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             # 提取最后出现的 URL（若无则为空）
-            url=$(grep -oE 'https?://[^[:space:]]+' "$tmpfile" | tail -n1 || true)
+            # 在提取下载链接前确认临时文件存在，避免 grep 对已删除文件报错
+            if [[ -f "$tmpfile" ]]; then
+                url=$(grep -oE 'https?://[^[:space:]]+' "$tmpfile" 2>/dev/null | tail -n1 || true)
+            else
+                url=""
+            fi
             echo "$pkg|$url" >> "$FAILED_FETCH_FORMULAS_FILE"
         fi
         rm -f "$tmpfile"
@@ -2706,7 +2711,12 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             echo "$pkg" >> "$SUCCESS_FETCH_CASKS_FILE"
         else
             echo -e "❌  下载失败 [cask] ：$pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-            url=$(grep -oE 'https?://[^[:space:]]+' "$tmpfile" | tail -n1 || true)
+            # 在提取下载链接前确认临时文件存在，避免 grep 对已删除文件报错
+            if [[ -f "$tmpfile" ]]; then
+                url=$(grep -oE 'https?://[^[:space:]]+' "$tmpfile" 2>/dev/null | tail -n1 || true)
+            else
+                url=""
+            fi
             echo "$pkg|$url" >> "$FAILED_FETCH_CASKS_FILE"
         fi
         rm -f "$tmpfile"
@@ -2848,10 +2858,10 @@ EOF
         if [ ${#success_formulas_list[@]} -gt 0 ] || [ ${#success_casks_list[@]} -gt 0 ]; then
             echo -e "------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             for pkg in "${success_formulas_list[@]}"; do
-                echo -e "✅  下载成功 [formula] ：$pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "✔︎  下载成功 [formula] ：$pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             done
             for pkg in "${success_casks_list[@]}"; do
-                echo -e "✅  下载成功 [cask]   ：$pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "✔︎  下载成功 [cask]   ：$pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             done
            #echo -e "------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         else
@@ -2971,11 +2981,17 @@ EOF
             # 如果此次升级失败且输出中含有 SHA-256 mismatch，则提取期望和实际校验码并停止后续尝试
             # 允许用户通过 SHA_MISMATCH_MAX_RETRIES 配置尝试次数（默认为 1）
             if [ "$brew_formula_upgrade_exit" -ne 0 ]; then
-                # 查找关键字（兼容大小写）
-                if grep -qiE 'sha[- ]?256 mismatch' "$brew_formula_tmpfile"; then
-                    # 抽取期望和实际校验码（若有）
-                    sha_expected=$(grep -i 'Expected:' "$brew_formula_tmpfile" | head -n1 | sed -E 's/.*Expected:[[:space:]]*//I')
-                    sha_actual=$(grep -i 'Actual:' "$brew_formula_tmpfile" | head -n1 | sed -E 's/.*Actual:[[:space:]]*//I')
+                # 查找关键字（兼容大小写）。在访问临时文件前先确认其存在，
+                # 避免在文件已被删除的情况下触发 “grep: No such file or directory” 错误。
+                if [[ -f "$brew_formula_tmpfile" ]] && grep -qiE 'sha[- ]?256 mismatch' "$brew_formula_tmpfile"; then
+                    # 抽取期望和实际校验码（若有）。同样在读取前检查文件是否仍存在。
+                    if [[ -f "$brew_formula_tmpfile" ]]; then
+                        sha_expected=$(grep -i 'Expected:' "$brew_formula_tmpfile" | head -n1 | sed -E 's/.*Expected:[[:space:]]*//I')
+                        sha_actual=$(grep -i 'Actual:' "$brew_formula_tmpfile" | head -n1 | sed -E 's/.*Actual:[[:space:]]*//I')
+                    else
+                        sha_expected=""
+                        sha_actual=""
+                    fi
                     # 输出警告并停止重试
                     echo -e "⚠️  检测到 SHA-256 校验失败 [formula] $pkg_brew_formula ，停止后续尝试。实际校验码: ${sha_actual:-未知} ，期望校验码: ${sha_expected:-未知}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     # 记录失败状态，方法为 sha256_mismatch:actual:expected
@@ -2990,7 +3006,9 @@ EOF
             if [ $brew_formula_upgrade_exit -ne 0 ] ; then
 
                 # 第二次尝试升级：通过 brew link 修复 formula APP 链接 （检查输出中是否包含符号链接冲突提示）
-                if grep -q "not symlinked" "$brew_formula_tmpfile" || grep -q "Could not symlink" "$brew_formula_tmpfile"; then
+                # 先确认临时文件存在，再检查符号链接冲突提示。这样可以避免因文件
+                # 被提前删除而触发 grep 的错误信息。
+                if [[ -f "$brew_formula_tmpfile" ]] && { grep -q "not symlinked" "$brew_formula_tmpfile" || grep -q "Could not symlink" "$brew_formula_tmpfile"; }; then
 
                     echo "⚠️ 检测到 $pkg_brew_formula 升级后，符号链接冲突，尝试执行 'brew link --overwrite $pkg_brew_formula' ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     # 检查是否以 root 身份运行
@@ -3026,6 +3044,9 @@ EOF
                             updated_list+=("failure|formula|$pkg_brew_formula|$brew_formula_method")
                         fi
                         echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        if [ "${DEBUG_SCRIPT:-false}" = true ]; then
+                            echo -e "[DEBUG] Removing brew_formula_tmpfile (relink): $brew_formula_tmpfile" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        fi
                         rm -f "$brew_formula_tmpfile"
                         continue   # 进入下一个 formula 处理
                     else
@@ -3099,7 +3120,10 @@ EOF
             fi
 
             echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-            rm -f "$brew_formula_tmpfile"
+                    if [ "${DEBUG_SCRIPT:-false}" = true ]; then
+                        echo -e "[DEBUG] Removing brew_formula_tmpfile (upgrade failure): $brew_formula_tmpfile" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    fi
+                    rm -f "$brew_formula_tmpfile"
 
         done
 
@@ -3218,7 +3242,7 @@ EOF
                 # 检测常见的校验失败提示，若匹配则直接记录失败并跳过后续尝试。
                 # 为避免 ANSI 颜色编码影响匹配结果，先移除输出中的转义序列。
                 # 使用 sed 删除 ESC[ 开头的终端控制序列，再用 grep 进行匹配。
-                if sed -E 's/\x1B\[[0-9;]*[A-Za-z]//g' "$brew_cask_tmpfile" | \
+                if [[ -f "$brew_cask_tmpfile" ]] && sed -E 's/\x1B\[[0-9;]*[A-Za-z]//g' "$brew_cask_tmpfile" | \
                    grep -qiE 'sha[ -]*256[^[:alnum:]]*mismatch|checksum[^[:alnum:]]*mismatch|wrong checksum'; then
                     sha_expected=$(sed -E 's/\x1B\[[0-9;]*[A-Za-z]//g' "$brew_cask_tmpfile" | grep -i 'Expected:' | head -n1 | sed -E 's/.*Expected:[[:space:]]*//I' || true)
                     sha_actual=$(sed -E 's/\x1B\[[0-9;]*[A-Za-z]//g' "$brew_cask_tmpfile" | grep -i 'Actual:' | head -n1 | sed -E 's/.*Actual:[[:space:]]*//I' || true)
@@ -3243,9 +3267,15 @@ EOF
 
                 # 额外检测：brew upgrade 输出中若包含显式的 "SHA-256 mismatch" 文本，则认为校验码错误并跳过后续安装。
                 # 某些情况下 ANSI 颜色影响前面的正则匹配，这里直接匹配关键字以增强鲁棒性。
-                if grep -qi 'SHA-256 mismatch' "$brew_cask_tmpfile"; then
-                    sha_expected=$(grep -i 'Expected:' "$brew_cask_tmpfile" | head -n1 | sed -E 's/.*Expected:[[:space:]]*//I' || true)
-                    sha_actual=$(grep -i 'Actual:' "$brew_cask_tmpfile" | head -n1 | sed -E 's/.*Actual:[[:space:]]*//I' || true)
+                if [[ -f "$brew_cask_tmpfile" ]] && grep -qi 'SHA-256 mismatch' "$brew_cask_tmpfile"; then
+                    # 初始化默认值，避免在文件不存在时引用未定义变量
+                    sha_expected=""
+                    sha_actual=""
+                    # 在提取期望和实际校验码之前，再次确认临时文件存在
+                    if [[ -f "$brew_cask_tmpfile" ]]; then
+                        sha_expected=$(grep -i 'Expected:' "$brew_cask_tmpfile" | head -n1 | sed -E 's/.*Expected:[[:space:]]*//I' || true)
+                        sha_actual=$(grep -i 'Actual:' "$brew_cask_tmpfile" | head -n1 | sed -E 's/.*Actual:[[:space:]]*//I' || true)
+                    fi
                     echo -e "⚠️  检测到校验码不匹配 [cask]   $pkg_brew_cask ，停止后续尝试。实际校验码: ${sha_actual:-未知} ，期望校验码: ${sha_expected:-未知}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     updated_list+=("failure|cask|$pkg_brew_cask|sha256_mismatch:${sha_actual:-unknown}:${sha_expected:-unknown}")
                     echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -3514,10 +3544,14 @@ EOF
             # 在记录完结果后，检查是否需要后台启动手动安装器。
             # 仅当该 cask 不在手动安装列表中时执行，并在后台运行
             if [[ " ${MANUAL_INSTALL_CASKS[*]} " != *" $pkg_brew_cask "* ]]; then
-                # 将调用放入后台运行，避免由于解析或 open 命令阻塞导致主流程停滞
-                run_fsinstaller_if_needed "$pkg_brew_cask" "$brew_cask_tmpfile" "$LOG_FULL_LAST" &
+                # 同步执行 run_fsinstaller_if_needed，确保在删除临时文件前完成解析
+                run_fsinstaller_if_needed "$pkg_brew_cask" "$brew_cask_tmpfile" "$LOG_FULL_LAST"
             fi
 
+            # 调试输出：删除临时文件前打印其路径，帮助定位潜在的文件访问问题
+            if [ "${DEBUG_SCRIPT:-false}" = true ]; then
+                echo -e "[DEBUG] Removing brew_cask_tmpfile: $brew_cask_tmpfile" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            fi
             rm -f "$brew_cask_tmpfile"  # 清理临时文件
 
             # 调试输出：完成当前 cask 处理
@@ -3873,7 +3907,7 @@ else
                 rc=$?
                 if [ "$rc" -eq 0 ]; then
                     sparkle_updates_list+=("$app")
-                    echo -e "✅  检测到新版本 : $app_name " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    echo -e "✔︎  检测到新版本 : $app_name " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 fi
             done <<< "$sparkle_app_paths"
         else
@@ -3884,7 +3918,7 @@ else
                 rc=$?
                 if [ "$rc" -eq 0 ]; then
                     sparkle_updates_list+=("$app")
-                    echo -e "✅  检测到新版本 : $app_name " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    echo -e "✔︎  检测到新版本 : $app_name " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 fi
             done <<< "$sparkle_app_paths"
         fi
@@ -4059,9 +4093,9 @@ while [ $mas_attempt -le $MAS_MAX_RETRIES ]; do
         echo -e "$mas_output"                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
         # 使用 sed 去掉应用ID和版本号，只保留应用名
         mas_app_names=$(echo "$mas_output" | sed -E 's/^[0-9]+[[:space:]]+//; s/ *\([^)]*\)//g; s/ *->.*//g')
-        #echo -e "✅  检测到新版本 : $mas_app_names" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        #echo -e "✔︎  检测到新版本 : $mas_app_names" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         while IFS= read -r app_line; do
-            [[ -n "$app_line" ]] && echo -e "✅  检测到新版本 : $app_line" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            [[ -n "$app_line" ]] && echo -e "✔︎  检测到新版本 : $app_line" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         done <<< "$mas_app_names"
         mas_success=true
         break
