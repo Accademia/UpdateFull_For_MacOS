@@ -4125,23 +4125,6 @@ printf  "\033[1;34m[Download & Install]\033[0m "
 printf  "[Download & Install] "                                                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "MAS 下载安装 ... "                                                           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
-# ---------------------------------------------------------------------------------------
-# 新增：MAS outdated 完成后，重启 App Store 代理进程和安装守护进程，以避免后续流程因
-# 大量 MAS 请求导致系统安装服务卡死。根据当前权限分别处理，确保日志打印风格一致。
-if [[ "$(id -u)" -eq 0 ]]; then
-    # 当前为 root 权限，直接重启代理进程和安装守护进程
-    echo -e "✓  Root权限, MAS 准备下载安装，正在重启 App Store 代理进程(appstoreagent) 和 installd ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    # 结束 App Store 代理进程（忽略不存在的错误）
-    killall appstoreagent 2>/dev/null || true
-    # 重启安装守护进程
-    killall installd 2>/dev/null || true
-else
-    # 当前为普通用户，需要使用 sudo 重启安装守护进程
-    echo -e "✓  当前用户 '$USER', MAS 准备下载安装，正在重启 App Store 代理进程(appstoreagent) 和 installd ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    killall appstoreagent 2>/dev/null || true
-    sudo $SUDO_N_FLAG killall installd 2>/dev/null || true
-fi
-
 
 # 根据扫描结果决定是否进行安装更新
 if [ "$mas_success" = true ]; then
@@ -4202,6 +4185,23 @@ if [ "$mas_success" = true ]; then
     done
     
     echo -e "✓  所有 待更新的 MAS APP ，均已停止运行 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
+    # ---------------------------------------------------------------------------------------
+    # 新增：MAS outdated 完成后，重启 App Store 代理进程和安装守护进程，以避免后续流程因
+    # 大量 MAS 请求导致系统安装服务卡死。根据当前权限分别处理，确保日志打印风格一致。
+    if [[ "$(id -u)" -eq 0 ]]; then
+        # 当前为 root 权限，直接重启代理进程和安装守护进程
+        echo -e "✓  Root权限, MAS 准备下载安装，正在重启 App Store 代理进程(appstoreagent) 和 installd ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        # 结束 App Store 代理进程（忽略不存在的错误）
+        killall appstoreagent 2>/dev/null || true
+        # 重启安装守护进程
+        killall installd 2>/dev/null || true
+    else
+        # 当前为普通用户，需要使用 sudo 重启安装守护进程
+        echo -e "✓  当前用户 '$USER', MAS 准备下载安装，正在重启 App Store 代理进程(appstoreagent) 和 installd ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        killall appstoreagent 2>/dev/null || true
+        sudo $SUDO_N_FLAG killall installd 2>/dev/null || true
+    fi
 
     if [[ $(id -u) -eq 0 ]]; then
         targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
