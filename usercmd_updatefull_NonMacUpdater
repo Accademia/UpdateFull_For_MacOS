@@ -94,6 +94,12 @@ fi
 STOP_TIME="03:00"       # 拒绝执行 的 结束时间（这个时间后任务正常运行）
 DURATION_MINUTES=1     # 拒绝执行结束前 的 时间长度（10分钟，意味着从 2:50 - 3:00 , 本脚本拒绝执行） 注意，单位：分钟（注意，单位不是秒！！！）
 
+# ===== MAS 更新并行度设置 =====
+# 为 mas upgrade 命令定义并行进程数。默认使用 8 个进程并行执行单个应用的升级
+# 如果希望调整并行度（例如根据 CPU 数量），请修改此变量。
+MAS_PARALLEL_JOBS=8
+
+
 # 路径：保存日志文件的路径
 # ICLOUD_PATH="$HOME/Library/Mobile Documents/com~apple~CloudDocs"            # 获取 iCloud 云盘路径，
 # COMPUTER_NAME=$(scutil --get ComputerName)                                  # 获取 本机名称（并以本机名称作为子文件夹名称）
@@ -2497,10 +2503,10 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             # 在首次下载与重试之间增加头部提示，便于区分本次尝试是初次还是重试
             if [ "$download_attempt" -eq 1 ]; then
                 # 第一次下载
-                echo -e "[下载] $pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "✔︎  开始下载 [formula] ：$pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             else
                 # 重试下载
-                echo -e "[重试] $pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "✔︎  重试中   [formula] ：$pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             fi
             # 调用 brew fetch 下载 formula，去重输出并过滤掉 Bottle Manifest 行，仅保留实际瓶子下载信息
             brew fetch --formula --retry "$pkg" 2>&1 \
@@ -2637,9 +2643,9 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             # 清空 HOMEBREW_CASK_OPTS 环境变量，保证 brew fetch 只接受必要参数。
             # 在首次下载与重试之间增加头部提示
             if [ "$download_attempt" -eq 1 ]; then
-                echo -e "[下载] $pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "✔︎  开始下载 [cask]    ：$pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             else
-                echo -e "[重试] $pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "✔︎  重试中   [cask]    ：$pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             fi
             # 调用 brew fetch 下载 cask，去重输出并过滤 Bottle Manifest 行
             env HOMEBREW_CASK_OPTS="" brew fetch --cask --retry "$pkg" 2>&1 \
@@ -2845,16 +2851,16 @@ EOF
         # 如果存在成功的包，则打印成功列表；否则仍然打印一条分隔线，以便后续统计与下载提示之间有隔断
         if [ ${#success_formulas_list[@]} -gt 0 ] || [ ${#success_casks_list[@]} -gt 0 ]; then
             for pkg in "${success_formulas_list[@]}"; do
-                echo -e "✔︎  下载成功 [formula] ：$pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "✔︎  下载成功 [formula] : $pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             done
             for pkg in "${success_casks_list[@]}"; do
-                echo -e "✔︎  下载成功 [cask]   ：$pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "✔︎  下载成功 [cask]    : $pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             done
         fi
         #echo -e "------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 打印成功统计
-        echo -e "✔︎  下载完成 [formula]：$success_formula/$total_formula_count" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        echo -e "✔︎  下载完成 [cask]   ：$success_cask/$total_cask_count" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✔︎  汇总     [formula] : $success_formula/$total_formula_count" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✔︎  汇总     [cask]    : $success_cask/$total_cask_count" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 输出失败软件列表 [WARNING]
         if [ "$failed_formula" -gt 0 ]; then
             formula_fail_list=$(cut -d'|' -f1 < "$FAILED_FETCH_FORMULAS_FILE" | xargs)
@@ -2921,7 +2927,7 @@ EOF
                     fail_url=$(echo "$fail_line" | cut -d'|' -f2-)
                     echo -e "❌  更新失败 [formula] : $pkg_brew_formula (下载失败：$fail_url)" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     updated_list+=("failure|formula|$pkg_brew_formula|fetch_failed:$fail_url")
-                    echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                   #echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     continue
                 fi
             fi
@@ -2964,7 +2970,7 @@ EOF
                     echo -e "⚠️  检测到 SHA-256 校验失败 [formula] $pkg_brew_formula ，停止后续尝试。实际校验码: ${sha_actual:-未知} ，期望校验码: ${sha_expected:-未知}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     # 记录失败状态，方法为 sha256_mismatch:actual:expected
                     updated_list+=("failure|formula|$pkg_brew_formula|sha256_mismatch:${sha_actual:-unknown}:${sha_expected:-unknown}")
-                    echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                   #echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     rm -f "$brew_formula_tmpfile"
                     continue   # 跳过后续链接或重装步骤
                 fi
@@ -3011,7 +3017,7 @@ EOF
                         else
                             updated_list+=("failure|formula|$pkg_brew_formula|$brew_formula_method")
                         fi
-                        echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                       #echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                         if [ "${DEBUG_SCRIPT:-false}" = true ]; then
                             echo -e "[DEBUG] Removing brew_formula_tmpfile (relink): $brew_formula_tmpfile" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                         fi
@@ -3087,11 +3093,11 @@ EOF
                 updated_list+=("failure|formula|$pkg_brew_formula|$brew_formula_method")
             fi
 
-            echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                    if [ "${DEBUG_SCRIPT:-false}" = true ]; then
-                        echo -e "[DEBUG] Removing brew_formula_tmpfile (upgrade failure): $brew_formula_tmpfile" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                    fi
-                    rm -f "$brew_formula_tmpfile"
+           #echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            if [ "${DEBUG_SCRIPT:-false}" = true ]; then
+                echo -e "[DEBUG] Removing brew_formula_tmpfile (upgrade failure): $brew_formula_tmpfile" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            fi
+            rm -f "$brew_formula_tmpfile"
 
         done
 
@@ -3137,9 +3143,9 @@ EOF
                 fail_line=$(grep -F "${pkg_brew_cask}|" "$FAILED_FETCH_CASKS_FILE" || true)
                 if [[ -n "$fail_line" ]]; then
                     fail_url=$(echo "$fail_line" | cut -d'|' -f2-)
-                    echo -e "❌  更新失败 [cask]   : $pkg_brew_cask (下载失败：$fail_url)" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    echo -e "❌  更新失败 [cask]    : $pkg_brew_cask (下载失败：$fail_url)" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     updated_list+=("failure|cask|$pkg_brew_cask|fetch_failed:$fail_url")
-                    echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                   #echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     continue
                 fi
             fi
@@ -3216,7 +3222,7 @@ EOF
                     sha_actual=$(sed -E 's/\x1B\[[0-9;]*[A-Za-z]//g' "$brew_cask_tmpfile" | grep -i 'Actual:' | head -n1 | sed -E 's/.*Actual:[[:space:]]*//I' || true)
                     echo -e "⚠️  检测到校验码不匹配 [cask]   $pkg_brew_cask ，停止后续尝试。实际校验码: ${sha_actual:-未知} ，期望校验码: ${sha_expected:-未知}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     updated_list+=("failure|cask|$pkg_brew_cask|sha256_mismatch:${sha_actual:-unknown}:${sha_expected:-unknown}")
-                    echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                   #echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     # 调试输出：发生校验不匹配，跳过当前 cask
                     if [ "${DEBUG_SCRIPT:-false}" = true ]; then
                         echo -e "[DEBUG] Checksum mismatch detected for $pkg_brew_cask, skipping further install attempts" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -3246,7 +3252,7 @@ EOF
                     fi
                     echo -e "⚠️  检测到校验码不匹配 [cask]   $pkg_brew_cask ，停止后续尝试。实际校验码: ${sha_actual:-未知} ，期望校验码: ${sha_expected:-未知}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     updated_list+=("failure|cask|$pkg_brew_cask|sha256_mismatch:${sha_actual:-unknown}:${sha_expected:-unknown}")
-                    echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                   #echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     if [ "${DEBUG_SCRIPT:-false}" = true ]; then
                         echo -e "[DEBUG] SHA-256 mismatch detected for $pkg_brew_cask via fallback check, skipping further install attempts" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     fi
@@ -3507,7 +3513,7 @@ EOF
                 updated_list+=("failure|cask|$pkg_brew_cask|$brew_cask_method")
             fi
 
-            echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+           #echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
             # 在记录完结果后，检查是否需要后台启动手动安装器。
             # 仅当该 cask 不在手动安装列表中时执行，并在后台运行
@@ -4036,13 +4042,33 @@ echo -e "✅  APP 数量（ Mac App Store ） ：$mas_app_count  "              
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
+
+
 printf  "\033[1;34m[Scan] \033[0m"
 printf  "[Scan] "                                                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "MAS 扫描更新 ... "                                                             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
-    # 根据已安装应用列表，提取 ID 列用于后续并行检查过时应用。
-    # 使用 awk 取第一列（应用ID），并筛选出纯数字的 ID。
-    mas_app_ids_list=$(echo "$mas_installed_apps" | awk '{print $1}' | grep -E '^[0-9]+$')
+# ---------------------------------------------------------------------------------------
+# 新增：MAS outdated 完成后，重启 App Store 代理进程和安装守护进程，以避免后续流程因
+# 大量 MAS 请求导致系统安装服务卡死。根据当前权限分别处理，确保日志打印风格一致。
+if [[ "$(id -u)" -eq 0 ]]; then
+    # 当前为 root 权限，直接重启代理进程和安装守护进程
+    echo -e "✓  Root权限, MAS 准备扫描，正在重启 App Store 代理进程(appstoreagent) 和 installd ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    # 结束 App Store 代理进程（忽略不存在的错误）
+    killall appstoreagent 2>/dev/null || true
+    # 重启安装守护进程
+    killall installd 2>/dev/null || true
+else
+    # 当前为普通用户，需要使用 sudo 重启安装守护进程
+    echo -e "✓  当前用户 '$USER', MAS 准备扫描，正在重启 App Store 代理进程(appstoreagent) 和 installd ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    killall appstoreagent 2>/dev/null || true
+    sudo $SUDO_N_FLAG killall installd 2>/dev/null || true
+fi
+
+
+# 根据已安装应用列表，提取 ID 列用于后续并行检查过时应用。
+# 使用 awk 取第一列（应用ID），并筛选出纯数字的 ID。
+mas_app_ids_list=$(echo "$mas_installed_apps" | awk '{print $1}' | grep -E '^[0-9]+$')
 
 while [ $mas_attempt -le $MAS_MAX_RETRIES ]; do
    #mas_output=$(mas outdated 2>&1)                                                     # 执行 mas 查询更新（捕获输出和错误）
@@ -4091,11 +4117,31 @@ while [ $mas_attempt -le $MAS_MAX_RETRIES ]; do
     fi
 done
 
+
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+
 
 printf  "\033[1;34m[Download & Install]\033[0m "
 printf  "[Download & Install] "                                                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "MAS 下载安装 ... "                                                           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
+# ---------------------------------------------------------------------------------------
+# 新增：MAS outdated 完成后，重启 App Store 代理进程和安装守护进程，以避免后续流程因
+# 大量 MAS 请求导致系统安装服务卡死。根据当前权限分别处理，确保日志打印风格一致。
+if [[ "$(id -u)" -eq 0 ]]; then
+    # 当前为 root 权限，直接重启代理进程和安装守护进程
+    echo -e "✓  Root权限, MAS 准备下载安装，正在重启 App Store 代理进程(appstoreagent) 和 installd ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    # 结束 App Store 代理进程（忽略不存在的错误）
+    killall appstoreagent 2>/dev/null || true
+    # 重启安装守护进程
+    killall installd 2>/dev/null || true
+else
+    # 当前为普通用户，需要使用 sudo 重启安装守护进程
+    echo -e "✓  当前用户 '$USER', MAS 准备下载安装，正在重启 App Store 代理进程(appstoreagent) 和 installd ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    killall appstoreagent 2>/dev/null || true
+    sudo $SUDO_N_FLAG killall installd 2>/dev/null || true
+fi
+
 
 # 根据扫描结果决定是否进行安装更新
 if [ "$mas_success" = true ]; then
@@ -4158,13 +4204,15 @@ if [ "$mas_success" = true ]; then
     echo -e "✓  所有 待更新的 MAS APP ，均已停止运行 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     if [[ $(id -u) -eq 0 ]]; then
-        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 mas upgrade 指定应用 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
-        # 使用目标用户执行 mas upgrade，并仅对需要更新的应用 ID 执行精准升级
-        mas_output=$(sudo -n -H -u "$targetUser" /bin/bash -lc "mas upgrade $mas_app_ids_joined" 2>/dev/null )
+    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 并行运行 mas upgrade 指定应用 ($MAS_PARALLEL_JOBS 个进程) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        # 使用目标用户执行 mas upgrade，并行针对每个需要更新的应用 ID 单独执行 mas upgrade
+        # 将应用 ID 列表通过 printf 逐行传递给 xargs，并行数为 8；每个任务以独立的 bash 会话执行
+        mas_output=$(printf '%s\n' $mas_app_ids | xargs -P $MAS_PARALLEL_JOBS -I{} sudo -n -H -u "$targetUser" /bin/bash -lc "mas upgrade {}" 2>/dev/null )
     else
-        echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 mas upgrade 指定应用 ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
-        mas_output=$( /bin/bash -lc "mas upgrade $mas_app_ids_joined" 2>/dev/null )
+        echo -e "✓  当前用户 '$USER' 为普通权限，直接并行运行 mas upgrade 指定应用 ($MAS_PARALLEL_JOBS 个进程) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
+        # 在普通用户模式下，直接并行运行 mas upgrade，每个任务处理单个应用 ID
+        mas_output=$(printf '%s\n' $mas_app_ids | xargs -P $MAS_PARALLEL_JOBS -I{} /bin/bash -lc "mas upgrade {}" 2>/dev/null )
     fi
     
     echo -e "$mas_output"                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -4225,6 +4273,19 @@ if [ "$mas_success" = true ]; then
     # 完成提示
     echo -e "\033[1;32m[OK] Mac App Store Upgrade  运行已完成已完成 ，APP 已重启 ✅ \033[1;32m"
     echo -e "[OK]  Mac App Store Upgrade  运行已完成已完成 ，APP 已重启 ✅ "                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+
+    # ---------------------------------------------------------------------------------------
+    # 新增：MAS upgrade 完成后，重启 App Store 代理进程和安装守护进程，以防止大量更新请求可能导致系统安装服务卡死。
+    # 根据当前执行身份区分处理，并保证输出风格与其它日志一致。
+    if [[ "$(id -u)" -eq 0 ]]; then
+        echo -e "✓  Root权限, MAS 升级过程结束，正在重启 App Store 代理进程(appstoreagent) 和 installd ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        killall appstoreagent 2>/dev/null || true
+        killall installd 2>/dev/null || true
+    else
+        echo -e "✓  当前用户 '$USER', MAS 升级过程结束，正在重启 App Store 代理进程(appstoreagent) 和 installd ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        killall appstoreagent 2>/dev/null || true
+        sudo $SUDO_N_FLAG killall installd 2>/dev/null || true
+    fi
 
 else
 
