@@ -1490,12 +1490,12 @@ if [ "$mas_installed" = true ]; then
         targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
         echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 MAS 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 以目标用户身份执行 HomeBrew 命令
-        sudo -n -H -u "$targetUser" brew upgrade mas 2>&1 |
+        sudo -n -H -u "$targetUser" brew upgrade --greedy mas 2>&1 |
             tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         mas_update_rc=${PIPESTATUS[0]}
     else
         echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 MAS 自更新 ... "            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-        brew upgrade mas 2>&1 |
+        brew upgrade --greedy mas 2>&1 |
             tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         mas_update_rc=${PIPESTATUS[0]}
     fi
@@ -2438,7 +2438,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         done
     fi
     # 输出分隔线，表示缓存检查结束
-    echo -e "------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+   #echo -e "------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     # 输出并行下载提示信息，根据身份决定降权或直接运行
     if [ "$(id -u)" -eq 0 ]; then
@@ -2844,18 +2844,14 @@ EOF
         done
         # 如果存在成功的包，则打印成功列表；否则仍然打印一条分隔线，以便后续统计与下载提示之间有隔断
         if [ ${#success_formulas_list[@]} -gt 0 ] || [ ${#success_casks_list[@]} -gt 0 ]; then
-            echo -e "------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             for pkg in "${success_formulas_list[@]}"; do
                 echo -e "✔︎  下载成功 [formula] ：$pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             done
             for pkg in "${success_casks_list[@]}"; do
                 echo -e "✔︎  下载成功 [cask]   ：$pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             done
-           #echo -e "------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        else
-            # 无成功列表时仍插入分隔线，保证输出美观
-            echo -e "------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         fi
+        #echo -e "------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 打印成功统计
         echo -e "✔︎  下载完成 [formula]：$success_formula/$total_formula_count" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         echo -e "✔︎  下载完成 [cask]   ：$success_cask/$total_cask_count" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -2878,7 +2874,7 @@ EOF
     else
         # 如果没有任何下载任务，则输出“所有下载已全部完成”并统计扫描包数量
         echo -e "✓  所有下载已全部完成" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        echo -e "------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+       #echo -e "------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 计算扫描到的 formula/cask 数量，用于展示安装包统计
         scanned_formula_count=0
         scanned_cask_count=0
