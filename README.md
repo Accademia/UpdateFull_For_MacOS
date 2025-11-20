@@ -15,14 +15,6 @@
  - 用户体验 = AppStore 每日夜间 静默更新
  - 覆盖率  >  90% Mac 软件
 
-.
-
-
-# 最终效果：
-
-<img width="700"  alt="example" src="https://github.com/user-attachments/assets/eaf6ff98-7180-4420-8f56-ba77471028b1" />
-
-
 
 .
 
@@ -45,6 +37,16 @@
     - 更新 所有APP
 
 在更新后，自动还原LaunchPad（启动台）布局
+
+
+.
+
+
+# 最终效果：
+
+<img width="700"  alt="example" src="https://github.com/user-attachments/assets/eaf6ff98-7180-4420-8f56-ba77471028b1" />
+
+
 
 .
 
