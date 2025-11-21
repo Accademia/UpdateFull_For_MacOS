@@ -2848,19 +2848,19 @@ EOF
             fi
             unknown_casks+=("$pkg")
         done
-        # 如果存在成功的包，则打印成功列表；否则仍然打印一条分隔线，以便后续统计与下载提示之间有隔断
-        if [ ${#success_formulas_list[@]} -gt 0 ] || [ ${#success_casks_list[@]} -gt 0 ]; then
-            for pkg in "${success_formulas_list[@]}"; do
-                echo -e "✔︎  下载成功 [formula] : $pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-            done
-            for pkg in "${success_casks_list[@]}"; do
-                echo -e "✔︎  下载成功 [cask]    : $pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-            done
-        fi
+       ## 如果存在成功的包，则打印成功列表；否则仍然打印一条分隔线，以便后续统计与下载提示之间有隔断
+       #if [ ${#success_formulas_list[@]} -gt 0 ] || [ ${#success_casks_list[@]} -gt 0 ]; then
+       #    for pkg in "${success_formulas_list[@]}"; do
+       #        echo -e "✔︎  下载成功 [formula] : $pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+       #    done
+       #    for pkg in "${success_casks_list[@]}"; do
+       #        echo -e "✔︎  下载成功 [cask]    : $pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+       #    done
+       #fi
         #echo -e "------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 打印成功统计
-        echo -e "✔︎  汇总     [formula] : $success_formula/$total_formula_count" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        echo -e "✔︎  汇总     [cask]    : $success_cask/$total_cask_count" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✔︎  下载成功 [formula] : $success_formula/$total_formula_count" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✔︎  下载成功 [cask]    : $success_cask/$total_cask_count" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 输出失败软件列表 [WARNING]
         if [ "$failed_formula" -gt 0 ]; then
             formula_fail_list=$(cut -d'|' -f1 < "$FAILED_FETCH_FORMULAS_FILE" | xargs)
