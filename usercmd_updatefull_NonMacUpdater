@@ -99,6 +99,16 @@ DURATION_MINUTES=1     # 拒绝执行结束前 的 时间长度（10分钟，意
 # 如果希望调整并行度（例如根据 CPU 数量），请修改此变量。
 MAS_PARALLEL_JOBS=8
 
+# ===== MAS 扫描方式设置 =====
+# 控制 mas outdated 的执行方式。
+# - 当 MAS_OUTDATED_MODE 设置为 "parallel"（默认）时，脚本会针对每个已安装的应用 ID 单独调用 `mas outdated`，并通过并行运行提高速度。
+#   并行度由 MAS_OUTDATED_PARALLEL_JOBS 设置。
+# - 当 MAS_OUTDATED_MODE 设置为 "simple" 时，脚本将直接运行一次 `mas outdated`（不传入任何参数）来获取所有待更新应用。
+#   对于用户希望保留官方实现行为或避免并行导致的潜在问题，可将此值设为 "simple"。
+MAS_OUTDATED_MODE="parallel"
+# 当 MAS_OUTDATED_MODE 为 "parallel" 时的并发扫描进程数。默认使用 16 个进程。
+MAS_OUTDATED_PARALLEL_JOBS=16
+
 
 # 路径：保存日志文件的路径
 # ICLOUD_PATH="$HOME/Library/Mobile Documents/com~apple~CloudDocs"            # 获取 iCloud 云盘路径，
@@ -4071,6 +4081,38 @@ fi
 mas_app_ids_list=$(echo "$mas_installed_apps" | awk '{print $1}' | grep -E '^[0-9]+$')
 
 while [ $mas_attempt -le $MAS_MAX_RETRIES ]; do
+    # 如果选择非并行扫描模式，则仅运行一次 mas outdated（不传入参数），并直接跳出循环。
+    if [ "$MAS_OUTDATED_MODE" != "parallel" ]; then
+        # 根据当前权限运行 mas outdated
+        if [[ $(id -u) -eq 0 ]]; then
+            echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 运行 mas outdated ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+            mas_output=$(sudo -n -H -u "$targetUser" gtimeout 300s /opt/homebrew/bin/mas outdated 2>&1)
+            mas_status=$?
+        else
+            echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 mas outdated ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            mas_output=$(gtimeout 300s /opt/homebrew/bin/mas outdated 2>&1)
+            mas_status=$?
+        fi
+        outdated_mas_apps="$mas_output"
+        if [ $mas_status -eq 0 ]; then
+            # 输出结果并标记成功
+            echo -e "$mas_output" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            mas_app_names=$(echo "$mas_output" | sed -E 's/^[0-9]+[[:space:]]+//; s/ *\([^)]*\)//g; s/ *->.*//g')
+            while IFS= read -r app_line; do
+                [[ -n "$app_line" ]] && echo -e "✔︎  检测到新版本 : $app_line" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            done <<< "$mas_app_names"
+            mas_success=true
+        else
+            # 失败处理：超时重试或其他错误
+            if echo -e "$mas_output" | grep -q "The request timed out"; then
+                echo -e "⚠️ 第${mas_attempt}次 MAS 扫描超时，重试中 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            else
+                echo -e "❌ mas 扫描更新失败：$mas_output" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            fi
+        fi
+        break
+    fi
    #mas_output=$(mas outdated 2>&1)                                                     # 执行 mas 查询更新（捕获输出和错误）
     if [[ $(id -u) -eq 0 ]]; then
         echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 并行运行 mas outdated 检查各个应用 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -4078,13 +4120,13 @@ while [ $mas_attempt -le $MAS_MAX_RETRIES ]; do
         # 在 root 情况下，使用目标用户执行 mas outdated 针对每个应用 ID。
         # 为了避免 mas 弹窗阻塞，针对每个 ID 单独运行 gtimeout 120s mas outdated "id"。
         # 超时退出码为124时尝试关闭 App Store，并继续后续检查。使用 xargs 并发 16 个进程。
-        mas_output=$(printf '%s\n' $mas_app_ids_list | xargs -P 16 -I{} sudo -n -H -u "$targetUser" sh -lc 'if gtimeout 120s mas outdated "{}"; then exit 0; fi; ec=$?; if [ $ec -eq 60 ]; then osascript -e "tell application \"App Store\" to quit" >/dev/null 2>&1 || true; sleep 1; fi; exit $ec' 2>/dev/null )
+        mas_output=$(printf '%s\n' $mas_app_ids_list | xargs -P "$MAS_OUTDATED_PARALLEL_JOBS" -I{} sudo -n -H -u "$targetUser" sh -lc 'if gtimeout 120s mas outdated "{}"; then exit 0; fi; ec=$?; if [ $ec -eq 60 ] || [ $ec -eq 124 ]; then osascript -e "tell application \"App Store\" to quit" >/dev/null 2>&1 || true; sleep 1; fi; exit $ec' 2>/dev/null )
         # 由于并行执行会返回最后一个子进程的退出码，此处统一标记为 0，表示我们总是收集并解析输出。
         mas_status=0
     else
         echo -e "✓  当前用户 '$USER' 为普通权限，直接并行运行 mas outdated 检查各个应用 ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
         # 当前用户为普通权限，直接并行运行 mas outdated 针对每个应用 ID。
-        mas_output=$(printf '%s\n' $mas_app_ids_list | xargs -P 16 -I{} sh -lc 'if gtimeout 120s mas outdated "{}"; then exit 0; fi; ec=$?; if [ $ec -eq 60 ]; then osascript -e "tell application \"App Store\" to quit" >/dev/null 2>&1 || true; sleep 1; fi; exit $ec' 2>/dev/null )
+        mas_output=$(printf '%s\n' $mas_app_ids_list | xargs -P "$MAS_OUTDATED_PARALLEL_JOBS" -I{} sh -lc 'if gtimeout 120s mas outdated "{}"; then exit 0; fi; ec=$?; if [ $ec -eq 60 ] || [ $ec -eq 124 ]; then osascript -e "tell application \"App Store\" to quit" >/dev/null 2>&1 || true; sleep 1; fi; exit $ec' 2>/dev/null )
         mas_status=0
     fi
         # mas_status 已在并行命令中设置，不使用上一条命令的退出码
@@ -4220,9 +4262,11 @@ if [ "$mas_success" = true ]; then
     # （3）解析升级结果，构建结果列表（不立即输出）
     mas_result_list=()
     # 提取已更新的应用名称
+    # 尝试解析 mas upgrade 输出中的已更新应用名称。
     updated_mas_app_names=""
-    if echo "$mas_output" | grep -q "Installed"; then
-        updated_mas_app_names=$(echo "$mas_output"  | grep -E "Installed"  | sed -E 's/^==> Installed //; s/ *\([^)]*\)//g')
+    # 如果输出中包含 “Installed”、“Upgraded” 或 “Upgrading” 等关键字，认为这些行表示更新成功。
+    if echo "$mas_output" | grep -Eq "Installed|Upgraded|Upgrading"; then
+        updated_mas_app_names=$(echo "$mas_output"  | grep -E "Installed|Upgraded|Upgrading"  | sed -E 's/^==> (Installed|Upgraded|Upgrading) //; s/ *\([^)]*\)//g; s/ *->.*//g')
     fi
     # 提取需要更新的应用名称
     outdated_mas_app_names=""
@@ -4233,7 +4277,8 @@ if [ "$mas_success" = true ]; then
     if [ -n "$outdated_mas_app_names" ]; then
         while IFS= read -r __mas_name; do
             [ -n "$__mas_name" ] || continue
-            if grep -Fxq "$__mas_name" <<< "$updated_mas_app_names"; then
+            # 判断更新成功：若 updated_mas_app_names 非空，则优先匹配；否则，在 mas_output 中查找应用名称
+            if { [ -n "$updated_mas_app_names" ] && grep -Fxq "$__mas_name" <<< "$updated_mas_app_names"; } || echo "$mas_output" | grep -Fqi "$__mas_name"; then
                 mas_result_list+=("success|$__mas_name")
             else
                 mas_result_list+=("failure|$__mas_name")
