@@ -97,7 +97,7 @@ DURATION_MINUTES=1     # 拒绝执行结束前 的 时间长度（10分钟，意
 # ===== MAS 更新并行度设置 =====
 # 为 mas upgrade 命令定义并行进程数。默认使用 8 个进程并行执行单个应用的升级
 # 如果希望调整并行度（例如根据 CPU 数量），请修改此变量。
-MAS_PARALLEL_JOBS=8
+MAS_PARALLEL_JOBS=2
 
 # ===== MAS 扫描方式设置 =====
 # 控制 mas outdated 的执行方式。
@@ -4250,11 +4250,13 @@ if [ "$mas_success" = true ]; then
     echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 并行运行 mas upgrade 指定应用 ($MAS_PARALLEL_JOBS 个进程) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 使用目标用户执行 mas upgrade，并行针对每个需要更新的应用 ID 单独执行 mas upgrade
         # 将应用 ID 列表通过 printf 逐行传递给 xargs，并行数为 8；每个任务以独立的 bash 会话执行
-        mas_output=$(printf '%s\n' $mas_app_ids | xargs -P $MAS_PARALLEL_JOBS -I{} sudo -n -H -u "$targetUser" /bin/bash -lc "mas upgrade {}" 2>/dev/null )
+        # 执行 mas 升级时不重定向错误输出，从而捕获完整安装日志
+        mas_output=$(printf '%s\n' $mas_app_ids | xargs -P "$MAS_PARALLEL_JOBS" -I{} sudo -n -H -u "$targetUser" /bin/bash -lc "mas upgrade {}")
     else
         echo -e "✓  当前用户 '$USER' 为普通权限，直接并行运行 mas upgrade 指定应用 ($MAS_PARALLEL_JOBS 个进程) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
         # 在普通用户模式下，直接并行运行 mas upgrade，每个任务处理单个应用 ID
-        mas_output=$(printf '%s\n' $mas_app_ids | xargs -P $MAS_PARALLEL_JOBS -I{} /bin/bash -lc "mas upgrade {}" 2>/dev/null )
+        # 执行 mas 升级时不重定向错误输出，从而捕获完整安装日志
+        mas_output=$(printf '%s\n' $mas_app_ids | xargs -P "$MAS_PARALLEL_JOBS" -I{} /bin/bash -lc "mas upgrade {}")
     fi
     
     echo -e "$mas_output"                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -4277,8 +4279,9 @@ if [ "$mas_success" = true ]; then
     if [ -n "$outdated_mas_app_names" ]; then
         while IFS= read -r __mas_name; do
             [ -n "$__mas_name" ] || continue
-            # 判断更新成功：若 updated_mas_app_names 非空，则优先匹配；否则，在 mas_output 中查找应用名称
-            if { [ -n "$updated_mas_app_names" ] && grep -Fxq "$__mas_name" <<< "$updated_mas_app_names"; } || echo "$mas_output" | grep -Fqi "$__mas_name"; then
+            # 判断更新成功：仅当 updated_mas_app_names 中存在完整匹配的应用名称时才认为升级成功；
+            # 如果未匹配，则直接判定为失败，避免因名称出现在 “Downloading” 或错误输出中而误判。
+            if [ -n "$updated_mas_app_names" ] && grep -Fxq "$__mas_name" <<< "$updated_mas_app_names"; then
                 mas_result_list+=("success|$__mas_name")
             else
                 mas_result_list+=("failure|$__mas_name")
