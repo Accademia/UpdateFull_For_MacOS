@@ -15,7 +15,7 @@ export PATH="/usr/local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/opt/local/bin:
 export HOMEBREW_NO_COLOR=1
 
 # 脚本版本号：用于调试和确认是否使用最新脚本
-SCRIPT_VERSION="2025.11.24.v12"
+SCRIPT_VERSION="2025.11.24.v14"
 
 # 预先解析 GNU Parallel 的绝对路径。在某些 sudo 环境下 PATH 可能被重置，导致找不到 parallel。
 if command -v parallel >/dev/null 2>&1; then
@@ -4111,8 +4111,8 @@ while [ $mas_attempt -le $MAS_MAX_RETRIES ]; do
             mas_status=0
         fi
         # 解析输出，分别处理有效行和错误行
-        # 有效行以数字 ID 开头
-        valid_lines=$(echo "$mas_output" | grep -E '^[0-9]+[[:space:]]' || true)
+        # 有效行以数字 ID 开头，允许前面有空格
+        valid_lines=$(echo "$mas_output" | grep -E '^[[:space:]]*[0-9]+[[:space:]]' || true)
         # 统计网络错误组次数：每个以 Error: 开头且包含 NSURLErrorDomain 的行视为一个网络错误组
         network_error_groups=$(echo "$mas_output" | grep '^Error:' | grep 'NSURLErrorDomain' || true)
         network_error_count=$(echo "$network_error_groups" | wc -l | tr -d ' ')
@@ -4129,8 +4129,8 @@ while [ $mas_attempt -le $MAS_MAX_RETRIES ]; do
                 # 非缩进行标志错误组结束
                 inside_err=0
             }
-            # 输出所有不以数字 ID 开头的非错误行
-            ! /^[0-9]+[[:space:]]/ { print }
+            # 输出所有不以数字 ID 开头的非错误行（允许行首有空格）
+            ! /^[[:space:]]*[0-9]+[[:space:]]/ { print }
         ' || true)
 
         # 进一步过滤错误详情中的冗余信息，如 NSURL 相关字段和 LocalizedDescription 行等
@@ -4145,7 +4145,7 @@ while [ $mas_attempt -le $MAS_MAX_RETRIES ]; do
                 echo -e "$valid_lines" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 # 提取应用名称（去除 ID 和版本信息）
                 mas_app_names=$(echo "$valid_lines" \
-                    | sed -E 's/^[0-9]+[[:space:]]+//; s/ *\([^)]*\)//g; s/ *->.*//g')
+                    | sed -E 's/^[[:space:]]*[0-9]+[[:space:]]+//; s/ *\([^)]*\)//g; s/ *->.*//g')
                 while IFS= read -r app_line; do
                     [[ -n "$app_line" ]] && echo -e "✔︎  检测到新版本 : $app_line" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 done <<< "$mas_app_names"
@@ -4213,7 +4213,8 @@ while [ $mas_attempt -le $MAS_MAX_RETRIES ]; do
         # 这种情况下，降级为串行扫描 (mas outdated) 获取更新列表。
         if [[ -n "$mas_output" ]]; then
             # 使用 grep 判断是否存在以数字 ID 开头的行
-            if ! echo "$mas_output" | grep -q -E '^[0-9]+[[:space:]]' || echo "$mas_output" | grep -q "NSURLErrorDomain"; then
+            # 如果并行扫描结果中不包含有效的更新行（允许行首有空格），或包含网络错误，则尝试顺序扫描
+            if ! echo "$mas_output" | grep -q -E '^[[:space:]]*[0-9]+[[:space:]]' || echo "$mas_output" | grep -q "NSURLErrorDomain"; then
                 echo -e "⚠️  mas outdated 并行扫描未返回有效结果，尝试串行扫描 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 if [[ $(id -u) -eq 0 ]]; then
                     targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
@@ -4241,11 +4242,11 @@ while [ $mas_attempt -le $MAS_MAX_RETRIES ]; do
 
     # 解析并行扫描后的结果并写入日志
     # 提取以数字 ID 开头的有效行
-    valid_lines=$(echo "$mas_output" | grep -E '^[0-9]+[[:space:]]' || true)
+    valid_lines=$(echo "$mas_output" | grep -E '^[[:space:]]*[0-9]+[[:space:]]' || true)
     # 统计错误组次数：每个以 Error: 开头的行为一个错误组
     error_group_count=$(echo "$mas_output" | grep -c '^Error:' || true)
     # 其他错误行：排除有效行和 Error: 开头的错误行
-    other_errors=$(echo "$mas_output" | grep -v -E '^[0-9]+[[:space:]]' | grep -v '^Error:' || true)
+    other_errors=$(echo "$mas_output" | grep -v -E '^[[:space:]]*[0-9]+[[:space:]]' | grep -v '^Error:' || true)
     # 进一步过滤错误详情中的冗余信息，如 NSURL 相关字段和 LocalizedDescription 行等
     other_errors=$(echo "$other_errors" | grep -v -E '(NSLocalizedDescription=|NSErrorFailingURLStringKey=|NSErrorFailingURLKey=|NSUnderlyingError=|_NSURLErrorRelatedURLSessionTaskErrorKey=|_NSURLErrorFailingURLSessionTaskErrorKey=|_kCFStreamErrorDomainKey=|_kCFStreamErrorCodeKey=|\)\,)' || true)
 
@@ -4258,7 +4259,7 @@ while [ $mas_attempt -le $MAS_MAX_RETRIES ]; do
             echo -e "$valid_lines" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             # 提取应用名称（去除 ID 和版本信息）
             mas_app_names=$(echo "$valid_lines" \
-                | sed -E 's/^[0-9]+[[:space:]]+//; s/ *\([^)]*\)//g; s/ *->.*//g')
+                | sed -E 's/^[[:space:]]*[0-9]+[[:space:]]+//; s/ *\([^)]*\)//g; s/ *->.*//g')
             while IFS= read -r app_line; do
                 [[ -n "$app_line" ]] && echo -e "✔︎  检测到新版本 : $app_line" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             done <<< "$mas_app_names"
@@ -4420,8 +4421,8 @@ elif [ "$mas_success" = true ]; then
     if [ -n "$outdated_mas_apps" ]; then
         # 仅解析以数字 ID 开头的行，确保排除错误信息或其他无关输出
         outdated_mas_app_names=$(echo "$outdated_mas_apps" \
-            | grep -E '^[0-9]+[[:space:]]' \
-            | sed -E 's/^[0-9]+[[:space:]]+//; s/ *\([^)]*\)//g; s/ *->.*//g')
+            | grep -E '^[[:space:]]*[0-9]+[[:space:]]' \
+            | sed -E 's/^[[:space:]]*[0-9]+[[:space:]]+//; s/ *\([^)]*\)//g; s/ *->.*//g')
     fi
     # 根据旧列表和新列表构建更新结果
     if [ -n "$outdated_mas_app_names" ]; then
