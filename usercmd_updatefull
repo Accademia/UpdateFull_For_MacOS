@@ -15,7 +15,7 @@ export PATH="/usr/local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/opt/local/bin:
 export HOMEBREW_NO_COLOR=1
 
 # 脚本版本号：用于调试和确认是否使用最新脚本
-SCRIPT_VERSION="2025.11.19.v2"
+SCRIPT_VERSION="2025.11.24.v12"
 
 # 预先解析 GNU Parallel 的绝对路径。在某些 sudo 环境下 PATH 可能被重置，导致找不到 parallel。
 if command -v parallel >/dev/null 2>&1; then
@@ -105,9 +105,12 @@ MAS_PARALLEL_JOBS=2
 #   并行度由 MAS_OUTDATED_PARALLEL_JOBS 设置。
 # - 当 MAS_OUTDATED_MODE 设置为 "simple" 时，脚本将直接运行一次 `mas outdated`（不传入任何参数）来获取所有待更新应用。
 #   对于用户希望保留官方实现行为或避免并行导致的潜在问题，可将此值设为 "simple"。
-MAS_OUTDATED_MODE="parallel"
+# 允许从环境变量 MAS_OUTDATED_MODE 覆盖扫描模式，默认为 simple。
+# 用户可在执行脚本时设置 MAS_OUTDATED_MODE=parallel 启用并行扫描。
+MAS_OUTDATED_MODE="${MAS_OUTDATED_MODE:-simple}"
 # 当 MAS_OUTDATED_MODE 为 "parallel" 时的并发扫描进程数。默认使用 16 个进程。
-MAS_OUTDATED_PARALLEL_JOBS=16
+# 并行扫描过多的进程可能导致网络连接中断，降低并发度以提高稳定性
+MAS_OUTDATED_PARALLEL_JOBS=4
 
 
 # 路径：保存日志文件的路径
@@ -3811,7 +3814,8 @@ else
                 # root 情况：使用 SUDO_USER 或控制台用户执行 mas list
                 targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
                 if [ -n "$targetUser" ]; then
-                    mas_output=$(sudo -n -H -u "$targetUser" bash -lc 'mas list' 2>/dev/null || true)
+                    # 使用绝对路径调用 mas list，避免在 sudo 环境下 PATH 被清空导致命令无法找到，同时保留环境变量
+                    mas_output=$(sudo -E -n -H -u "$targetUser" bash -lc '/opt/homebrew/bin/mas list' 2>/dev/null || true)
                 fi
             else
                 mas_output=$(mas list 2>/dev/null || true)
@@ -4009,6 +4013,8 @@ check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 mas_attempt=1
 mas_success=false
+# 标记 MAS 扫描是否失败（无有效更新且发生网络错误）
+mas_scan_failed=false
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
@@ -4085,30 +4091,99 @@ while [ $mas_attempt -le $MAS_MAX_RETRIES ]; do
     if [ "$MAS_OUTDATED_MODE" != "parallel" ]; then
         # 根据当前权限运行 mas outdated
         if [[ $(id -u) -eq 0 ]]; then
-            echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 运行 mas outdated ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 执行 mas outdated ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+            # 当通过 sudo 调用时，SUDO_USER 可能为 root（表示父进程为 root），此时尝试
+            # 从控制台设备中获取真正的登录用户，确保降权到正确的用户以执行 mas 命令
+            if [[ "$targetUser" == "root" ]]; then
+                targetUser=$(stat -f '%Su' /dev/console)
+            fi
             mas_output=$(sudo -n -H -u "$targetUser" gtimeout 300s /opt/homebrew/bin/mas outdated 2>&1)
             mas_status=$?
         else
-            echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 mas outdated ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            echo -e "✓  当前用户 '$USER' 为普通权限，直接执行 mas outdated ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             mas_output=$(gtimeout 300s /opt/homebrew/bin/mas outdated 2>&1)
             mas_status=$?
         fi
-        outdated_mas_apps="$mas_output"
+        # 如果输出中包含 NSURLErrorDomain，则认为是网络错误。即便退出码不为0，也让后续逻辑按成功解析，避免打印大量错误详情
+        # 如果输出中包含 NSURLErrorDomain，则认为是网络错误。即便退出码不为0，也让后续逻辑按成功解析，避免打印大量错误详情
+        if [[ "$mas_output" == *NSURLErrorDomain* ]]; then
+            mas_status=0
+        fi
+        # 解析输出，分别处理有效行和错误行
+        # 有效行以数字 ID 开头
+        valid_lines=$(echo "$mas_output" | grep -E '^[0-9]+[[:space:]]' || true)
+        # 统计网络错误组次数：每个以 Error: 开头且包含 NSURLErrorDomain 的行视为一个网络错误组
+        network_error_groups=$(echo "$mas_output" | grep '^Error:' | grep 'NSURLErrorDomain' || true)
+        network_error_count=$(echo "$network_error_groups" | wc -l | tr -d ' ')
+        # 统计其他类型的错误组（不含 NSURLErrorDomain）
+        other_error_groups=$(echo "$mas_output" | grep '^Error:' | grep -v 'NSURLErrorDomain' || true)
+        other_error_count=$(echo "$other_error_groups" | wc -l | tr -d ' ')
+        # 使用 awk 移除错误组的后续行（以空格或制表符开头的行被视为错误详情），保留其他非错误信息
+        other_errors=$(echo "$mas_output" | awk '
+            BEGIN {inside_err=0}
+            /^Error:/ { inside_err=1; next }
+            inside_err==1 {
+                # 跳过以空格或制表符开头的行，这些是错误详情
+                if ($0 ~ /^[[:space:]]/) { next }
+                # 非缩进行标志错误组结束
+                inside_err=0
+            }
+            # 输出所有不以数字 ID 开头的非错误行
+            ! /^[0-9]+[[:space:]]/ { print }
+        ' || true)
+
+        # 进一步过滤错误详情中的冗余信息，如 NSURL 相关字段和 LocalizedDescription 行等
+        other_errors=$(echo "$other_errors" | grep -v -E '(NSLocalizedDescription=|NSErrorFailingURLStringKey=|NSErrorFailingURLKey=|NSUnderlyingError=|_NSURLErrorRelatedURLSessionTaskErrorKey=|_NSURLErrorFailingURLSessionTaskErrorKey=|_kCFStreamErrorDomainKey=|_kCFStreamErrorCodeKey=|\)\,)' || true)
+
+        # 保存仅包含有效更新信息的列表供后续安装使用
+        outdated_mas_apps="$valid_lines"
+
         if [ $mas_status -eq 0 ]; then
-            # 输出结果并标记成功
-            echo -e "$mas_output" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-            mas_app_names=$(echo "$mas_output" | sed -E 's/^[0-9]+[[:space:]]+//; s/ *\([^)]*\)//g; s/ *->.*//g')
-            while IFS= read -r app_line; do
-                [[ -n "$app_line" ]] && echo -e "✔︎  检测到新版本 : $app_line" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-            done <<< "$mas_app_names"
-            mas_success=true
+            # 如果存在有效的更新行，则输出这些行
+            if [ -n "$valid_lines" ]; then
+                echo -e "$valid_lines" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                # 提取应用名称（去除 ID 和版本信息）
+                mas_app_names=$(echo "$valid_lines" \
+                    | sed -E 's/^[0-9]+[[:space:]]+//; s/ *\([^)]*\)//g; s/ *->.*//g')
+                while IFS= read -r app_line; do
+                    [[ -n "$app_line" ]] && echo -e "✔︎  检测到新版本 : $app_line" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                done <<< "$mas_app_names"
+                mas_success=true
+            fi
+            # 如存在网络错误组，输出摘要而不是详细错误
+            if [ "$network_error_count" -gt 0 ]; then
+                echo -e "⚠️  MAS 更新接口出现网络错误 ${network_error_count} 次，已忽略错误详情！" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            fi
+            # 输出其他类型的错误组摘要
+            if [ "$other_error_count" -gt 0 ]; then
+                echo -e "⚠️  MAS 更新过程中出现 ${other_error_count} 个错误，请检查日志或稍后重试。" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            fi
+            # 输出其他非错误信息
+            if [ -n "$other_errors" ]; then
+                echo -e "$other_errors" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            fi
+            # 如果没有任何有效更新且存在网络错误组，则标记扫描失败
+            if [ -z "$valid_lines" ] && [ "$network_error_count" -gt 0 ]; then
+                mas_scan_failed=true
+                mas_success=false
+            fi
         else
             # 失败处理：超时重试或其他错误
             if echo -e "$mas_output" | grep -q "The request timed out"; then
                 echo -e "⚠️ 第${mas_attempt}次 MAS 扫描超时，重试中 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             else
-                echo -e "❌ mas 扫描更新失败：$mas_output" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                # 如果输出包含网络错误则统计并汇总
+                if [[ "$mas_output" == *NSURLErrorDomain* ]]; then
+                    # 使用 Error: 行计数作为网络错误次数
+                    net_count=$(printf '%s' "$mas_output" | grep -c '^Error:' || true)
+                    echo -e "⚠️  MAS 更新接口出现网络错误 ${net_count} 次，已忽略错误详情！" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    # 标记扫描失败
+                    mas_scan_failed=true
+                    mas_success=false
+                else
+                    echo -e "❌ mas 扫描更新失败：$mas_output" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                fi
             fi
         fi
         break
@@ -4120,44 +4195,101 @@ while [ $mas_attempt -le $MAS_MAX_RETRIES ]; do
         # 在 root 情况下，使用目标用户执行 mas outdated 针对每个应用 ID。
         # 为了避免 mas 弹窗阻塞，针对每个 ID 单独运行 gtimeout 120s mas outdated "id"。
         # 超时退出码为124时尝试关闭 App Store，并继续后续检查。使用 xargs 并发 16 个进程。
-        mas_output=$(printf '%s\n' $mas_app_ids_list | xargs -P "$MAS_OUTDATED_PARALLEL_JOBS" -I{} sudo -n -H -u "$targetUser" sh -lc 'if gtimeout 120s mas outdated "{}"; then exit 0; fi; ec=$?; if [ $ec -eq 60 ] || [ $ec -eq 124 ]; then osascript -e "tell application \"App Store\" to quit" >/dev/null 2>&1 || true; sleep 1; fi; exit $ec' 2>/dev/null )
+        mas_output=$(printf '%s\n' $mas_app_ids_list | xargs -P "$MAS_OUTDATED_PARALLEL_JOBS" -I{} sudo -E -n -H -u "$targetUser" sh -lc 'if gtimeout 120s /opt/homebrew/bin/mas outdated "{}"; then exit 0; fi; ec=$?; if [ $ec -eq 60 ] || [ $ec -eq 124 ]; then osascript -e "tell application \"App Store\" to quit" >/dev/null 2>&1 || true; sleep 1; fi; exit $ec' 2>/dev/null )
         # 由于并行执行会返回最后一个子进程的退出码，此处统一标记为 0，表示我们总是收集并解析输出。
         mas_status=0
     else
         echo -e "✓  当前用户 '$USER' 为普通权限，直接并行运行 mas outdated 检查各个应用 ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
         # 当前用户为普通权限，直接并行运行 mas outdated 针对每个应用 ID。
-        mas_output=$(printf '%s\n' $mas_app_ids_list | xargs -P "$MAS_OUTDATED_PARALLEL_JOBS" -I{} sh -lc 'if gtimeout 120s mas outdated "{}"; then exit 0; fi; ec=$?; if [ $ec -eq 60 ] || [ $ec -eq 124 ]; then osascript -e "tell application \"App Store\" to quit" >/dev/null 2>&1 || true; sleep 1; fi; exit $ec' 2>/dev/null )
+        mas_output=$(printf '%s\n' $mas_app_ids_list | xargs -P "$MAS_OUTDATED_PARALLEL_JOBS" -I{} sh -lc 'if gtimeout 120s /opt/homebrew/bin/mas outdated "{}"; then exit 0; fi; ec=$?; if [ $ec -eq 60 ] || [ $ec -eq 124 ]; then osascript -e "tell application \"App Store\" to quit" >/dev/null 2>&1 || true; sleep 1; fi; exit $ec' 2>/dev/null )
         mas_status=0
     fi
         # mas_status 已在并行命令中设置，不使用上一条命令的退出码
 
-    # 把扫描结果写日志并存变量
-    #echo -e "$mas_output"                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    outdated_mas_apps="$mas_output"
+        # -------------------------------------------------------------------------
+        # 新增：并行扫描后检查输出有效性。
+        # 如果并行扫描输出中没有任何有效的应用 ID 行（即以数字开头的行），
+        # 或者输出中包含 NSURLErrorDomain 等错误提示，则认为扫描无效。
+        # 这种情况下，降级为串行扫描 (mas outdated) 获取更新列表。
+        if [[ -n "$mas_output" ]]; then
+            # 使用 grep 判断是否存在以数字 ID 开头的行
+            if ! echo "$mas_output" | grep -q -E '^[0-9]+[[:space:]]' || echo "$mas_output" | grep -q "NSURLErrorDomain"; then
+                echo -e "⚠️  mas outdated 并行扫描未返回有效结果，尝试串行扫描 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                if [[ $(id -u) -eq 0 ]]; then
+                    targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+                    mas_output=$(sudo -E -n -H -u "$targetUser" /opt/homebrew/bin/mas outdated 2>&1 || true)
+                else
+                    mas_output=$(/opt/homebrew/bin/mas outdated 2>&1 || true)
+                fi
+                # 重置 mas_status 为 0，以便后续逻辑继续处理
+                mas_status=0
+            fi
+        fi
+
+    # 如并行扫描未返回结果，尝试单次执行 mas outdated 作为回退方案
+    if [ -z "$mas_output" ]; then
+        echo -e "⚠️  mas outdated 并行扫描未返回结果，尝试串行扫描 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        if [[ $(id -u) -eq 0 ]]; then
+            # 在 root 权限下，降权执行一次 mas outdated，并保留环境变量，捕获输出
+            targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+            mas_output=$(sudo -E -n -H -u "$targetUser" /opt/homebrew/bin/mas outdated 2>&1 || true)
+        else
+            # 普通用户直接执行 mas outdated
+            mas_output=$(/opt/homebrew/bin/mas outdated 2>&1 || true)
+        fi
+    fi
+
+    # 解析并行扫描后的结果并写入日志
+    # 提取以数字 ID 开头的有效行
+    valid_lines=$(echo "$mas_output" | grep -E '^[0-9]+[[:space:]]' || true)
+    # 统计错误组次数：每个以 Error: 开头的行为一个错误组
+    error_group_count=$(echo "$mas_output" | grep -c '^Error:' || true)
+    # 其他错误行：排除有效行和 Error: 开头的错误行
+    other_errors=$(echo "$mas_output" | grep -v -E '^[0-9]+[[:space:]]' | grep -v '^Error:' || true)
+    # 进一步过滤错误详情中的冗余信息，如 NSURL 相关字段和 LocalizedDescription 行等
+    other_errors=$(echo "$other_errors" | grep -v -E '(NSLocalizedDescription=|NSErrorFailingURLStringKey=|NSErrorFailingURLKey=|NSUnderlyingError=|_NSURLErrorRelatedURLSessionTaskErrorKey=|_NSURLErrorFailingURLSessionTaskErrorKey=|_kCFStreamErrorDomainKey=|_kCFStreamErrorCodeKey=|\)\,)' || true)
+
+    # 仅保存有效更新信息供后续安装使用
+    outdated_mas_apps="$valid_lines"
 
     if [ $mas_status -eq 0 ]; then
-        # 扫描成功，输出结果并标记成功
-        echo -e "$mas_output"                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-        # 使用 sed 去掉应用ID和版本号，只保留应用名
-        mas_app_names=$(echo "$mas_output" | sed -E 's/^[0-9]+[[:space:]]+//; s/ *\([^)]*\)//g; s/ *->.*//g')
-        #echo -e "✔︎  检测到新版本 : $mas_app_names" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        while IFS= read -r app_line; do
-            [[ -n "$app_line" ]] && echo -e "✔︎  检测到新版本 : $app_line" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        done <<< "$mas_app_names"
-        mas_success=true
+        # 若存在有效的更新行，则输出这些行
+        if [ -n "$valid_lines" ]; then
+            echo -e "$valid_lines" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            # 提取应用名称（去除 ID 和版本信息）
+            mas_app_names=$(echo "$valid_lines" \
+                | sed -E 's/^[0-9]+[[:space:]]+//; s/ *\([^)]*\)//g; s/ *->.*//g')
+            while IFS= read -r app_line; do
+                [[ -n "$app_line" ]] && echo -e "✔︎  检测到新版本 : $app_line" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            done <<< "$mas_app_names"
+            mas_success=true
+        fi
+        # 输出网络错误摘要
+        if [ "$error_group_count" -gt 0 ]; then
+            echo -e "⚠️  MAS 更新接口出现网络错误 ${error_group_count} 次，已忽略错误详情！" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        fi
+        # 输出其他错误行
+        if [ -n "$other_errors" ]; then
+            echo -e "$other_errors" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        fi
         break
     else
         # 扫描失败，检查是否超时错误
         if echo -e "$mas_output" | grep -q "The request timed out"; then
-            echo -e "⚠️ 第${mas_attempt}次 MAS 扫描超时，重试中 ... "                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+            echo -e "⚠️ 第${mas_attempt}次 MAS 扫描超时，重试中 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         else
-            echo -e "❌ mas 扫描更新失败：$mas_output"                                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+            echo -e "❌ mas 扫描更新失败：$mas_output" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             break   # 遇到非超时错误，跳出循环不再重试
         fi
         mas_attempt=$((mas_attempt+1))
-        sleep $MAS_RETRY_DELAY 2>&1                                                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"          # 等待一段时间再重试
+        sleep $MAS_RETRY_DELAY 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  # 等待一段时间再重试
     fi
 done
+
+    # 如果扫描标记为失败（无有效更新且发生网络错误），在扫描阶段结束时输出失败提示
+    if [ "$mas_scan_failed" = true ]; then
+        echo -e "❌ 扫描更新失败" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    fi
 
 
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
@@ -4169,7 +4301,9 @@ echo -e "MAS 下载安装 ... "                                                 
 
 
 # 根据扫描结果决定是否进行安装更新
-if [ "$mas_success" = true ]; then
+if [ "$mas_scan_failed" = true ]; then
+    echo -e "❌ 由于 MAS 扫描更新失败，已跳过下载和安装步骤。" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+elif [ "$mas_success" = true ]; then
     # 开始执行：MAS 更新（并捕获输出）
     # 获取过时应用程序的ID，并转换为以空格分隔的列表以供 mas upgrade 使用
     mas_app_ids=$(echo -e "$outdated_mas_apps" | awk '{print $1}' | grep -E '^[0-9]+$')
@@ -4247,16 +4381,27 @@ if [ "$mas_success" = true ]; then
 
     if [[ $(id -u) -eq 0 ]]; then
         targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+        # 如果通过 sudo 调用链时 SUDO_USER 为 root，则代表实际用户信息无法直接从 SUDO_USER 获得
+        # 尝试从当前控制台获取真实登录用户
+        if [[ "$targetUser" == "root" ]]; then
+            targetUser=$(stat -f '%Su' /dev/console)
+        fi
     echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 并行运行 mas upgrade 指定应用 ($MAS_PARALLEL_JOBS 个进程) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 使用目标用户执行 mas upgrade，并行针对每个需要更新的应用 ID 单独执行 mas upgrade
         # 将应用 ID 列表通过 printf 逐行传递给 xargs，并行数为 8；每个任务以独立的 bash 会话执行
-        # 执行 mas 升级时不重定向错误输出，从而捕获完整安装日志
-        mas_output=$(printf '%s\n' $mas_app_ids | xargs -P "$MAS_PARALLEL_JOBS" -I{} sudo -n -H -u "$targetUser" /bin/bash -lc "mas upgrade {}")
+        # 执行 mas 升级时同时捕获标准输出和标准错误，保证安装错误信息能够写入日志
+        mas_output=$(
+          printf '%s\n' $mas_app_ids |
+          xargs -P "$MAS_PARALLEL_JOBS" -I{} sudo -E -n -H -u "$targetUser" /bin/bash -lc "/opt/homebrew/bin/mas upgrade {} 2>&1"
+        )
     else
         echo -e "✓  当前用户 '$USER' 为普通权限，直接并行运行 mas upgrade 指定应用 ($MAS_PARALLEL_JOBS 个进程) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
         # 在普通用户模式下，直接并行运行 mas upgrade，每个任务处理单个应用 ID
-        # 执行 mas 升级时不重定向错误输出，从而捕获完整安装日志
-        mas_output=$(printf '%s\n' $mas_app_ids | xargs -P "$MAS_PARALLEL_JOBS" -I{} /bin/bash -lc "mas upgrade {}")
+        # 执行 mas 升级时同时捕获标准输出和标准错误，保证安装错误信息能够写入日志
+        mas_output=$(
+          printf '%s\n' $mas_app_ids |
+          xargs -P "$MAS_PARALLEL_JOBS" -I{} /bin/bash -lc "/opt/homebrew/bin/mas upgrade {} 2>&1"
+        )
     fi
     
     echo -e "$mas_output"                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -4273,7 +4418,10 @@ if [ "$mas_success" = true ]; then
     # 提取需要更新的应用名称
     outdated_mas_app_names=""
     if [ -n "$outdated_mas_apps" ]; then
-        outdated_mas_app_names=$(echo "$outdated_mas_apps" | sed -E 's/^[0-9]+[[:space:]]+//; s/ *\([^)]*\)//g; s/ *->.*//g')
+        # 仅解析以数字 ID 开头的行，确保排除错误信息或其他无关输出
+        outdated_mas_app_names=$(echo "$outdated_mas_apps" \
+            | grep -E '^[0-9]+[[:space:]]' \
+            | sed -E 's/^[0-9]+[[:space:]]+//; s/ *\([^)]*\)//g; s/ *->.*//g')
     fi
     # 根据旧列表和新列表构建更新结果
     if [ -n "$outdated_mas_app_names" ]; then
