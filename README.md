@@ -240,6 +240,14 @@
 
 
 # --------------------------------
+# 免密更新 MAS 
+# --------------------------------
+
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/homebrew/bin/mas upgrade*
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /opt/homebrew/bin/mas update*
+
+
+# --------------------------------
 # 免密更新 其他模块 
 # --------------------------------
 你的用户名 ALL=(ALL) NOPASSWD: SETENV: /Library/TeX/texbin/tlmgr update *

@@ -4387,13 +4387,16 @@ elif [ "$mas_success" = true ]; then
         if [[ "$targetUser" == "root" ]]; then
             targetUser=$(stat -f '%Su' /dev/console)
         fi
-    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 并行运行 mas upgrade 指定应用 ($MAS_PARALLEL_JOBS 个进程) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  使用Root权限 运行 mas upgrade 指定应用 ($MAS_PARALLEL_JOBS 个进程) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 使用目标用户执行 mas upgrade，并行针对每个需要更新的应用 ID 单独执行 mas upgrade
         # 将应用 ID 列表通过 printf 逐行传递给 xargs，并行数为 8；每个任务以独立的 bash 会话执行
         # 执行 mas 升级时同时捕获标准输出和标准错误，保证安装错误信息能够写入日志
         mas_output=$(
           printf '%s\n' $mas_app_ids |
-          xargs -P "$MAS_PARALLEL_JOBS" -I{} sudo -E -n -H -u "$targetUser" /bin/bash -lc "/opt/homebrew/bin/mas upgrade {} 2>&1"
+          # 由于 Apple 官方的 mas 工具在最新版中要求通过 sudo 提权才能升级应用程序，这里无论当前用户权限如何
+          # 都在最终的命令中显式添加 `sudo` 前缀。这样即使先前通过 sudo 将权限降至普通用户，
+          # 也会重新以管理员权限执行 `mas upgrade`。其它逻辑保持不变，不影响并行和日志捕获。
+          xargs -P "$MAS_PARALLEL_JOBS" -I{} sudo -E -n -H -u "$targetUser" /bin/bash -lc "sudo /opt/homebrew/bin/mas upgrade {} 2>&1"
         )
     else
         echo -e "✓  当前用户 '$USER' 为普通权限，直接并行运行 mas upgrade 指定应用 ($MAS_PARALLEL_JOBS 个进程) ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
@@ -4401,7 +4404,7 @@ elif [ "$mas_success" = true ]; then
         # 执行 mas 升级时同时捕获标准输出和标准错误，保证安装错误信息能够写入日志
         mas_output=$(
           printf '%s\n' $mas_app_ids |
-          xargs -P "$MAS_PARALLEL_JOBS" -I{} /bin/bash -lc "/opt/homebrew/bin/mas upgrade {} 2>&1"
+          xargs -P "$MAS_PARALLEL_JOBS" -I{} /bin/bash -lc "sudo /opt/homebrew/bin/mas upgrade {} 2>&1"
         )
     fi
     
