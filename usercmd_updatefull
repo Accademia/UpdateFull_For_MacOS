@@ -4380,89 +4380,92 @@ elif [ "$mas_success" = true ]; then
         sudo $SUDO_N_FLAG killall installd 2>/dev/null || true
     fi
 
+    # -------------------------------------------------------------------------
+    # 调整：串行运行 mas upgrade 更新每个应用，确保输出与并行 Homebrew 风格一致。
+    # 这里不再使用并行 xargs，而是逐个 ID 处理并实时打印结果。
+    #
+    # 初始化结果列表
+    mas_result_list=()
+    # 根据当前身份选择执行方式
     if [[ $(id -u) -eq 0 ]]; then
         targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
-        # 如果通过 sudo 调用链时 SUDO_USER 为 root，则代表实际用户信息无法直接从 SUDO_USER 获得
-        # 尝试从当前控制台获取真实登录用户
+        # 若通过 sudo 调用链时 SUDO_USER 为 root，则尝试从控制台获取真实登录用户
         if [[ "$targetUser" == "root" ]]; then
             targetUser=$(stat -f '%Su' /dev/console)
         fi
-        # 修改：在 root 模式下串行运行 mas upgrade。依次处理每个待升级的应用，并实时输出结果。
-        echo -e "✓  使用Root权限 运行 mas upgrade 指定应用 (串行) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        mas_result_list=()
-        mas_output=""
+        # 打印串行升级提示
+        echo -e "✓  使用Root权限 直接串行运行 mas upgrade 指定应用 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        # 逐个应用执行 mas upgrade
         for mas_id in $mas_app_ids; do
-            mas_app_name=$(echo -e "$mas_installed_apps" | grep "^$mas_id" | awk '{ $1=""; print substr($0,2) }' | sed 's/ ([0-9].*)$//')
+            # 从已安装应用列表中提取应用名称，去掉 ID 和可能的版本号
+            mas_app_name=$(printf '%s\n' "$mas_installed_apps" | awk -v id="$mas_id" '($1==id){$1=""; sub(/^ +/, ""); print; exit}' | sed 's/ ([0-9].*)$//')
+            # 如果没有找到名称，则使用 ID 作为名称（防止打印出空白）
             [ -n "$mas_app_name" ] || mas_app_name="$mas_id"
-            echo -e "✓  正在升级 MAS APP：$mas_app_name (ID: $mas_id) ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-            sudo -E -n -H -u "$targetUser" /bin/bash -lc "sudo /opt/homebrew/bin/mas upgrade $mas_id" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-            cmd_exit=${PIPESTATUS[0]}
-            if [ $cmd_exit -eq 0 ]; then
-                echo -e "✅  更新成功       : $mas_app_name" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            # 提示正在升级
+            echo -e "✓  正在升级 MAS APP：$mas_app_name (ID: $mas_id) ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            # 执行升级并捕获输出
+            upgrade_output=$(sudo -E -n -H -u "$targetUser" /bin/bash -lc "sudo /opt/homebrew/bin/mas upgrade $mas_id 2>&1")
+            upgrade_status=$?
+            # 实时打印升级输出
+            echo -e "$upgrade_output" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            # 根据返回码判定结果
+            if [ $upgrade_status -eq 0 ]; then
                 mas_result_list+=("success|$mas_app_name")
             else
-                echo -e "❌  更新失败       : $mas_app_name" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 mas_result_list+=("failure|$mas_app_name")
             fi
         done
-        mas_output=""
     else
-        # 修改：在普通用户模式下串行运行 mas upgrade。
-        echo -e "✓  当前用户 '$USER' 为普通权限，直接串行运行 mas upgrade 指定应用 ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        mas_result_list=()
-        mas_output=""
+        # 非 root 用户直接执行 mas upgrade
+        echo -e "✓  当前用户 '$USER' 为普通权限，直接串行运行 mas upgrade 指定应用 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         for mas_id in $mas_app_ids; do
-            mas_app_name=$(echo -e "$mas_installed_apps" | grep "^$mas_id" | awk '{ $1=""; print substr($0,2) }' | sed 's/ ([0-9].*)$//')
+            mas_app_name=$(printf '%s\n' "$mas_installed_apps" | awk -v id="$mas_id" '($1==id){$1=""; sub(/^ +/, ""); print; exit}' | sed 's/ ([0-9].*)$//')
             [ -n "$mas_app_name" ] || mas_app_name="$mas_id"
-            echo -e "✓  正在升级 MAS APP：$mas_app_name (ID: $mas_id) ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-            /bin/bash -lc "sudo /opt/homebrew/bin/mas upgrade $mas_id" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-            cmd_exit=${PIPESTATUS[0]}
-            if [ $cmd_exit -eq 0 ]; then
-                echo -e "✅  更新成功       : $mas_app_name" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            echo -e "✓  正在升级 MAS APP：$mas_app_name (ID: $mas_id) ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            upgrade_output=$(/bin/bash -lc "sudo /opt/homebrew/bin/mas upgrade $mas_id 2>&1")
+            upgrade_status=$?
+            echo -e "$upgrade_output" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            if [ $upgrade_status -eq 0 ]; then
                 mas_result_list+=("success|$mas_app_name")
             else
-                echo -e "❌  更新失败       : $mas_app_name" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 mas_result_list+=("failure|$mas_app_name")
             fi
         done
-        mas_output=""
     fi
-    
-    echo -e "$mas_output"                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    # 清空 mas_output 以避免后续解析覆盖结果（mas_result_list 已经构建）
+    mas_output=""
 
+    # 如果未产生任何结果（mas_result_list 为空），则保留原有解析逻辑作为后备方案
+    if [ ${#mas_result_list[@]} -eq 0 ]; then
         # （3）解析升级结果，构建结果列表（不立即输出）
-        # 如果在串行升级过程中 mas_result_list 已经被填充，则直接跳过解析逻辑；否则解析 mas_output 构建结果。
-        if [ ${#mas_result_list[@]} -eq 0 ]; then
-            mas_result_list=()
-            # 提取已更新的应用名称
-            # 尝试解析 mas upgrade 输出中的已更新应用名称。
-            updated_mas_app_names=""
-            # 如果输出中包含 “Installed”、“Upgraded” 或 “Upgrading” 等关键字，认为这些行表示更新成功。
-            if echo "$mas_output" | grep -Eq "Installed|Upgraded|Upgrading"; then
-                updated_mas_app_names=$(echo "$mas_output"  | grep -E "Installed|Upgraded|Upgrading"  | sed -E 's/^==> (Installed|Upgraded|Upgrading) //; s/ *\([^)]*\)//g; s/ *->.*//g')
-            fi
-            # 提取需要更新的应用名称
-            outdated_mas_app_names=""
-            if [ -n "$outdated_mas_apps" ]; then
-                # 仅解析以数字 ID 开头的行，确保排除错误信息或其他无关输出
-                outdated_mas_app_names=$(echo "$outdated_mas_apps" \
-                    | grep -E '^[[:space:]]*[0-9]+[[:space:]]' \
-                    | sed -E 's/^[[:space:]]*[0-9]+[[:space:]]+//; s/ *\([^)]*\)//g; s/ *->.*//g')
-            fi
-            # 根据旧列表和新列表构建更新结果
-            if [ -n "$outdated_mas_app_names" ]; then
-                while IFS= read -r __mas_name; do
-                    [ -n "$__mas_name" ] || continue
-                    # 判断更新成功：仅当 updated_mas_app_names 中存在完整匹配的应用名称时才认为升级成功；
-                    # 如果未匹配，则直接判定为失败，避免因名称出现在 “Downloading” 或错误输出中而误判。
-                    if [ -n "$updated_mas_app_names" ] && grep -Fxq "$__mas_name" <<< "$updated_mas_app_names"; then
-                        mas_result_list+=("success|$__mas_name")
-                    else
-                        mas_result_list+=("failure|$__mas_name")
-                    fi
-                done <<< "$outdated_mas_app_names"
-            fi
+        mas_result_list=()
+        # 提取已更新的应用名称
+        # 尝试解析 mas upgrade 输出中的已更新应用名称。
+        updated_mas_app_names=""
+        # 如果输出中包含 “Installed”、“Upgraded” 或 “Upgrading” 等关键字，认为这些行表示更新成功。
+        if echo "$mas_output" | grep -Eq "Installed|Upgraded|Upgrading"; then
+            updated_mas_app_names=$(echo "$mas_output"  | grep -E "Installed|Upgraded|Upgrading"  | sed -E 's/^==> (Installed|Upgraded|Upgrading) //; s/ *\([^)]*\)//g; s/ *->.*//g')
         fi
+        # 提取需要更新的应用名称
+        outdated_mas_app_names=""
+        if [ -n "$outdated_mas_apps" ]; then
+            # 仅解析以数字 ID 开头的行，确保排除错误信息或其他无关输出
+            outdated_mas_app_names=$(echo "$outdated_mas_apps" | grep -E '^[[:space:]]*[0-9]+[[:space:]]' | sed -E 's/^[[:space:]]*[0-9]+[[:space:]]+//; s/ *\([^)]*\)//g; s/ *->.*//g')
+        fi
+        # 根据旧列表和新列表构建更新结果
+        if [ -n "$outdated_mas_app_names" ]; then
+            while IFS= read -r __mas_name; do
+                [ -n "$__mas_name" ] || continue
+                # 判断更新成功：仅当 updated_mas_app_names 中存在完整匹配的应用名称时才认为升级成功；
+                # 如果未匹配，则直接判定为失败，避免因名称出现在 “Downloading” 或错误输出中而误判。
+                if [ -n "$updated_mas_app_names" ] && grep -Fxq "$__mas_name" <<< "$updated_mas_app_names"; then
+                    mas_result_list+=("success|$__mas_name")
+                else
+                    mas_result_list+=("failure|$__mas_name")
+                fi
+            done <<< "$outdated_mas_app_names"
+        fi
+    fi
 
     # 重新启动之前关闭的应用程序
     for mas_app in "${mas_apps_to_restart[@]}"; do
