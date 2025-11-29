@@ -15,7 +15,7 @@ export PATH="/usr/local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/opt/local/bin:
 export HOMEBREW_NO_COLOR=1
 
 # 脚本版本号：用于调试和确认是否使用最新脚本
-SCRIPT_VERSION="2025.11.24.v14"
+SCRIPT_VERSION="2025.11.29.v4"
 
 # 预先解析 GNU Parallel 的绝对路径。在某些 sudo 环境下 PATH 可能被重置，导致找不到 parallel。
 if command -v parallel >/dev/null 2>&1; then
@@ -4113,12 +4113,12 @@ while [ $mas_attempt -le $MAS_MAX_RETRIES ]; do
         # 解析输出，分别处理有效行和错误行
         # 有效行以数字 ID 开头，允许前面有空格
         valid_lines=$(echo "$mas_output" | grep -E '^[[:space:]]*[0-9]+[[:space:]]' || true)
-        # 统计网络错误组次数：每个以 Error: 开头且包含 NSURLErrorDomain 的行视为一个网络错误组
-        network_error_groups=$(echo "$mas_output" | grep '^Error:' | grep 'NSURLErrorDomain' || true)
-        network_error_count=$(echo "$network_error_groups" | wc -l | tr -d ' ')
-        # 统计其他类型的错误组（不含 NSURLErrorDomain）
-        other_error_groups=$(echo "$mas_output" | grep '^Error:' | grep -v 'NSURLErrorDomain' || true)
-        other_error_count=$(echo "$other_error_groups" | wc -l | tr -d ' ')
+        # 统计错误行：以 Error: 开头的为错误组
+        total_error_count=$(echo "$mas_output" | grep -c '^Error:' || true)
+        # 其中包含 NSURLErrorDomain 的错误行视为网络错误
+        network_error_count=$(echo "$mas_output" | grep -c '^Error:.*NSURLErrorDomain' || true)
+        # 剩余的错误行则为其他类型错误
+        other_error_count=$(( total_error_count - network_error_count ))
         # 使用 awk 移除错误组的后续行（以空格或制表符开头的行被视为错误详情），保留其他非错误信息
         other_errors=$(echo "$mas_output" | awk '
             BEGIN {inside_err=0}
@@ -4243,12 +4243,16 @@ while [ $mas_attempt -le $MAS_MAX_RETRIES ]; do
     # 解析并行扫描后的结果并写入日志
     # 提取以数字 ID 开头的有效行
     valid_lines=$(echo "$mas_output" | grep -E '^[[:space:]]*[0-9]+[[:space:]]' || true)
-    # 统计错误组次数：每个以 Error: 开头的行为一个错误组
-    error_group_count=$(echo "$mas_output" | grep -c '^Error:' || true)
-    # 其他错误行：排除有效行和 Error: 开头的错误行
-    other_errors=$(echo "$mas_output" | grep -v -E '^[[:space:]]*[0-9]+[[:space:]]' | grep -v '^Error:' || true)
-    # 进一步过滤错误详情中的冗余信息，如 NSURL 相关字段和 LocalizedDescription 行等
-    other_errors=$(echo "$other_errors" | grep -v -E '(NSLocalizedDescription=|NSErrorFailingURLStringKey=|NSErrorFailingURLKey=|NSUnderlyingError=|_NSURLErrorRelatedURLSessionTaskErrorKey=|_NSURLErrorFailingURLSessionTaskErrorKey=|_kCFStreamErrorDomainKey=|_kCFStreamErrorCodeKey=|\)\,)' || true)
+            # 统计错误组次数：每个以 Error: 开头的行为一个错误组
+            total_error_count=$(echo "$mas_output" | grep -c '^Error:' || true)
+            # 其中包含 NSURLErrorDomain 的错误组视为网络错误
+            network_error_count=$(echo "$mas_output" | grep -c '^Error:.*NSURLErrorDomain' || true)
+            # 剩余的错误组视为其他类型错误
+            other_error_count=$(( total_error_count - network_error_count ))
+            # 其他错误行：排除有效行和 Error: 开头的错误行
+            other_errors=$(echo "$mas_output" | grep -v -E '^[[:space:]]*[0-9]+[[:space:]]' | grep -v '^Error:' || true)
+            # 进一步过滤错误详情中的冗余信息，如 NSURL 相关字段和 LocalizedDescription 行等
+            other_errors=$(echo "$other_errors" | grep -v -E '(NSLocalizedDescription=|NSErrorFailingURLStringKey=|NSErrorFailingURLKey=|NSUnderlyingError=|_NSURLErrorRelatedURLSessionTaskErrorKey=|_NSURLErrorFailingURLSessionTaskErrorKey=|_kCFStreamErrorDomainKey=|_kCFStreamErrorCodeKey=|\)\,)' || true)
 
     # 仅保存有效更新信息供后续安装使用
     outdated_mas_apps="$valid_lines"
@@ -4265,15 +4269,18 @@ while [ $mas_attempt -le $MAS_MAX_RETRIES ]; do
             done <<< "$mas_app_names"
             mas_success=true
         fi
-        # 输出网络错误摘要
-        if [ "$error_group_count" -gt 0 ]; then
-            echo -e "⚠️  MAS 更新接口出现网络错误 ${error_group_count} 次，已忽略错误详情！" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        fi
-        # 输出其他错误行
-        if [ -n "$other_errors" ]; then
-            echo -e "$other_errors" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        fi
-        break
+            # 根据错误统计输出摘要信息
+            if [ "$network_error_count" -gt 0 ]; then
+                echo -e "⚠️  MAS 更新接口出现网络错误 ${network_error_count} 次，已忽略错误详情！" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            fi
+            if [ "$other_error_count" -gt 0 ]; then
+                echo -e "⚠️  MAS 更新过程中出现 ${other_error_count} 个错误，请检查日志或稍后重试。" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            fi
+            # 输出其他非错误信息（如果有）
+            if [ -n "$other_errors" ]; then
+                echo -e "$other_errors" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            fi
+            break
     else
         # 扫描失败，检查是否超时错误
         if echo -e "$mas_output" | grep -q "The request timed out"; then
