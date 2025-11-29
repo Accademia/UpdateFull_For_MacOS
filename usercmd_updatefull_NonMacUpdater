@@ -4409,7 +4409,7 @@ elif [ "$mas_success" = true ]; then
             # 如果没有找到名称，则使用 ID 作为名称（防止打印出空白）
             [ -n "$mas_app_name" ] || mas_app_name="$mas_id"
             # 提示正在升级
-            echo -e "✓  正在升级 MAS APP：$mas_app_name (ID: $mas_id) ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            echo -e "✓  正在升级 MAS APP：$mas_app_name ( sudo mas upgrade $mas_id ) ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             # 执行升级并捕获输出
             upgrade_output=$(sudo -E -n -H -u "$targetUser" /bin/bash -lc "sudo /opt/homebrew/bin/mas upgrade $mas_id 2>&1")
             upgrade_status=$?
@@ -4428,7 +4428,7 @@ elif [ "$mas_success" = true ]; then
         for mas_id in $mas_app_ids; do
             mas_app_name=$(printf '%s\n' "$mas_installed_apps" | awk -v id="$mas_id" '($1==id){$1=""; sub(/^ +/, ""); print; exit}' | sed 's/ ([0-9].*)$//')
             [ -n "$mas_app_name" ] || mas_app_name="$mas_id"
-            echo -e "✓  正在升级 MAS APP：$mas_app_name (ID: $mas_id) ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            echo -e "✓  正在升级 MAS APP：$mas_app_name ( sudo mas upgrade $mas_id ) ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             upgrade_output=$(/bin/bash -lc "sudo /opt/homebrew/bin/mas upgrade $mas_id 2>&1")
             upgrade_status=$?
             echo -e "$upgrade_output" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
