@@ -15,7 +15,7 @@ export PATH="/usr/local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/opt/local/bin:
 export HOMEBREW_NO_COLOR=1
 
 # 脚本版本号：用于调试和确认是否使用最新脚本
-SCRIPT_VERSION="2025.11.29.v4"
+SCRIPT_VERSION="2025.11.30.v1"
 
 # 预先解析 GNU Parallel 的绝对路径。在某些 sudo 环境下 PATH 可能被重置，导致找不到 parallel。
 if command -v parallel >/dev/null 2>&1; then
@@ -4098,11 +4098,11 @@ while [ $mas_attempt -le $MAS_MAX_RETRIES ]; do
             if [[ "$targetUser" == "root" ]]; then
                 targetUser=$(stat -f '%Su' /dev/console)
             fi
-            mas_output=$(sudo -n -H -u "$targetUser" gtimeout 300s /opt/homebrew/bin/mas outdated 2>&1)
+            mas_output=$(sudo -n -H -u "$targetUser" gtimeout 300s /opt/homebrew/bin/mas outdated --accurate-ignore-unknown-apps --verbose 2>&1)
             mas_status=$?
         else
             echo -e "✓  当前用户 '$USER' 为普通权限，直接执行 mas outdated ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-            mas_output=$(gtimeout 300s /opt/homebrew/bin/mas outdated 2>&1)
+            mas_output=$(gtimeout 300s /opt/homebrew/bin/mas outdated --accurate-ignore-unknown-apps --verbose 2>&1)
             mas_status=$?
         fi
         # 如果输出中包含 NSURLErrorDomain，则认为是网络错误。即便退出码不为0，也让后续逻辑按成功解析，避免打印大量错误详情
@@ -4195,13 +4195,13 @@ while [ $mas_attempt -le $MAS_MAX_RETRIES ]; do
         # 在 root 情况下，使用目标用户执行 mas outdated 针对每个应用 ID。
         # 为了避免 mas 弹窗阻塞，针对每个 ID 单独运行 gtimeout 120s mas outdated "id"。
         # 超时退出码为124时尝试关闭 App Store，并继续后续检查。使用 xargs 并发 16 个进程。
-        mas_output=$(printf '%s\n' $mas_app_ids_list | xargs -P "$MAS_OUTDATED_PARALLEL_JOBS" -I{} sudo -E -n -H -u "$targetUser" sh -lc 'if gtimeout 120s /opt/homebrew/bin/mas outdated "{}"; then exit 0; fi; ec=$?; if [ $ec -eq 60 ] || [ $ec -eq 124 ]; then osascript -e "tell application \"App Store\" to quit" >/dev/null 2>&1 || true; sleep 1; fi; exit $ec' 2>/dev/null )
+        mas_output=$(printf '%s\n' $mas_app_ids_list | xargs -P "$MAS_OUTDATED_PARALLEL_JOBS" -I{} sudo -E -n -H -u "$targetUser" sh -lc 'if gtimeout 120s /opt/homebrew/bin/mas outdated --accurate-ignore-unknown-apps --verbose "{}"; then exit 0; fi; ec=$?; if [ $ec -eq 60 ] || [ $ec -eq 124 ]; then osascript -e "tell application \"App Store\" to quit" >/dev/null 2>&1 || true; sleep 1; fi; exit $ec' 2>/dev/null )
         # 由于并行执行会返回最后一个子进程的退出码，此处统一标记为 0，表示我们总是收集并解析输出。
         mas_status=0
     else
         echo -e "✓  当前用户 '$USER' 为普通权限，直接并行运行 mas outdated 检查各个应用 ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"  
         # 当前用户为普通权限，直接并行运行 mas outdated 针对每个应用 ID。
-        mas_output=$(printf '%s\n' $mas_app_ids_list | xargs -P "$MAS_OUTDATED_PARALLEL_JOBS" -I{} sh -lc 'if gtimeout 120s /opt/homebrew/bin/mas outdated "{}"; then exit 0; fi; ec=$?; if [ $ec -eq 60 ] || [ $ec -eq 124 ]; then osascript -e "tell application \"App Store\" to quit" >/dev/null 2>&1 || true; sleep 1; fi; exit $ec' 2>/dev/null )
+        mas_output=$(printf '%s\n' $mas_app_ids_list | xargs -P "$MAS_OUTDATED_PARALLEL_JOBS" -I{} sh -lc 'if gtimeout 120s /opt/homebrew/bin/mas outdated --accurate-ignore-unknown-apps --verbose "{}"; then exit 0; fi; ec=$?; if [ $ec -eq 60 ] || [ $ec -eq 124 ]; then osascript -e "tell application \"App Store\" to quit" >/dev/null 2>&1 || true; sleep 1; fi; exit $ec' 2>/dev/null )
         mas_status=0
     fi
         # mas_status 已在并行命令中设置，不使用上一条命令的退出码
@@ -4218,9 +4218,9 @@ while [ $mas_attempt -le $MAS_MAX_RETRIES ]; do
                 echo -e "⚠️  mas outdated 并行扫描未返回有效结果，尝试串行扫描 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 if [[ $(id -u) -eq 0 ]]; then
                     targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
-                    mas_output=$(sudo -E -n -H -u "$targetUser" /opt/homebrew/bin/mas outdated 2>&1 || true)
+                    mas_output=$(sudo -E -n -H -u "$targetUser" /opt/homebrew/bin/mas outdated --accurate-ignore-unknown-apps --verbose 2>&1 || true)
                 else
-                    mas_output=$(/opt/homebrew/bin/mas outdated 2>&1 || true)
+                    mas_output=$(/opt/homebrew/bin/mas outdated --accurate-ignore-unknown-apps --verbose 2>&1 || true)
                 fi
                 # 重置 mas_status 为 0，以便后续逻辑继续处理
                 mas_status=0
@@ -4233,10 +4233,10 @@ while [ $mas_attempt -le $MAS_MAX_RETRIES ]; do
         if [[ $(id -u) -eq 0 ]]; then
             # 在 root 权限下，降权执行一次 mas outdated，并保留环境变量，捕获输出
             targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
-            mas_output=$(sudo -E -n -H -u "$targetUser" /opt/homebrew/bin/mas outdated 2>&1 || true)
+            mas_output=$(sudo -E -n -H -u "$targetUser" /opt/homebrew/bin/mas outdated --accurate-ignore-unknown-apps --verbose 2>&1 || true)
         else
             # 普通用户直接执行 mas outdated
-            mas_output=$(/opt/homebrew/bin/mas outdated 2>&1 || true)
+            mas_output=$(/opt/homebrew/bin/mas outdated --accurate-ignore-unknown-apps --verbose 2>&1 || true)
         fi
     fi
 
@@ -4297,6 +4297,12 @@ done
     # 如果扫描标记为失败（无有效更新且发生网络错误），在扫描阶段结束时输出失败提示
     if [ "$mas_scan_failed" = true ]; then
         echo -e "❌ 扫描更新失败" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    fi
+
+    # 如果扫描成功但没有发现任何可更新的应用，则提示扫描已完成且无新版本
+    # 仅当未标记为扫描失败且未检测到任何需要更新的应用时输出此信息
+    if [ "$mas_scan_failed" != true ] && [ "$mas_success" != true ]; then
+        echo -e "✓  已完成所有软件扫描，没有发现新版本" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     fi
 
 
@@ -4525,7 +4531,15 @@ elif [ "$mas_success" = true ]; then
 
 else
 
-    echo -e "❌ mas 多次尝试仍超时，已跳过 Mac App Store （MAS）应用更新"
+    # 如果扫描成功但没有应用需要更新，则输出友好的提示，表示无需更新
+    echo -e "✅  Mac App Store （MAS）无需更新软件，所有软件无新版本。" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    # 打印空行以保持输出风格一致
+    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    # 输出完成提示，与其他任务模块保持一致，表明 MAS 更新任务已完成
+    # 打印带颜色的提示到终端，但不写入日志文件
+    echo -e "\033[1;32m[OK] Mac App Store Upgrade  运行已完成已完成  ✅ \033[1;32m"
+    # 将无颜色的提示写入日志文件中
+    echo -e "[OK] Mac App Store Upgrade  运行已完成已完成  ✅ " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 
 fi
 
