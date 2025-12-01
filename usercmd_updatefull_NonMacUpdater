@@ -4532,7 +4532,7 @@ elif [ "$mas_success" = true ]; then
 else
 
     # 如果扫描成功但没有应用需要更新，则输出友好的提示，表示无需更新
-    echo -e "✅  Mac App Store （MAS）无需更新软件，所有软件无新版本。" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✓  Mac App Store （MAS）无需更新软件，所有软件无新版本。" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     # 打印空行以保持输出风格一致
     echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     # 输出完成提示，与其他任务模块保持一致，表明 MAS 更新任务已完成
