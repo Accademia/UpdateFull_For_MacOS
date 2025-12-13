@@ -142,7 +142,12 @@
         /opt/homebrew/bin/bash /usr/local/bin/usercmd_updatefull                       
         ```
      
-    + 方法 3 ：以Roo权限 静默执行 （相当于 root 后台执行）
+    + 方法 3 : 静默执行 （相当于 模拟前台终端 的 后台执行）
+        ```
+        /usr/bin/script -q /dev/null /bin/zsh -lc "/usr/local/bin/usercmd_updatefull"
+        ```
+     
+    + 方法 4 ：以Roo权限 静默执行 （相当于 root 后台执行）
         ```
         /usr/bin/sudo -n -E /opt/homebrew/bin/bash /usr/local/bin/usercmd_updatefull      
         ```
