@@ -50,9 +50,21 @@
 
 .
 
+# 程序下载
+
+# usercmd_updatefull
+
+> ### https://cdn.jsdelivr.net/gh/Accademia/UpdateFull_For_MacOS/usercmd_updatefull
+
+# usercmd_updatefull_NonMacUpdater
+
+> ### https://cdn.jsdelivr.net/gh/Accademia/UpdateFull_For_MacOS/usercmd_updatefull_NonMacUpdater
+
+.
+
 # 使用方法（纯鼠标）
 
- 1. 下载 usercmd_updatefull (无需下载其他文件)
+ 1. 下载 usercmd_updatefull 或 usercmd_updatefull_NonMacUpdater  (无需下载其他文件)
  2. 然后 双击执行
 
 .
