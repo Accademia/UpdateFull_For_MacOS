@@ -4704,7 +4704,10 @@ elif [ "$mas_success" = true ]; then
             # 新增：剥离并收集 Spotlight 未索引警告，避免刷屏（详细信息仅写入 Update_Mas.log）
             upgrade_output="$(mas_strip_spotlight_warnings "$upgrade_output" "mas upgrade")"
             # 实时打印升级输出
-            echo -e "$upgrade_output" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            # 如果输出为空或仅包含空白字符，则不打印，避免产生多余空行。
+            if printf '%s' "$upgrade_output" | grep -q '[^[:space:]]'; then
+                echo -e "$upgrade_output" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            fi
             # 根据返回码判定结果
             if [ $upgrade_status -eq 0 ]; then
                 mas_result_list+=("success|$mas_app_name")
@@ -4723,7 +4726,10 @@ elif [ "$mas_success" = true ]; then
             upgrade_status=$?
             # 新增：剥离并收集 Spotlight 未索引警告，避免刷屏（详细信息仅写入 Update_Mas.log）
             upgrade_output="$(mas_strip_spotlight_warnings "$upgrade_output" "mas upgrade")"
-            echo -e "$upgrade_output" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            # 如果输出为空或仅包含空白字符，则不打印，避免产生多余空行。
+            if printf '%s' "$upgrade_output" | grep -q '[^[:space:]]'; then
+                echo -e "$upgrade_output" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            fi
             if [ $upgrade_status -eq 0 ]; then
                 mas_result_list+=("success|$mas_app_name")
             else
