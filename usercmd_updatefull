@@ -4841,8 +4841,8 @@ if [ -s "${MAS_SPOTLIGHT_WARNINGS_FILE:-}" ]; then
         echo "[MAS] Spotlight 索引失效警告（已从屏幕/主日志隐藏）"
         echo "涉及应用数量（去重）：${__sp_unique_count}"
         echo ""
-        echo "【涉及应用清单】"
-        sort -u "$MAS_SPOTLIGHT_UNINDEXED_APPS_FILE" 2>/dev/null | sed '/^$/d' | sed 's/^/ - /'
+	        echo "【涉及应用清单，以及对应的测试命令】"
+	        sort -u "$MAS_SPOTLIGHT_UNINDEXED_APPS_FILE" 2>/dev/null | sed '/^$/d' | sed 's/"/\\"/g' | sed 's#^#mdls -rn kMDItemAppStoreAdamID "#; s#$#"#'
         echo ""
         echo "【mas 原始警告输出】"
         cat "$MAS_SPOTLIGHT_WARNINGS_FILE"
