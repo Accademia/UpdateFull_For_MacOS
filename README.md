@@ -274,8 +274,17 @@
 # ---------------------------
 # 免密修改：计算机名称
 # ---------------------------
+
 你的用户名 ALL=(root) NOPASSWD: /usr/sbin/scutil --set ComputerName *
 你的用户名 ALL=(root) NOPASSWD: /usr/sbin/scutil --set LocalHostName *
+
+
+# ---------------------------
+# 免密执行：索引重建
+# ---------------------------
+
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/bin/mdutil -E *
+你的用户名 ALL=(ALL) NOPASSWD: SETENV: /usr/bin/mdutil -i on *
 
 
 # -------------------------------
