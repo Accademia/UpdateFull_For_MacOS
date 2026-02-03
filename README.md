@@ -52,14 +52,14 @@
 
 # 程序下载
 
-# usercmd_updatefull
-
-> ### https://cdn.jsdelivr.net/gh/Accademia/UpdateFull_For_MacOS/usercmd_updatefull
-
-# usercmd_updatefull_NonMacUpdater
+# usercmd_updatefull_NonMacUpdater （ 推荐 🔥🔥🔥 ）
 
 > ### https://cdn.jsdelivr.net/gh/Accademia/UpdateFull_For_MacOS/usercmd_updatefull_NonMacUpdater
 
+
+# usercmd_updatefull  （ 不建议 ：MacUpdater 已经停止更新 ）
+
+> ### https://cdn.jsdelivr.net/gh/Accademia/UpdateFull_For_MacOS/usercmd_updatefull
 .
 
 # 使用方法（纯鼠标）
@@ -71,13 +71,13 @@
 
 # 使用方法（命令行）
 
- 1.  下载 usercmd_updatefull (无需下载其他文件)
- 2.  请将命令拷贝至：/usr/local/bin目录中（或将文件所在的路径，加入到环境变量的$PATH中）
- 3.  使用usercmd_updatefull命令，启动脚本
- 4.  如果要每日自动执行，建议使用 Lingon，将usercmd_updatefull挂载为循环任务（比如每天夜间3点钟执行）
+ 1.  下载 usercmd_updatefull_NonMacUpdater (无需下载其他文件)
+ 2.  请将命令拷贝至：/usr/local/bin 目录中（或将文件所在的路径，加入到环境变量的$PATH中）
+ 3.  使用 usercmd_updatefull_NonMacUpdater 命令，启动脚本
+ 4.  如果要每日自动执行，建议使用 Lingon，将 usercmd_updatefull_NonMacUpdater 挂载为循环任务（比如每天夜间3点钟执行）
    - 挂载命令 ：
       ```
-      /usr/bin/sudo -n -E /opt/homebrew/bin/bash /usr/local/bin/usercmd_updatefull 
+      /usr/bin/sudo -n -E /opt/homebrew/bin/bash /usr/local/bin/usercmd_updatefull_NonMacUpdater 
       ```
 
 注意:
@@ -146,28 +146,28 @@
  - (后台执行) 挂载命令 ：
     + 方法 1 : 打开窗口执行 （相当于 前台执行）
         ```
-        /usr/bin/open /usr/local/bin/usercmd_updatefull                                
+        /usr/bin/open /usr/local/bin/usercmd_updatefull_NonMacUpdater                                
         ```
     
     + 方法 2 : 静默执行 （相当于 后台执行）
         ```
-        /opt/homebrew/bin/bash /usr/local/bin/usercmd_updatefull                       
+        /opt/homebrew/bin/bash /usr/local/bin/usercmd_updatefull_NonMacUpdater                       
         ```
      
     + 方法 3 : 静默执行 （相当于 模拟前台终端 的 后台执行）
         ```
-        /usr/bin/script -q /dev/null /bin/zsh -lc "/usr/local/bin/usercmd_updatefull"
+        /usr/bin/script -q /dev/null /bin/zsh -lc "/usr/local/bin/usercmd_updatefull_NonMacUpdater"
         ```
      
     + 方法 4 ：以Roo权限 静默执行 （相当于 root 后台执行）
         ```
-        /usr/bin/sudo -n -E /opt/homebrew/bin/bash /usr/local/bin/usercmd_updatefull      
+        /usr/bin/sudo -n -E /opt/homebrew/bin/bash /usr/local/bin/usercmd_updatefull_NonMacUpdater      
         ```
      
     + 特别注意：⚠️⚠️⚠️⚠️  
-        + 后台执行usercmd_updatefull时，千万不要不加 /opt/homebrew/bin/bash ，而直接调用 /usr/local/bin/usercmd_updatefull。这会导致Generate_Homebrew_Sudoers生成的免密规则失效。
-        + 因为 程序Generate_Homebrew_Sudoers在前台生成免密规则，不能足量覆盖/usr/local/bin/usercmd_updatefull程序在后台 直接执行时的所有免密请求，会多出来特别多 在前台生成规则时 无法看到的高权限命令。从而导致执行被卡住。
-        + 但是前台调用/usr/local/bin/usercmd_updatefull时，无上述限制！！
+        + 后台执行usercmd_updatefull时，千万不要不加 /opt/homebrew/bin/bash ，而直接调用 /usr/local/bin/usercmd_updatefull_NonMacUpdater 。这会导致Generate_Homebrew_Sudoers生成的免密规则失效。
+        + 因为 程序Generate_Homebrew_Sudoers在前台生成免密规则，不能足量覆盖/usr/local/bin/usercmd_updatefull_NonMacUpdater 程序在后台 直接执行时的所有免密请求，会多出来特别多 在前台生成规则时 无法看到的高权限命令。从而导致执行被卡住。
+        + 但是前台调用/usr/local/bin/usercmd_updatefull_NonMacUpdater 时，无上述限制！！
 
     - PS：
       - 建议命令被存储到 /usr/local/bin 路径下 ！
