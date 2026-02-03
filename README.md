@@ -9,17 +9,23 @@
     
  4. 更新结束后，不打乱 启动台布局（LaunchPad Layout）
 
-.
+<br>
 
 最终：
  - 用户体验 = AppStore 每日夜间 静默更新
  - 覆盖率  >  90% Mac 软件
 
 
-.
+
+<br>
+<br>
+
+---------
 
 
 # 可以更新哪些程序？
+
+<br>
 
 本脚本是 聚合更新软件，会调用 所有主流更新软件，更新所有mac软件。
 被聚合的 更新软件包括：
@@ -39,17 +45,26 @@
 在更新后，自动还原LaunchPad（启动台）布局
 
 
-.
+<br>
+<br>
 
+
+---------
 
 # 最终效果：
+
+<br>
 
 <img width="700"  alt="example" src="https://github.com/user-attachments/assets/eaf6ff98-7180-4420-8f56-ba77471028b1" />
 
 
 
-.
+
 <br>
+<br>
+
+---------
+
 
 # 程序下载
 
@@ -69,24 +84,40 @@
 
 > ### https://cdn.jsdelivr.net/gh/Accademia/UpdateFull_For_MacOS/usercmd_updatefull
 
+
 <br>
+<br>
+
+---------
+
 
 # 上述两者区别
 
-上述两个程序，唯一的区别就是 后者 增加了 ，通过 MacUpdater 更新所有APP的功能。其他方面无任何区别 ！ 但是MacUpdater 已经在 2026-01-01 停止更新了。所以建议下载 [usercmd_updatefull_NonMacUpdater](https://cdn.jsdelivr.net/gh/Accademia/UpdateFull_For_MacOS/usercmd_updatefull_NonMacUpdater) 程序
-
-.
 <br>
 
+上述两个程序，唯一的区别就是 后者 增加了 ，通过 MacUpdater 更新所有APP的功能。其他方面无任何区别 ！ 但是MacUpdater 已经在 2026-01-01 停止更新了。所以建议下载 [usercmd_updatefull_NonMacUpdater](https://cdn.jsdelivr.net/gh/Accademia/UpdateFull_For_MacOS/usercmd_updatefull_NonMacUpdater) 程序
+
+<br>
+<br>
+
+---------
+
 # 使用方法（纯鼠标）
+
+<br>
 
  1. 下载 [usercmd_updatefull](https://cdn.jsdelivr.net/gh/Accademia/UpdateFull_For_MacOS/usercmd_updatefull)  或 [usercmd_updatefull_NonMacUpdater](https://cdn.jsdelivr.net/gh/Accademia/UpdateFull_For_MacOS/usercmd_updatefull_NonMacUpdater)  (无需下载其他文件)
  
  2. 然后 双击执行
 
-.
+<br>
+<br>
+
+---------
 
 # 使用方法（命令行）
+
+<br>
 
  1.  下载 usercmd_updatefull_NonMacUpdater (无需下载其他文件)
  
@@ -108,10 +139,16 @@
   2.  本脚本，可配置 在 几点几分 到 几点几分 之间，拒绝执行（以避免和其他定时更新的软件冲突）
 
 
-.
+
+<br>
+<br>
+
+---------
 
 
 # 日志保存在哪？
+
+<br>
 
  - 每次执行完成后，会自动打开日志目录
 
@@ -127,10 +164,15 @@
  
   - 另外，将LOG日志写入iCLOUD，也便于异地检测更新状态。用iPhone都可以查看iCloud中其他Mac的有没有按时更新，以及以往每次、每天的更新记录。
 
-.
 
+<br>
+<br>
+
+---------
 
 # 可管理的应用太少，怎么办？
+
+<br>
 
  - 我发现，通过本脚本升级的APP数量太少，只有总APP数量的1/3 ，怎么办 ？ 请看如下：
 
@@ -161,10 +203,15 @@
     brew_install_commands.txt 内含了，迁移所需的全部命令。注意，迁移过程会触发多次密码请求。
 
 
-.
 
+<br>
+<br>
+
+---------
 
 # 如何设置定时更新？
+
+<br>
 
  - 如何实现，类似AppStore一样，每天夜间，自动静默更新 所有 Mac APP ？ 请看如下：
  - 建议使用 Lingon Pro（或类似软件），将usercmd_updatefull挂载为循环任务（比如每天夜间3点钟执行）
@@ -200,9 +247,15 @@
       - 建议命令被存储到 /usr/local/bin 路径下 ！
 
 
-.
+
+<br>
+<br>
+
+---------
 
 # 如何避免密码请求？
+
+<br>
 
  - 如何让每次执行本脚本 更新APP (包括定时更新) 的时候，都不弹出管理员密码请求，全程能全自动更新 ？ 请看如下：
  - 需要通过 sudo visudo，将要程序加入到免密列表当中
@@ -346,20 +399,33 @@
    root            ALL = (ALL) ALL
    ```
 
-.
+
+<br>
+<br>
+
+---------
+
    
 #  HomeBrew更新后，须 “手动更新” 的软件
+
+<br>
 
    ```
    paragon-extfs
    paragon-ntfs
    ```
 
-.
 
+<br>
+<br>
+
+---------
 
 
 # 出现Error的应对
+
+
+<br>
 
 如果出现如下错误：
 
@@ -382,10 +448,16 @@ uesrcmd_fix_nosort
 grep -R "nosort" /opt/homebrew/etc/bash_completion.d
 ```
 
-.
+
+<br>
+<br>
+
+---------
 
 
 # Mac App Store 更新错误怎么办 ？
+
+<br>
 
 对于MAS应用更新 出错的情况。往往是因为，MacOS系统更新后，苹果修改了MAS升级接口导致的。由于mas-cli逆向出来的苹果接口，不是公开的接口。所以跟进修改需要大量开发时间。
 
@@ -393,16 +465,26 @@ grep -R "nosort" /opt/homebrew/etc/bash_completion.d
 
 也就是说，你什么都不做。坐等mas-cli开发者修复，就可以了.
 
-.
 
-声明：
---------------------------------
+<br>
+<br>
+
+---------
+
+
+# 声明：
+
+<br>
 
  - 本脚本，代码均来自AI，人工仅仅做极少量调整维护。参与编程的AI包括：
+   
    1. 【2025/Q4-？】编程者：OpenAI  ChatGPT 5-Pro + Agent + CodeX
-   1. 【2025/Q3-Q3】编程者：OpenAI  ChatGPT O3-Pro + 深度研究 （主力）  、  xAI Grok4 （少量）
-   2. 【2025/Q1-Q2】编程者：xAI     Grok3 + DeeperSearch / Think
-   3. 【2024/Q3-Q4】编程者：OpenAI  ChatGPT O1 
+   
+   2. 【2025/Q3-Q3】编程者：OpenAI  ChatGPT O3-Pro + 深度研究 （主力）  、  xAI Grok4 （少量）
+   
+   3. 【2025/Q1-Q2】编程者：xAI     Grok3 + DeeperSearch / Think
+   
+   4. 【2024/Q3-Q4】编程者：OpenAI  ChatGPT O1 
    
  - 本脚本经过长期测试。
  
