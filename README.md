@@ -49,22 +49,39 @@
 
 
 .
+<br>
 
 # 程序下载
 
-# usercmd_updatefull_NonMacUpdater （ 推荐 🔥🔥🔥 ）
+<br>
+
+# 命令 A ：  [usercmd_updatefull_NonMacUpdater](https://cdn.jsdelivr.net/gh/Accademia/UpdateFull_For_MacOS/usercmd_updatefull_NonMacUpdater)  
+ 
+🔥🔥🔥 推荐 🔥🔥🔥
 
 > ### https://cdn.jsdelivr.net/gh/Accademia/UpdateFull_For_MacOS/usercmd_updatefull_NonMacUpdater
 
+<br>
 
-# usercmd_updatefull  （ 不建议 ：MacUpdater 已经停止更新 ）
+# 命令 B ： [usercmd_updatefull](https://cdn.jsdelivr.net/gh/Accademia/UpdateFull_For_MacOS/usercmd_updatefull)   
+
+❌❌❌ 不推荐 ❌❌❌ ： 因为 MacUpdater 已停止更新 
 
 > ### https://cdn.jsdelivr.net/gh/Accademia/UpdateFull_For_MacOS/usercmd_updatefull
+
+<br>
+
+# 上述两者区别
+
+上述两个程序，唯一的区别就是 后者 增加了 ，通过 MacUpdater 更新所有APP的功能。其他方面无任何区别 ！ 但是MacUpdater 已经在 2026-01-01 停止更新了。所以建议下载 [usercmd_updatefull_NonMacUpdater](https://cdn.jsdelivr.net/gh/Accademia/UpdateFull_For_MacOS/usercmd_updatefull_NonMacUpdater) 程序
+
 .
+<br>
 
 # 使用方法（纯鼠标）
 
- 1. 下载 usercmd_updatefull 或 usercmd_updatefull_NonMacUpdater  (无需下载其他文件)
+ 1. 下载 [usercmd_updatefull](https://cdn.jsdelivr.net/gh/Accademia/UpdateFull_For_MacOS/usercmd_updatefull)  或 [usercmd_updatefull_NonMacUpdater](https://cdn.jsdelivr.net/gh/Accademia/UpdateFull_For_MacOS/usercmd_updatefull_NonMacUpdater)  (无需下载其他文件)
+ 
  2. 然后 双击执行
 
 .
@@ -72,16 +89,22 @@
 # 使用方法（命令行）
 
  1.  下载 usercmd_updatefull_NonMacUpdater (无需下载其他文件)
+ 
  2.  请将命令拷贝至：/usr/local/bin 目录中（或将文件所在的路径，加入到环境变量的$PATH中）
+ 
  3.  使用 usercmd_updatefull_NonMacUpdater 命令，启动脚本
+ 
  4.  如果要每日自动执行，建议使用 Lingon，将 usercmd_updatefull_NonMacUpdater 挂载为循环任务（比如每天夜间3点钟执行）
+   
    - 挂载命令 ：
       ```
       /usr/bin/sudo -n -E /opt/homebrew/bin/bash /usr/local/bin/usercmd_updatefull_NonMacUpdater 
       ```
 
 注意:
+
   1.  本脚本会检测，更新所需的服务器，是否能正常访问，如果不能正常访问，建议开启VPN。
+
   2.  本脚本，可配置 在 几点几分 到 几点几分 之间，拒绝执行（以避免和其他定时更新的软件冲突）
 
 
@@ -91,13 +114,17 @@
 # 日志保存在哪？
 
  - 每次执行完成后，会自动打开日志目录
+
  - 日志路径：
    - icloud云盘 -> LOG -> 产品名-芯片型号-序列号 ->
+
  - 启动台LaunchPad的备份路径：
    - icloud云盘 -> BACKUP -> 产品名-芯片型号-序列号 -> 当前用户名称 -> DesktopLayout
 
 注意：
+
   - 没有使用计算机名称：计算机名称会因为网络冲突，而变化，会导致log目录和备份目录频繁改变，而且无法关闭自动改名，这是macos系统功能之一。所以不能使用计算机名称。
+ 
   - 另外，将LOG日志写入iCLOUD，也便于异地检测更新状态。用iPhone都可以查看iCloud中其他Mac的有没有按时更新，以及以往每次、每天的更新记录。
 
 .
