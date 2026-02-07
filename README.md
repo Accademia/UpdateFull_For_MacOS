@@ -272,6 +272,13 @@
 
 
 # ----------------------------
+# 免密执行 本脚本
+# ----------------------------
+
+你的用户名 ALL=(root) NOPASSWD: SETENV: /usr/local/bin/usercmd_updatefull
+你的用户名 ALL=(root) NOPASSWD: SETENV: /usr/local/bin/usercmd_updatefull_NonMacUpdater
+
+# ----------------------------
 # 免密备份 控制台（LaunchPad）
 # ----------------------------
 
