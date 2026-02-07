@@ -5981,10 +5981,7 @@ else
     echo -e "✅  APP 数量（ Sparkle              ） ：$sparkle_app_count  " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
     echo -e "✅  APP 数量（ Sparkle_Non_Homebrew ） ：$sparkle_non_brew_count  " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
 
-    sparkle_probe_paths=$(echo "$sparkle_non_brew_paths" | /usr/bin/sed '/^\s*$/d')
-    if [ -z "$sparkle_probe_paths" ]; then
-        sparkle_probe_paths="$sparkle_app_paths"
-    fi
+    sparkle_probe_paths="$sparkle_app_paths"
     sparkle_probe_count=$(echo "$sparkle_probe_paths" | /usr/bin/sed '/^\s*$/d' | /usr/bin/wc -l | /usr/bin/tr -d ' ')
     echo -e "✅  APP 数量（ Sparkle_Probe        ） ：$sparkle_probe_count  " | tee -a "$LOG_SPARKLE_FILE" > /dev/null
 
@@ -6002,6 +5999,8 @@ else
     sparkle_probe_update=0
     sparkle_probe_warn=0
     sparkle_probe_warn_list=""
+    sparkle_update_warn=0
+    sparkle_update_warn_list=""
 
     SPARKLE_PROBE_JOBS="${SPARKLE_PROBE_JOBS:-32}"
 
@@ -6120,6 +6119,13 @@ else
             "$sparkle_probe_total" "$sparkle_probe_update" "$sparkle_probe_fail" "$sparkle_probe_skip" "$sparkle_probe_warn" \
             | tee -a "$LOG_SPARKLE_FILE" > /dev/null
     fi
+
+    if [ ${#sparkle_updates_list[@]} -gt 0 ]; then
+        for __app in "${sparkle_updates_list[@]}"; do
+            __app_name="$(basename "$__app")"
+            echo -e "✔︎  检测到新版本 : $__app_name " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
+        done
+    fi
     # 如果没有检测到更新
     if [ ${#sparkle_updates_list[@]} -eq 0 ]; then
         echo -e "✓  未检测到新版本 ：Sparkle 应用 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
@@ -6140,18 +6146,42 @@ else
             if [ "$(id -u)" -eq 0 ]; then
                 targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
                 echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 Sparkle 更新 : $app_name" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
-                sudo -n -H -u "$targetUser" bash -lc "\"$SPARKLE_CLI\" --check-immediately --allow-major-upgrades \"$update_path\"" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
-                rc=${PIPESTATUS[0]}
+                sparkle_update_output=$(sudo -n -H -u "$targetUser" bash -lc "\"$SPARKLE_CLI\" --check-immediately --allow-major-upgrades \"$update_path\"" 2>&1)
+                rc=$?
+                if [ -n "$sparkle_update_output" ]; then
+                    printf "%s\n" "$sparkle_update_output" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
+                fi
+                if echo "$sparkle_update_output" | /usr/bin/grep -qi "require user authorization"; then
+                    echo -e "⚠️  检测到更新需要授权，尝试使用 Root 直接更新 : $app_name" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
+                    sparkle_update_output_root=$("$SPARKLE_CLI" --check-immediately --allow-major-upgrades "$update_path" 2>&1)
+                    rc=$?
+                    if [ -n "$sparkle_update_output_root" ]; then
+                        printf "%s\n" "$sparkle_update_output_root" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
+                    fi
+                fi
             else
                 echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 Sparkle 更新 : $app_name" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
-                "$SPARKLE_CLI" --check-immediately --allow-major-upgrades "$update_path" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
-                rc=${PIPESTATUS[0]}
+                sparkle_update_output=$("$SPARKLE_CLI" --check-immediately --allow-major-upgrades "$update_path" 2>&1)
+                rc=$?
+                if [ -n "$sparkle_update_output" ]; then
+                    printf "%s\n" "$sparkle_update_output" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
+                fi
+                if echo "$sparkle_update_output" | /usr/bin/grep -qi "require user authorization"; then
+                    echo -e "⚠️  更新需要授权，请使用 Root 运行脚本以完成更新 : $app_name" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
+                fi
             fi
             # 根据退出状态记录结果
             if [ "$rc" -eq 0 ]; then
                 sparkle_result_list+=("success|$app_name")
             else
-                sparkle_result_list+=("failure|$app_name")
+                if echo "$sparkle_update_output" | /usr/bin/grep -qi 'SUSparkleErrorDomain' \
+                   && echo "$sparkle_update_output" | /usr/bin/grep -qi 'error[[:space:]]*4005'; then
+                    sparkle_update_warn=$((sparkle_update_warn+1))
+                    sparkle_update_warn_list="${sparkle_update_warn_list}"$'\n'"$app_name"
+                    sparkle_result_list+=("warn|$app_name")
+                else
+                    sparkle_result_list+=("failure|$app_name")
+                fi
             fi
         done
     else
@@ -6175,12 +6205,23 @@ else
             if [ "$__status" = "success" ]; then
                 __symbol="✅"
                 __status_text="成功"
+            elif [ "$__status" = "warn" ]; then
+                __symbol="⚠️"
+                __status_text="警告"
             else
                 __symbol="❌"
                 __status_text="失败"
             fi
             echo -e "$__symbol  更新$__status_text [sparkle]   : $__name" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
         done
+        if [ "$sparkle_update_warn" -gt 0 ]; then
+            warn_updates=$(echo "$sparkle_update_warn_list" | /usr/bin/sed '/^\s*$/d' | /usr/bin/paste -sd ', ' -)
+            if [ -n "$warn_updates" ]; then
+                echo -e "⚠️  更新警告（签名无效 4005）: $sparkle_update_warn  ( $warn_updates )" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
+            else
+                echo -e "⚠️  更新警告（签名无效 4005）: $sparkle_update_warn" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
+            fi
+        fi
     fi
     echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
 
