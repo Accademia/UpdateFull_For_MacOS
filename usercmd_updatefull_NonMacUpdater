@@ -21,7 +21,7 @@ export PATH="/usr/local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/opt/local/bin:
 export HOMEBREW_NO_COLOR=1
 
 # 脚本版本号：用于调试和确认是否使用最新脚本
-SCRIPT_VERSION="2026.02.07.v6"
+SCRIPT_VERSION="2026.02.08.v1"
 # 预先解析 GNU Parallel 的绝对路径。在某些 sudo 环境下 PATH 可能被重置，导致找不到 parallel。
 if command -v parallel >/dev/null 2>&1; then
     PARALLEL_BIN="$(command -v parallel)"
@@ -288,8 +288,10 @@ LOG_FULL_FILE="$LOG_PATH/UpdateFull.$(date +%Y-%m).log"
 LOG_BACKUPRESTORE_FILE="$LOG_PATH/BackupRestore.log"
 LOG_ERROR_FILE="$LOG_PATH/Update_Error.log"
 LOG_MACUPDATER_FILE="$LOG_PATH/Update_MacUpdater.log"
+LOG_SPARKLE_FILE="$LOG_PATH/Update_Sparkle.log"
 LOG_MAS_FILE="$LOG_PATH/Update_Mas.log"
 echo -e "" | tee "$LOG_MACUPDATER_FILE" > /dev/null
+echo -e "" | tee "$LOG_SPARKLE_FILE" > /dev/null
 # 每次执行先清空 BackupRestore.log，避免持续累积膨胀
 safe_touch "$LOG_BACKUPRESTORE_FILE"
 cat /dev/null > "$LOG_BACKUPRESTORE_FILE"
@@ -2889,6 +2891,9 @@ fi
 
 # 初始化 MacUpdater 日志文件（使用 tee 降权写入）
 echo -e "MacUpdater 执行日志 - $(date)" | tee "$LOG_MACUPDATER_FILE" > /dev/null
+
+# 初始化 Sparkle 日志文件（使用 tee 降权写入）
+echo -e "Sparkle 执行日志 - $(date)" | tee "$LOG_SPARKLE_FILE" > /dev/null
 
 
 
@@ -5810,30 +5815,30 @@ if [ "${sparkle_available:-false}" != "true" ]; then
     echo -e "\033[1;32m 运行 Sparkle                                \033[0m"
     echo -e "\033[1;32m-----------------------------------------------\033[0m"
 
-    echo -e "-------------------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "运行 Sparkle" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "-------------------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "-------------------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE" > /dev/null
+    echo -e "运行 Sparkle" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE" > /dev/null
+    echo -e "-------------------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE" > /dev/null
 
-    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
     printf  "\033[1;34m[ERROR]\033[0m "
-    printf  "[ERROR] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "未找到 Sparkle CLI，可执行文件缺失。跳过 Sparkle 更新。 ❌" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    printf  "[ERROR] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE" > /dev/null
+    echo -e "未找到 Sparkle CLI，可执行文件缺失。跳过 Sparkle 更新。 ❌" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
+    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
+    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
 else
     # Sparkle 可用，开始执行应用扫描与更新
     echo -e "\033[1;32m-----------------------------------------------\033[0m"
     echo -e "\033[1;32m 运行 Sparkle                                \033[0m"
     echo -e "\033[1;32m-----------------------------------------------\033[0m"
 
-    echo -e "-------------------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "运行 Sparkle" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "-------------------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "-------------------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE" > /dev/null
+    echo -e "运行 Sparkle" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE" > /dev/null
+    echo -e "-------------------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE" > /dev/null
 
     # 调用检查时间范围函数
     check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
-    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
 
     # 确定 Sparkle CLI 路径
     SPARKLE_CLI="$(command -v sparkle 2>/dev/null || true)"
@@ -5845,20 +5850,20 @@ else
 
     # [List] 阶段：列出支持 Sparkle 的应用
     printf  "\033[1;34m[List]\033[0m "
-    printf  "[List] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "Sparkle 应用列表 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    printf  "[List] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE" > /dev/null
+    echo -e "Sparkle 应用列表 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
 
     sparkle_app_paths=""
     if [ "$(id -u)" -eq 0 ]; then
         targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
-        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 Sparkle 应用扫描 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 Sparkle 应用扫描 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
         sparkle_app_paths=$(sudo -n -H -u "$targetUser" bash -lc 'find /Applications "$HOME"/Applications -maxdepth 2 -type d -name "*.app" -print0 | while IFS= read -r -d "" app; do
             if [[ -d "$app/Contents/Frameworks/Sparkle.framework" ]] || [[ -d "$app/Contents/SharedFrameworks/Sparkle.framework" ]] || /usr/libexec/PlistBuddy -c "Print :SUFeedURL" "$app/Contents/Info.plist" >/dev/null 2>&1; then
               echo "$app"
             fi
           done')
     else
-        echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 Sparkle 应用扫描 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 Sparkle 应用扫描 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
         sparkle_app_paths=$(find /Applications "$HOME"/Applications -maxdepth 2 -type d -name "*.app" -print0 | while IFS= read -r -d '' app; do
             if [[ -d "$app/Contents/Frameworks/Sparkle.framework" ]] || [[ -d "$app/Contents/SharedFrameworks/Sparkle.framework" ]] || /usr/libexec/PlistBuddy -c "Print :SUFeedURL" "$app/Contents/Info.plist" >/dev/null 2>&1; then
               echo "$app"
@@ -5871,6 +5876,7 @@ else
 
     # 统计无法通过 Homebrew 升级的 Sparkle 应用数量（基于应用名称匹配）
     sparkle_non_brew_count=0
+    sparkle_non_brew_paths=""
     # 获取已安装的 Homebrew Cask 名单
     if [ "$(id -u)" -eq 0 ]; then
         tmp_target="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
@@ -5964,6 +5970,7 @@ else
             fi
             if [ "$skip_brew" = false ]; then
                 sparkle_non_brew_count=$((sparkle_non_brew_count+1))
+                sparkle_non_brew_paths="${sparkle_non_brew_paths}"$'\n'"$app_path"
                 # 新增：打印每个不在 HomeBrew 或 MAS 管理中的 Sparkle 应用名称
                #echo -e "✅  Sparkle 应用不在 HomeBrew 或 MAS 中：$base"
             fi
@@ -5971,55 +5978,159 @@ else
     fi
 
     # 新增打印：提示当前用户权限下如何获取 HomeBrew 应用列表
-    echo -e "✅  APP 数量（ Sparkle              ） ：$sparkle_app_count  " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    echo -e "✅  APP 数量（ Sparkle_Non_Homebrew ） ：$sparkle_non_brew_count  " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✅  APP 数量（ Sparkle              ） ：$sparkle_app_count  " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
+    echo -e "✅  APP 数量（ Sparkle_Non_Homebrew ） ：$sparkle_non_brew_count  " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
 
-    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    sparkle_probe_paths=$(echo "$sparkle_non_brew_paths" | /usr/bin/sed '/^\s*$/d')
+    if [ -z "$sparkle_probe_paths" ]; then
+        sparkle_probe_paths="$sparkle_app_paths"
+    fi
+    sparkle_probe_count=$(echo "$sparkle_probe_paths" | /usr/bin/sed '/^\s*$/d' | /usr/bin/wc -l | /usr/bin/tr -d ' ')
+    echo -e "✅  APP 数量（ Sparkle_Probe        ） ：$sparkle_probe_count  " | tee -a "$LOG_SPARKLE_FILE" > /dev/null
+
+    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
 
     # [Scan] 阶段：检测可更新的应用
     printf  "\033[1;34m[Scan]\033[0m "
-    printf  "[Scan] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "Sparkle 扫描更新 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    printf  "[Scan] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE" > /dev/null
+    echo -e "Sparkle 扫描更新 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
 
     sparkle_updates_list=()
-    if [ "$sparkle_app_count" -gt 0 ] && [ -n "$SPARKLE_CLI" ]; then
+    sparkle_probe_total=0
+    sparkle_probe_skip=0
+    sparkle_probe_fail=0
+    sparkle_probe_update=0
+    sparkle_probe_warn=0
+    sparkle_probe_warn_list=""
+
+    SPARKLE_PROBE_JOBS="${SPARKLE_PROBE_JOBS:-32}"
+
+    sparkle_probe_worker() {
+        local app="$1"
+        local app_name="$(basename "$app")"
+        local info_plist="$app/Contents/Info.plist"
+        local log_file="${SPARKLE_PROBE_TMP_DIR}/$(printf '%s' "$app_name" | /usr/bin/tr '/ ' '__').log"
+
+        /bin/echo -n "" > "$log_file"
+
+        if ! /usr/libexec/PlistBuddy -c "Print :SUFeedURL" "$info_plist" >/dev/null 2>&1; then
+            printf "[Probe][SKIP] %s (No SUFeedURL)\n" "$app_name" >> "$log_file"
+            printf "SKIP|%s|0|%s\n" "$app" "$log_file"
+            return 0
+        fi
+        if ! /usr/libexec/PlistBuddy -c "Print :SUPublicEDKey" "$info_plist" >/dev/null 2>&1            && ! /usr/libexec/PlistBuddy -c "Print :SUPublicDSAKey" "$info_plist" >/dev/null 2>&1            && [ ! -f "$app/Contents/Resources/dsa_pub.pem" ]; then
+            printf "[Probe][SKIP] %s (No Sparkle public key)\n" "$app_name" >> "$log_file"
+            printf "SKIP|%s|0|%s\n" "$app" "$log_file"
+            return 0
+        fi
+
+        local probe_output rc
         if [ "$(id -u)" -eq 0 ]; then
-            targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
-            echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 Sparkle 更新检查 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-            while IFS= read -r app; do
-                app_name="$(basename "$app")"
-                sudo -n -H -u "$targetUser" bash -lc "\"$SPARKLE_CLI\" --check-immediately --probe \"$app\"" >/dev/null 2>&1
-                rc=$?
-                if [ "$rc" -eq 0 ]; then
-                    sparkle_updates_list+=("$app")
-                    echo -e "✔︎  检测到新版本 : $app_name " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                fi
-            done <<< "$sparkle_app_paths"
+            probe_output=$(sudo -n -H -u "$SPARKLE_TARGET_USER" bash -lc "\"$SPARKLE_CLI\" --probe --allow-major-upgrades \"$app\"" 2>&1)
+            rc=$?
         else
-            echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 Sparkle 更新检查 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-            while IFS= read -r app; do
-                app_name="$(basename "$app")"
-                "$SPARKLE_CLI" --check-immediately --probe "$app" >/dev/null 2>&1
-                rc=$?
-                if [ "$rc" -eq 0 ]; then
-                    sparkle_updates_list+=("$app")
-                    echo -e "✔︎  检测到新版本 : $app_name " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            probe_output=$("$SPARKLE_CLI" --probe --allow-major-upgrades "$app" 2>&1)
+            rc=$?
+        fi
+
+        if [ -n "$probe_output" ] && echo "$probe_output" | /usr/bin/grep -qi '^Error:'; then
+            if echo "$probe_output" | /usr/bin/grep -qi 'SUSparkleErrorDomain' \
+               && echo "$probe_output" | /usr/bin/grep -qi 'error[[:space:]]*2001'; then
+                printf "WARN2001|%s|%s|%s\n" "$app" "$rc" "$log_file"
+                return 0
+            fi
+            printf "[Probe][FAIL] %s (rc=%s)\n%s\n" "$app_name" "$rc" "$probe_output" >> "$log_file"
+            printf "FAIL|%s|%s|%s\n" "$app" "$rc" "$log_file"
+            return 0
+        fi
+
+        if [ "$rc" -eq 0 ] || [ "$rc" -eq 2 ]; then
+            printf "UPDATE|%s|%s|%s\n" "$app" "$rc" "$log_file"
+            return 0
+        fi
+
+        printf "NONE|%s|%s|%s\n" "$app" "$rc" "$log_file"
+    }
+
+    if [ -n "$sparkle_probe_paths" ] && [ -n "$SPARKLE_CLI" ]; then
+        SPARKLE_TARGET_USER="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+        export SPARKLE_CLI SPARKLE_TARGET_USER
+
+        SPARKLE_PROBE_TMP_DIR=$(mktemp -d "/tmp/sparkle_probe.XXXXXX")
+        export SPARKLE_PROBE_TMP_DIR
+        export -f sparkle_probe_worker
+
+        probe_results_file=$(mktemp -t sparkle_probe_results.XXXXXX)
+
+        if [ "$SPARKLE_PROBE_JOBS" -le 1 ]; then
+            while IFS= read -r __app; do
+                [ -z "$__app" ] && continue
+                sparkle_probe_worker "$__app" >> "$probe_results_file"
+            done <<< "$sparkle_probe_paths"
+        else
+            while IFS= read -r __app; do
+                [ -z "$__app" ] && continue
+                printf '%s\0' "$__app"
+            done <<< "$sparkle_probe_paths" | /usr/bin/xargs -0 -n1 -P "$SPARKLE_PROBE_JOBS" -I{} bash -lc 'sparkle_probe_worker "$@"' _ "{}" >> "$probe_results_file"
+        fi
+
+        if [ -f "$probe_results_file" ]; then
+            while IFS='|' read -r __kind __app __rc __logf; do
+                [ -z "$__kind" ] && continue
+                if [ -n "$__logf" ] && [ -s "$__logf" ]; then
+                    /bin/cat "$__logf" | tee -a "$LOG_SPARKLE_FILE" > /dev/null
                 fi
-            done <<< "$sparkle_app_paths"
+                case "$__kind" in
+                    UPDATE)
+                        sparkle_updates_list+=("$__app")
+                        sparkle_probe_update=$((sparkle_probe_update+1))
+                        ;;
+                    WARN2001)
+                        sparkle_probe_warn=$((sparkle_probe_warn+1))
+                        __app_name="$(basename "$__app")"
+                        sparkle_probe_warn_list="${sparkle_probe_warn_list}"$'\n'"$__app_name"
+                        ;;
+                    FAIL)
+                        sparkle_probe_fail=$((sparkle_probe_fail+1))
+                        ;;
+                    SKIP)
+                        sparkle_probe_skip=$((sparkle_probe_skip+1))
+                        ;;
+                esac
+            done < "$probe_results_file"
+        fi
+
+        sparkle_probe_total=$(echo "$sparkle_probe_paths" | /usr/bin/sed '/^\s*$/d' | /usr/bin/wc -l | /usr/bin/tr -d ' ')
+
+        /bin/rm -f "$probe_results_file"
+        /bin/rm -rf "$SPARKLE_PROBE_TMP_DIR"
+        unset SPARKLE_PROBE_TMP_DIR
+    fi
+
+    if [ "$sparkle_probe_warn" -gt 0 ]; then
+        warn_apps=$(echo "$sparkle_probe_warn_list" | /usr/bin/sed '/^\s*$/d' | /usr/bin/paste -sd ', ' -)
+        if [ -n "$warn_apps" ]; then
+            printf "[Probe][Warn] error 2001: %s  (%s)\n" "$sparkle_probe_warn" "$warn_apps" | tee -a "$LOG_SPARKLE_FILE" > /dev/null
+        else
+            printf "[Probe][Warn] error 2001: %s\n" "$sparkle_probe_warn" | tee -a "$LOG_SPARKLE_FILE" > /dev/null
         fi
     fi
-
+    if [ "$sparkle_probe_total" -gt 0 ]; then
+        printf "[Probe][Summary] total=%s, update=%s, fail=%s, skip=%s, warn=%s\n" \
+            "$sparkle_probe_total" "$sparkle_probe_update" "$sparkle_probe_fail" "$sparkle_probe_skip" "$sparkle_probe_warn" \
+            | tee -a "$LOG_SPARKLE_FILE" > /dev/null
+    fi
     # 如果没有检测到更新
     if [ ${#sparkle_updates_list[@]} -eq 0 ]; then
-        echo -e "✓  未检测到新版本 ：Sparkle 应用 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  未检测到新版本 ：Sparkle 应用 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
     fi
 
-    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
 
     # [Install] 阶段：下载安装更新
     printf  "\033[1;34m[Install]\033[0m "
-    printf  "[Install] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "Sparkle 下载安装 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    printf  "[Install] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE" > /dev/null
+    echo -e "Sparkle 下载安装 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
 
     if [ ${#sparkle_updates_list[@]} -gt 0 ] && [ -n "$SPARKLE_CLI" ]; then
         # 初始化 Sparkle 更新结果列表
@@ -6028,12 +6139,12 @@ else
             app_name="$(basename "$update_path")"
             if [ "$(id -u)" -eq 0 ]; then
                 targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
-                echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 Sparkle 更新 : $app_name" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                sudo -n -H -u "$targetUser" bash -lc "\"$SPARKLE_CLI\" --check-immediately --allow-major-upgrades \"$update_path\"" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 Sparkle 更新 : $app_name" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
+                sudo -n -H -u "$targetUser" bash -lc "\"$SPARKLE_CLI\" --check-immediately --allow-major-upgrades \"$update_path\"" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
                 rc=${PIPESTATUS[0]}
             else
-                echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 Sparkle 更新 : $app_name" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                "$SPARKLE_CLI" --check-immediately --allow-major-upgrades "$update_path" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 Sparkle 更新 : $app_name" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
+                "$SPARKLE_CLI" --check-immediately --allow-major-upgrades "$update_path" 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
                 rc=${PIPESTATUS[0]}
             fi
             # 根据退出状态记录结果
@@ -6045,19 +6156,19 @@ else
         done
     else
         # 如果没有任何应用需要更新
-        echo -e "✓  所有APP已经是 最新版本 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  所有APP已经是 最新版本 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
         # 同样初始化为空列表，方便后续判断
         sparkle_result_list=()
     fi
 
-    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
 
     # 输出 Sparkle 更新结果，使用类似 HomeBrew/MAS 的风格
     printf "\033[1;34m[Final]\033[0m "
-    printf "[Final] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "Sparkle 更新结果 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    printf "[Final] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE" > /dev/null
+    echo -e "Sparkle 更新结果 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
     if [ ${#sparkle_result_list[@]} -eq 0 ]; then
-        echo -e "✓  没有APP被更新 !!! " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  没有APP被更新 !!! " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
     else
         for __entry in "${sparkle_result_list[@]}"; do
             IFS='|' read -r __status __name <<< "$__entry"
@@ -6068,16 +6179,16 @@ else
                 __symbol="❌"
                 __status_text="失败"
             fi
-            echo -e "$__symbol  更新$__status_text [sparkle]   : $__name" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            echo -e "$__symbol  更新$__status_text [sparkle]   : $__name" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
         done
     fi
-    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
 
     echo -e "\033[1;32m[OK] Sparkle 运行已完成  ✅ \033[0m"
-    echo -e "[OK]   Sparkle 运行已完成  ✅ " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "[OK]   Sparkle 运行已完成  ✅ " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE" > /dev/null
 
-    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
+    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$LOG_SPARKLE_FILE"
 fi
 
 # ----------------------------------
