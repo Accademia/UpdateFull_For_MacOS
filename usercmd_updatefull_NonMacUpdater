@@ -290,7 +290,10 @@ LOG_ERROR_FILE="$LOG_PATH/Update_Error.log"
 LOG_MACUPDATER_FILE="$LOG_PATH/Update_MacUpdater.log"
 LOG_MAS_FILE="$LOG_PATH/Update_Mas.log"
 echo -e "" | tee "$LOG_MACUPDATER_FILE" > /dev/null
+# 每次执行先清空 BackupRestore.log，避免持续累积膨胀
 safe_touch "$LOG_BACKUPRESTORE_FILE"
+cat /dev/null > "$LOG_BACKUPRESTORE_FILE"
+echo "LoginItems & Privacy 执行日志 - $(date)" >> "$LOG_BACKUPRESTORE_FILE"
 
 # 打印脚本版本信息到日志，方便核对版本。仅在日志路径初始化后执行。
 #echo -e "[Info] Script version : $SCRIPT_VERSION" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
