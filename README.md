@@ -472,6 +472,52 @@ grep -R "nosort" /opt/homebrew/etc/bash_completion.d
 
 也就是说，你什么都不做。坐等mas-cli开发者修复，就可以了.
 
+<br>
+<br>
+
+---------
+
+
+# 执行过程中 ，《隐私与安全》 还原失败 怎么办 ？
+
+<br>
+
++ 原因说明：
+	
+	- 系统级 TCC（/Library/Application Support/com.apple.TCC）属于系统保护范围，SIP 开启时会限制对系统目录的写入。
+	
+	- 因此在还原 System TCC 目录时，可能会出现 rsync 的 Operation not permitted 或还原不完整的情况。
+	- 
+<br>
+
++ 解决办法（需要临时关闭 SIP）：
+	
+	- 必须进入 Recovery OS，再使用 csrutil 关闭 SIP，完成还原后再恢复 SIP。
+	
+	- 关闭 / 恢复 命令：
+		1) 进入 Recovery OS，打开“终端”
+		2) 关闭 SIP：csrutil disable
+		3) 还原完成后，再进入 Recovery OS
+		4) 恢复 SIP：csrutil enable
+		5) 每次修改后都需要重启生效
+		
+<br>
+
++ 风险提示（非常重要）：
+	
+	- 关闭 SIP 会降低系统对关键目录和系统组件的保护能力。
+	
+	- 仅在“临时还原”期间关闭，完成后务必恢复 SIP；日常使用不要关闭 SIP。
+	
+<br>
+
++ 对于备份还原这个功能，可以移步到专门的备份还原脚本：
+	
+	- https://github.com/Accademia/BackUp_LoginitemsPrivacy_For_MacOS
+
+
+
+
 
 <br>
 <br>
