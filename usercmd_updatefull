@@ -21,7 +21,7 @@ export PATH="/usr/local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/opt/local/bin:
 export HOMEBREW_NO_COLOR=1
 
 # 脚本版本号：用于调试和确认是否使用最新脚本
-SCRIPT_VERSION="2026.02.08.v1"
+SCRIPT_VERSION="2026.02.08.v2"
 # 预先解析 GNU Parallel 的绝对路径。在某些 sudo 环境下 PATH 可能被重置，导致找不到 parallel。
 if command -v parallel >/dev/null 2>&1; then
     PARALLEL_BIN="$(command -v parallel)"
@@ -3678,7 +3678,7 @@ if command -v /opt/local/bin/port >/dev/null 2>&1; then
     # 保证 CLT 收据存在，否则跳过 MacPorts 更新
     macports_update_rc=0
     if ensure_clt_or_skip_macports; then
-        echo -e "✓  使用Root权限(sudo命令), 运行 MacPorts 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  使用Root权限 ( sudo 命令 ) , 运行 MacPorts 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # MacPorts 基础更新：仅运行自更新以更新 MacPorts base 和 ports 树
         sudo $SUDO_N_FLAG /opt/local/bin/port selfupdate 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         macports_update_rc=${PIPESTATUS[0]}
@@ -3742,6 +3742,48 @@ echo -e ""                                                                      
 
 
 
+
+# -----------------------------------------------
+# 更新 TLDR 缓存
+# -----------------------------------------------
+
+echo -e "[1;36m-----------------------------------------------[0m"
+echo -e "[1;36m 更新 TLDR 缓存 [0m"
+echo -e "[1;36m-----------------------------------------------[0m"
+
+echo -e "-------------------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "更新 TLDR 缓存" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "-------------------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+
+echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
+if command -v tldr >/dev/null 2>&1; then
+    if [ "$(id -u)" -eq 0 ]; then
+        targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 tldr --update ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        tldr_update_output=$(sudo -n -H -u "$targetUser" tldr --update 2>&1)
+        tldr_update_rc=$?
+    else
+        echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 tldr --update ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        tldr_update_output=$(tldr --update 2>&1)
+        tldr_update_rc=$?
+    fi
+    if [ -n "$tldr_update_output" ]; then
+        printf "%s
+" "$tldr_update_output" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    fi
+    if [ "$tldr_update_rc" -eq 0 ]; then
+        echo -e '[1;36m[OK] 更新 TLDR 缓存 已完成[0m '
+        echo -e '[OK] 更新 TLDR 缓存 已完成' | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    else
+        echo -e "⚠️  TLDR 缓存更新失败（已忽略，继续执行 TopGrade）" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    fi
+else
+    echo -e "✓  未检测到 tldr，已跳过 TLDR 缓存更新。" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+fi
+
+echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 # -----------------------------------------------
 # 检查 5 ：TopGrade 是否安装（并更新）
@@ -6907,7 +6949,7 @@ else
     : > "$MIGRATE_LOG"
 
     if macports_should_migrate; then
-        echo -e "✓  使用Root权限(sudo命令), 运行 port migrate ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  使用Root权限 ( sudo 命令 ) , 运行 port migrate ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
         # 执行迁移并捕获各阶段的退出码。使用子 shell 保存各个子进程退出状态
         {
@@ -6949,7 +6991,7 @@ else
     printf "\033[1;34m[Scan]\033[0m "
     printf "[Scan] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null 
     echo "MacPorts 扫描更新 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    echo -e "✓  使用Root权限(sudo命令), 运行 port outdated ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✓  使用Root权限 ( sudo 命令 ) , 运行 port outdated ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     outdated_list="$(sudo $SUDO_N_FLAG /opt/local/bin/port -q outdated -N 2>/dev/null || true)"
 
     if [ -z "$outdated_list" ]; then
@@ -6968,7 +7010,7 @@ else
         printf "\033[1;34m[Clean]\033[0m "
         printf "[Clean] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
         echo "MacPorts 清理残留 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        echo -e "✓  使用Root权限(sudo命令), 运行 port reclaim ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  使用Root权限 ( sudo 命令 ) , 运行 port reclaim ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 官方 reclaim 命令会删除日志、旧档和 distfiles，并尝试卸载非活动版本
         sudo $SUDO_N_FLAG /opt/local/bin/port -q reclaim
         
@@ -6976,14 +7018,14 @@ else
         printf "\033[1;34m[Uninstall]\033[0m "
         printf "[Uninstall] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
         echo "MacPorts 卸载非活动旧版本 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        echo -e "✓  使用Root权限(sudo命令), 运行 port uninstall inactive ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  使用Root权限 ( sudo 命令 ) , 运行 port uninstall inactive ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         sudo $SUDO_N_FLAG /opt/local/bin/port uninstall inactive
         
         # 删除无人依赖的叶子端口
         printf "\033[1;34m[Leaves]\033[0m "
         printf "[Leaves] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
         echo "MacPorts 移除无人依赖的叶子端口 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        echo -e "✓  使用Root权限(sudo命令), 运行 port uninstall leaves ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  使用Root权限 ( sudo 命令 ) , 运行 port uninstall leaves ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         sudo $SUDO_N_FLAG /opt/local/bin/port echo leaves | xargs sudo $SUDO_N_FLAG /opt/local/bin/port uninstall
 
         echo "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -6994,7 +7036,7 @@ else
     printf "\033[1;34m[Verify]\033[0m "
     printf "[Verify] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo "MacPorts 验证结果 ..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    echo -e "✓  使用Root权限(sudo命令), 运行 port rev-upgrade ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✓  使用Root权限 ( sudo 命令 ) , 运行 port rev-upgrade ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     macports_rev_upgrade_quiet
 
     echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
@@ -7039,16 +7081,16 @@ if [[ $(id -u) -eq 0 ]]; then
     echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 topgrade 进行升级 ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
    #echo -e "✓  不参与更新的模块 ：brew_formula \ brew_cask \ sparkle \ mas \ macports \ system \ node \ pnpm \ tldr \ tlmgr \ ruby_gems \ gem \ powershell \ containers ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
    #topgrade_output=$(sudo -n -H -u "$targetUser"  /bin/bash -c 'topgrade --disable brew_formula --disable brew_cask --disable sparkle --disable mas --disable macports --disable system --disable node --disable pnpm --disable powershell --disable tldr --disable tlmgr --disable ruby_gems --disable gem --disable containers --cleanup' 2>&1)
-    echo -e "✓  不参与更新的模块 ：brew_formula \ brew_cask \ sparkle \ mas \ macports \ system \ tlmgr \ ruby_gems \ gem \ containers ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    topgrade_output=$(sudo -n -H -u "$targetUser"  /bin/bash -c 'topgrade --disable brew_formula --disable brew_cask --disable sparkle --disable mas --disable macports --disable system --disable tlmgr --disable ruby_gems --disable gem --disable containers --cleanup' 2>&1)
+    echo -e "✓  不参与更新的模块 ：brew_formula \ brew_cask \ sparkle \ mas \ macports \ system \ tldr \ tlmgr \ ruby_gems \ gem \ containers ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    topgrade_output=$(sudo -n -H -u "$targetUser"  /bin/bash -c 'topgrade --disable brew_formula --disable brew_cask --disable sparkle --disable mas --disable macports --disable system --disable tldr --disable tlmgr --disable ruby_gems --disable gem --disable containers --cleanup' 2>&1)
     printf "%s\n" "$topgrade_output"        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 else
     #—— 非 root 环境：直接执行 ——#
     echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 topgrade 进行升级 ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
    #echo -e "✓  不参与更新的模块 ：brew_formula \ brew_cask \ sparkle \ mas \ macports \ system \ node \ pnpm \ tldr \ tlmgr \ ruby_gems \ gem \ powershell \ containers ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
    #topgrade --disable brew_formula --disable brew_cask --disable sparkle --disable mas --disable macports --disable system --disable node --disable pnpm --disable powershell --disable tldr --disable tlmgr --disable ruby_gems --disable gem --disable containers --cleanup 2>&1   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    echo -e "✓  不参与更新的模块 ：brew_formula \ brew_cask \ sparkle \ mas \ macports \ system \ tlmgr \ ruby_gems \ gem \ containers ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    topgrade --disable brew_formula --disable brew_cask --disable sparkle --disable mas --disable macports --disable system --disable tlmgr --disable ruby_gems --disable gem --disable containers --cleanup 2>&1   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    echo -e "✓  不参与更新的模块 ：brew_formula \ brew_cask \ sparkle \ mas \ macports \ system \ tldr \ tlmgr \ ruby_gems \ gem \ containers ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    topgrade --disable brew_formula --disable brew_cask --disable sparkle --disable mas --disable macports --disable system --disable tldr --disable tlmgr --disable ruby_gems --disable gem --disable containers --cleanup 2>&1   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 fi
 
 
