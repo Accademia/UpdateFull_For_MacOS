@@ -3742,49 +3742,6 @@ echo -e ""                                                                      
 
 
 
-
-# -----------------------------------------------
-# 更新 TLDR 缓存
-# -----------------------------------------------
-
-echo -e "[1;36m-----------------------------------------------[0m"
-echo -e "[1;36m 更新 TLDR 缓存 [0m"
-echo -e "[1;36m-----------------------------------------------[0m"
-
-echo -e "-------------------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "更新 TLDR 缓存" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-echo -e "-------------------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-
-echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-
-if command -v tldr >/dev/null 2>&1; then
-    if [ "$(id -u)" -eq 0 ]; then
-        targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
-        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 tldr --update ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        tldr_update_output=$(sudo -n -H -u "$targetUser" tldr --update 2>&1)
-        tldr_update_rc=$?
-    else
-        echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 tldr --update ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        tldr_update_output=$(tldr --update 2>&1)
-        tldr_update_rc=$?
-    fi
-    if [ -n "$tldr_update_output" ]; then
-        printf "%s
-" "$tldr_update_output" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    fi
-    if [ "$tldr_update_rc" -eq 0 ]; then
-        echo -e '[1;36m[OK] 更新 TLDR 缓存 已完成[0m '
-        echo -e '[OK] 更新 TLDR 缓存 已完成' | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    else
-        echo -e "⚠️  TLDR 缓存更新失败（已忽略，继续执行 TopGrade）" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    fi
-else
-    echo -e "✓  未检测到 tldr，已跳过 TLDR 缓存更新。" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-fi
-
-echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-
 # -----------------------------------------------
 # 检查 5 ：TopGrade 是否安装（并更新）
 # -----------------------------------------------
@@ -3992,6 +3949,50 @@ echo -e ""                                                                      
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 
+
+
+# -----------------------------------------------
+# 更新 TLDR 缓存
+# -----------------------------------------------
+
+echo -e "[1;36m-----------------------------------------------[0m"
+echo -e "[1;36m 更新 TLDR 缓存 [0m"
+echo -e "[1;36m-----------------------------------------------[0m"
+
+echo -e "-------------------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "更新 TLDR 缓存" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+echo -e "-------------------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+
+echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
+if command -v tldr >/dev/null 2>&1; then
+    if [ "$(id -u)" -eq 0 ]; then
+        targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 tldr --update ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        tldr_update_output=$(sudo -n -H -u "$targetUser" tldr --update 2>&1)
+        tldr_update_rc=$?
+    else
+        echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 tldr --update ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        tldr_update_output=$(tldr --update 2>&1)
+        tldr_update_rc=$?
+    fi
+    if [ -n "$tldr_update_output" ]; then
+        printf "%s
+" "$tldr_update_output" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    fi
+    if [ "$tldr_update_rc" -eq 0 ]; then
+        echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e '[1;36m[OK] 更新 TLDR 缓存 已完成[0m '
+        echo -e '[OK] 更新 TLDR 缓存 已完成' | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    else
+        echo -e "⚠️  TLDR 缓存更新失败（已忽略，继续执行 TopGrade）" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    fi
+else
+    echo -e "✓  未检测到 tldr，已跳过 TLDR 缓存更新。" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+fi
+
+echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 
 # ----------------------------------
