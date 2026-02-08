@@ -70,19 +70,19 @@
 
 <br>
 
-# 命令 A ：  [usercmd_updatefull_NonMacUpdater](https://cdn.jsdelivr.net/gh/Accademia/UpdateFull_For_MacOS/usercmd_updatefull_NonMacUpdater)  
+## 程序命令  ：  [usercmd_updatefull_NonMacUpdater](https://cdn.jsdelivr.net/gh/Accademia/UpdateFull_For_MacOS/usercmd_updatefull_NonMacUpdater)  
  
 🔥🔥🔥 推荐 🔥🔥🔥
 
-> ### https://cdn.jsdelivr.net/gh/Accademia/UpdateFull_For_MacOS/usercmd_updatefull_NonMacUpdater
+> ### 下载链接 ： https://cdn.jsdelivr.net/gh/Accademia/UpdateFull_For_MacOS/usercmd_updatefull_NonMacUpdater
 
 <br>
 
-# 命令 B ： [usercmd_updatefull](https://cdn.jsdelivr.net/gh/Accademia/UpdateFull_For_MacOS/usercmd_updatefull)   
+## 程序命令  ： [usercmd_updatefull](https://cdn.jsdelivr.net/gh/Accademia/UpdateFull_For_MacOS/usercmd_updatefull)   
 
 ❌❌❌ 不推荐 ❌❌❌ ： 因为 MacUpdater 已停止更新 
 
-> ### https://cdn.jsdelivr.net/gh/Accademia/UpdateFull_For_MacOS/usercmd_updatefull
+> ### 下载链接 ： https://cdn.jsdelivr.net/gh/Accademia/UpdateFull_For_MacOS/usercmd_updatefull
 
 
 <br>
