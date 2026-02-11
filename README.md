@@ -95,7 +95,7 @@
 
 <br>
 
-上述两个程序，唯一的区别就是 后者 增加了 ，通过 MacUpdater 更新所有APP的功能。其他方面无任何区别 ！ 但是MacUpdater 已经在 2026-01-01 停止更新了。所以建议下载 [usercmd_updatefull_NonMacUpdater](https://cdn.jsdelivr.net/gh/Accademia/UpdateFull_For_MacOS/usercmd_updatefull_NonMacUpdater) 程序
+上述两个程序，唯一的区别就是 后者 增加了 ，通过 MacUpdater 更新所有APP的功能（可以多识别20%的软件更新）。其他方面无任何区别 ！ 但是MacUpdater 已经在 2026-01-01 停止更新了。所以建议下载 [usercmd_updatefull_NonMacUpdater](https://cdn.jsdelivr.net/gh/Accademia/UpdateFull_For_MacOS/usercmd_updatefull_NonMacUpdater) 程序
 
 <br>
 <br>
