@@ -287,10 +287,10 @@ LOG_FILE="$LOG_PATH/Update_Auto.log"
 LOG_FULL_FILE="$LOG_PATH/UpdateFull.$(date +%Y-%m).log"
 LOG_BACKUPRESTORE_FILE="$LOG_PATH/BackupRestore.log"
 LOG_ERROR_FILE="$LOG_PATH/Update_Error.log"
-LOG_MACUPDATER_FILE="$LOG_PATH/Update_MacUpdater.log"
+#LOG_MACUPDATER_FILE="$LOG_PATH/Update_MacUpdater.log"
 LOG_SPARKLE_FILE="$LOG_PATH/Update_Sparkle.log"
 LOG_MAS_FILE="$LOG_PATH/Update_Mas.log"
-echo -e "" | tee "$LOG_MACUPDATER_FILE" > /dev/null
+#echo -e "" | tee "$LOG_MACUPDATER_FILE" > /dev/null
 echo -e "" | tee "$LOG_SPARKLE_FILE" > /dev/null
 # 每次执行先清空 BackupRestore.log，避免持续累积膨胀
 safe_touch "$LOG_BACKUPRESTORE_FILE"
@@ -319,7 +319,8 @@ trap 'last_cmd=$BASH_COMMAND; code=$?; line=${BASH_LINENO[0]}; \
 TARGET_1="github.com"                                       # 测试 主流开源软件下载库 的连通性
 TARGET_2="formulae.brew.sh/api/formula.jws.json"            # 测试 homebrew 的主站 连通性 (brew.sh)
 TARGET_3="apps.apple.com/us/app/apple-store/id375380948"    # 测试 Mac App Store 连通性 （本链接是 苹果官方 Apple Store ）
-TARGET_4="macupdater.com"                                   # 测试 MacUpdater 连通性
+#TARGET_4="macupdater.com"                                  # 测试 MacUpdater 连通性
+TARGET_4="registry.npmjs.org"                               # 测试 TopGrade 中 npm 更新链路连通性
 # 如果不能访问上述网站，会导致很多软件都 更新失败。
 
 
@@ -2890,7 +2891,7 @@ else
 fi
 
 # 初始化 MacUpdater 日志文件（使用 tee 降权写入）
-echo -e "MacUpdater 执行日志 - $(date)" | tee "$LOG_MACUPDATER_FILE" > /dev/null
+#echo -e "MacUpdater 执行日志 - $(date)" | tee "$LOG_MACUPDATER_FILE" > /dev/null
 
 # 初始化 Sparkle 日志文件（使用 tee 降权写入）
 echo -e "Sparkle 执行日志 - $(date)" | tee "$LOG_SPARKLE_FILE" > /dev/null
@@ -3854,99 +3855,99 @@ echo -e ""                                                                      
 # ------------------------------------------------
 
 
-# 调用检查时间范围函数
-check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
-
-# 判断 MacUpdater 是否已安装：在 root 环境降权执行 brew list --cask
-macupdater_installed=false
-{
-    mu_list_output=""
-    if [ "$(id -u)" -eq 0 ]; then
-        mu_targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
-        mu_list_output=$(sudo -n -E -H -u "$mu_targetUser" env PATH="/opt/homebrew/bin:/usr/local/bin:$PATH" brew list --cask 2>/dev/null || true)
-    else
-        mu_list_output=$(brew list --cask 2>/dev/null || true)
-    fi
-    if echo "$mu_list_output" | grep -q '^macupdater$'; then
-        macupdater_installed=true
-    fi
-}
-
-if [ "$macupdater_installed" = true ]; then
-    echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    echo -e "\033[1;36m 更新 MacUpdater 工具 \033[0m"
-    echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    echo -e "-------------------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "更新 MacUpdater 工具"                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "-------------------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-    
-    # 检查是否以 root 身份运行
-    macupdater_update_rc=0
-    if [ "$(id -u)" -eq 0 ]; then
-        # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
-        targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
-        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 MacUpdater 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        # 以目标用户身份执行 HomeBrew 命令，并显式传递语言配置
-        sudo -n -H -u "$targetUser" env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew upgrade --greedy --cask macupdater 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        macupdater_update_rc=${PIPESTATUS[0]}
-    else
-        echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 MacUpdater 自更新 ... "     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-        env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew upgrade --greedy --cask macupdater 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        macupdater_update_rc=${PIPESTATUS[0]}
-    fi
-
-    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-
-    # 输出 MacUpdater 更新结果：成功或失败
-    if [ $macupdater_update_rc -eq 0 ]; then
-        # 打印绿色 [OK] 提示
-        echo -e '\033[1;36m[OK] 更新 MacUpdater 工具 已完成\033[0m '
-        # 在日志中记录 [OK] 状态
-        echo -e '[OK] 更新 MacUpdater 工具 已完成' | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    else
-        # 打印红色 [ERROR] 提示
-        echo -e '\033[1;31m[ERROR] 更新 MacUpdater 工具 失败 ❌\033[0m '
-        # 在日志中记录 [ERROR] 状态
-        echo -e '[ERROR] 更新 MacUpdater 工具 失败 ❌' | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    fi
-
-else
-
-    echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    echo -e "\033[1;36m MacUpdater 未安装，开始安装 \033[0m"
-    echo -e "\033[1;36m-----------------------------------------------\033[0m" 
-    echo -e "-------------------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "MacUpdater 未安装，开始安装 "                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "-------------------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    
-    # 检查是否以 root 身份运行
-    macupdater_install_rc=0
-    if [ "$(id -u)" -eq 0 ]; then
-        # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
-        targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
-        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 MacUpdater 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        # 以目标用户身份执行 HomeBrew 命令
-        # 显式传递语言配置，避免 sudo 环境丢失 HOMEBREW_CASK_OPTS
-        sudo -n -H -u "$targetUser" env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew install --cask macupdater 2>&1       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        macupdater_install_rc=${PIPESTATUS[0]}
-    else
-        echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 MacUpdater 安装 ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-        env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew install --cask macupdater 2>&1                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        macupdater_install_rc=${PIPESTATUS[0]}
-    fi
-    
-    echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-
-    if [ $macupdater_install_rc -eq 0 ]; then
-        echo -e "✅ MacUpdater 安装成功。"                                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-    else
-        echo -e "❌ MacUpdater 安装失败。"                                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-    fi
-fi
-
-echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+## 调用检查时间范围函数
+#check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
+#
+## 判断 MacUpdater 是否已安装：在 root 环境降权执行 brew list --cask
+#macupdater_installed=false
+#{
+#    mu_list_output=""
+#    if [ "$(id -u)" -eq 0 ]; then
+#        mu_targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+#        mu_list_output=$(sudo -n -E -H -u "$mu_targetUser" env PATH="/opt/homebrew/bin:/usr/local/bin:$PATH" brew list --cask 2>/dev/null || true)
+#    else
+#        mu_list_output=$(brew list --cask 2>/dev/null || true)
+#    fi
+#    if echo "$mu_list_output" | grep -q '^macupdater$'; then
+#        macupdater_installed=true
+#    fi
+#}
+#
+#if [ "$macupdater_installed" = true ]; then
+#    echo -e "\033[1;36m-----------------------------------------------\033[0m" 
+#    echo -e "\033[1;36m 更新 MacUpdater 工具 \033[0m"
+#    echo -e "\033[1;36m-----------------------------------------------\033[0m" 
+#    echo -e "-------------------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+#    echo -e "更新 MacUpdater 工具"                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+#    echo -e "-------------------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+#    echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+#    
+#    # 检查是否以 root 身份运行
+#    macupdater_update_rc=0
+#    if [ "$(id -u)" -eq 0 ]; then
+#        # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
+#        targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+#        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 MacUpdater 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+#        # 以目标用户身份执行 HomeBrew 命令，并显式传递语言配置
+#        sudo -n -H -u "$targetUser" env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew upgrade --greedy --cask macupdater 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+#        macupdater_update_rc=${PIPESTATUS[0]}
+#    else
+#        echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 MacUpdater 自更新 ... "     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+#        env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew upgrade --greedy --cask macupdater 2>&1 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+#        macupdater_update_rc=${PIPESTATUS[0]}
+#    fi
+#
+#    echo -e "" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+#
+#    # 输出 MacUpdater 更新结果：成功或失败
+#    if [ $macupdater_update_rc -eq 0 ]; then
+#        # 打印绿色 [OK] 提示
+#        echo -e '\033[1;36m[OK] 更新 MacUpdater 工具 已完成\033[0m '
+#        # 在日志中记录 [OK] 状态
+#        echo -e '[OK] 更新 MacUpdater 工具 已完成' | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+#    else
+#        # 打印红色 [ERROR] 提示
+#        echo -e '\033[1;31m[ERROR] 更新 MacUpdater 工具 失败 ❌\033[0m '
+#        # 在日志中记录 [ERROR] 状态
+#        echo -e '[ERROR] 更新 MacUpdater 工具 失败 ❌' | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+#    fi
+#
+#else
+#
+#    echo -e "\033[1;36m-----------------------------------------------\033[0m" 
+#    echo -e "\033[1;36m MacUpdater 未安装，开始安装 \033[0m"
+#    echo -e "\033[1;36m-----------------------------------------------\033[0m" 
+#    echo -e "-------------------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+#    echo -e "MacUpdater 未安装，开始安装 "                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+#    echo -e "-------------------------------------------"                                        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+#    
+#    # 检查是否以 root 身份运行
+#    macupdater_install_rc=0
+#    if [ "$(id -u)" -eq 0 ]; then
+#        # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
+#        targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+#        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 MacUpdater 安装 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+#        # 以目标用户身份执行 HomeBrew 命令
+#        # 显式传递语言配置，避免 sudo 环境丢失 HOMEBREW_CASK_OPTS
+#        sudo -n -H -u "$targetUser" env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew install --cask macupdater 2>&1       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+#        macupdater_install_rc=${PIPESTATUS[0]}
+#    else
+#        echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 MacUpdater 安装 ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+#        env HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" brew install --cask macupdater 2>&1                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+#        macupdater_install_rc=${PIPESTATUS[0]}
+#    fi
+#    
+#    echo -e ""                                                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+#
+#    if [ $macupdater_install_rc -eq 0 ]; then
+#        echo -e "✅ MacUpdater 安装成功。"                                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+#    else
+#        echo -e "❌ MacUpdater 安装失败。"                                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+#    fi
+#fi
+#
+#echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+#echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 
 

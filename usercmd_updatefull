@@ -320,6 +320,7 @@ TARGET_1="github.com"                                       # 测试 主流开�
 TARGET_2="formulae.brew.sh/api/formula.jws.json"            # 测试 homebrew 的主站 连通性 (brew.sh)
 TARGET_3="apps.apple.com/us/app/apple-store/id375380948"    # 测试 Mac App Store 连通性 （本链接是 苹果官方 Apple Store ）
 TARGET_4="macupdater.com"                                   # 测试 MacUpdater 连通性
+#TARGET_4="registry.npmjs.org"                               # 测试 TopGrade 中 npm 更新链路连通性
 # 如果不能访问上述网站，会导致很多软件都 更新失败。
 
 
