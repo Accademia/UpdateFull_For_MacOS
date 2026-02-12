@@ -225,8 +225,8 @@ MANUAL_INSTALL_CASKS=("paragon-ntfs" "paragon-extfs")
 # 新增：初始化下载失败记录和重试参数
 #
 # 为了在并行下载阶段准确记录下载失败的软件包及其下载链接，本脚本引入以下变量：
-#   FAILED_FETCH_FORMULAS_FILE ：记录 formula 下载失败的包名与下载链接
-#   FAILED_FETCH_CASKS_FILE    ：记录 cask 下载失败的包名与下载链接
+#   FAILED_FETCH_FORMULAS_FILE ：记录 formula 下载失败的包名、下载链接与失败原因
+#   FAILED_FETCH_CASKS_FILE    ：记录 cask 下载失败的包名、下载链接与失败原因
 #   DOWNLOAD_MAX_RETRIES       ：每个软件包下载时最大的重试次数，默认 3 次
 # 这些文件在脚本运行开始时会被清空，并在并行下载任务中写入。变量需要导出以便
 # 在 sudo/parallel 环境中生效。
@@ -260,12 +260,12 @@ fi
 export SUDO_N_FLAG
 
 # =====================
-# 新增：校验失败重试参数（默认 1 次）
+# 新增：校验失败重试参数（固定二次尝试）
 #
 # 当 HomeBrew 在安装过程中检测到下载后的文件 SHA-256 校验失败时，
-# 本脚本会停止后续的重装尝试并直接标记为失败。该变量允许用户配置
-# 重新尝试升级的次数（1 表示不重试）。如需尝试多次，可修改此值。
-SHA_MISMATCH_MAX_RETRIES=1
+# 本脚本仅再尝试一次（总计两次）。校验失败通常是上游发布内容异常，
+# 不应像网络错误那样进行多次重试，以免徒增等待时间。
+SHA_MISMATCH_MAX_RETRIES=2
 export SHA_MISMATCH_MAX_RETRIES
 ################################################################################
 
@@ -4653,7 +4653,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         tmpfile=$(mktemp)
         # 下载失败重试次数与校验失败重试次数
         local max_download_retry=${DOWNLOAD_MAX_RETRIES:-5}
-        local max_sha_retry=${SHA_MISMATCH_MAX_RETRIES:-1}
+        local max_sha_retry=${SHA_MISMATCH_MAX_RETRIES:-2}
         local download_attempt=0
         local sha_attempt=0
         # 循环尝试：根据错误类型分别重试
@@ -4675,7 +4675,17 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                 | tee "$tmpfile" >/dev/null
             fetch_exit=${PIPESTATUS[0]}
             if [ $fetch_exit -ne 0 ]; then
-                # 下载失败
+                # 校验失败仅再尝试一次（总计两次）；其他网络失败按常规重试次数执行
+                if [[ -f "$tmpfile" ]] && grep -qiE 'different checksum|checksum does not match|sha[- ]?256 mismatch|cask reports different checksum|sha-256 checksum of downloaded file' "$tmpfile"; then
+                    if [ $download_attempt -lt $max_sha_retry ]; then
+                        sleep 1
+                        continue
+                    else
+                        success=0
+                        break
+                    fi
+                fi
+                # 下载失败（网络/连接类）
                 if [ $download_attempt -lt $max_download_retry ]; then
                     sleep 1
                     continue
@@ -4772,10 +4782,28 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             # 在提取下载链接前确认临时文件存在，避免 grep 对已删除文件报错
             if [[ -f "$tmpfile" ]]; then
                 url=$(grep -oE 'https?://[^[:space:]]+' "$tmpfile" 2>/dev/null | tail -n1 || true)
+                if grep -qiE 'different checksum|checksum does not match|sha[- ]?256 mismatch|cask reports different checksum|sha-256 checksum of downloaded file' "$tmpfile"; then
+                    fail_reason="校验失败：下载文件与 HomeBrew 记录的 SHA256 不一致"
+                elif grep -qiE '404|not found' "$tmpfile"; then
+                    fail_reason="下载地址不存在（404/Not Found）"
+                elif grep -qiE '403|forbidden' "$tmpfile"; then
+                    fail_reason="下载被拒绝（403/Forbidden）"
+                elif grep -qiE 'timed out|timeout|operation timed out' "$tmpfile"; then
+                    fail_reason="下载超时（网络不稳定或源站响应慢）"
+                elif grep -qiE 'could not resolve host|name or service not known|temporary failure in name resolution|nodename nor servname provided' "$tmpfile"; then
+                    fail_reason="域名解析失败（DNS 问题）"
+                elif grep -qiE 'ssl|tls|certificate|cert' "$tmpfile"; then
+                    fail_reason="TLS/证书校验失败"
+                elif grep -qiE 'failed to connect|connection refused|connection reset|network is unreachable|no route to host' "$tmpfile"; then
+                    fail_reason="网络连接失败（无法连到下载源）"
+                else
+                    fail_reason="未知错误（详见日志）"
+                fi
             else
                 url=""
+                fail_reason="未知错误（未捕获到下载输出）"
             fi
-            echo "$pkg|$url" >> "$FAILED_FETCH_FORMULAS_FILE"
+            echo "$pkg|$url|$fail_reason" >> "$FAILED_FETCH_FORMULAS_FILE"
         fi
         rm -f "$tmpfile"
     }
@@ -4791,7 +4819,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         tmpfile=$(mktemp)
         # 下载失败重试次数与校验失败重试次数
         local max_download_retry=${DOWNLOAD_MAX_RETRIES:-5}
-        local max_sha_retry=${SHA_MISMATCH_MAX_RETRIES:-1}
+        local max_sha_retry=${SHA_MISMATCH_MAX_RETRIES:-2}
         local download_attempt=0
         local sha_attempt=0
         while true; do
@@ -4814,6 +4842,16 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                 | tee "$tmpfile" >/dev/null
             fetch_exit=${PIPESTATUS[0]}
             if [ $fetch_exit -ne 0 ]; then
+                # 校验失败仅再尝试一次（总计两次）；其他网络失败按常规重试次数执行
+                if [[ -f "$tmpfile" ]] && grep -qiE 'different checksum|checksum does not match|sha[- ]?256 mismatch|cask reports different checksum|sha-256 checksum of downloaded file' "$tmpfile"; then
+                    if [ $download_attempt -lt $max_sha_retry ]; then
+                        sleep 1
+                        continue
+                    else
+                        success=0
+                        break
+                    fi
+                fi
                 if [ $download_attempt -lt $max_download_retry ]; then
                     sleep 1
                     continue
@@ -4867,10 +4905,28 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             # 在提取下载链接前确认临时文件存在，避免 grep 对已删除文件报错
             if [[ -f "$tmpfile" ]]; then
                 url=$(grep -oE 'https?://[^[:space:]]+' "$tmpfile" 2>/dev/null | tail -n1 || true)
+                if grep -qiE 'different checksum|checksum does not match|sha[- ]?256 mismatch|cask reports different checksum|sha-256 checksum of downloaded file' "$tmpfile"; then
+                    fail_reason="校验失败：下载文件与 HomeBrew 记录的 SHA256 不一致"
+                elif grep -qiE '404|not found' "$tmpfile"; then
+                    fail_reason="下载地址不存在（404/Not Found）"
+                elif grep -qiE '403|forbidden' "$tmpfile"; then
+                    fail_reason="下载被拒绝（403/Forbidden）"
+                elif grep -qiE 'timed out|timeout|operation timed out' "$tmpfile"; then
+                    fail_reason="下载超时（网络不稳定或源站响应慢）"
+                elif grep -qiE 'could not resolve host|name or service not known|temporary failure in name resolution|nodename nor servname provided' "$tmpfile"; then
+                    fail_reason="域名解析失败（DNS 问题）"
+                elif grep -qiE 'ssl|tls|certificate|cert' "$tmpfile"; then
+                    fail_reason="TLS/证书校验失败"
+                elif grep -qiE 'failed to connect|connection refused|connection reset|network is unreachable|no route to host' "$tmpfile"; then
+                    fail_reason="网络连接失败（无法连到下载源）"
+                else
+                    fail_reason="未知错误（详见日志）"
+                fi
             else
                 url=""
+                fail_reason="未知错误（未捕获到下载输出）"
             fi
-            echo "$pkg|$url" >> "$FAILED_FETCH_CASKS_FILE"
+            echo "$pkg|$url|$fail_reason" >> "$FAILED_FETCH_CASKS_FILE"
         fi
         rm -f "$tmpfile"
     }
@@ -5083,9 +5139,19 @@ EOF
             if [[ -n "$FAILED_FETCH_FORMULAS_FILE" && -f "$FAILED_FETCH_FORMULAS_FILE" ]]; then
                 fail_line=$(grep -F "${pkg_brew_formula}|" "$FAILED_FETCH_FORMULAS_FILE" || true)
                 if [[ -n "$fail_line" ]]; then
-                    fail_url=$(echo "$fail_line" | cut -d'|' -f2-)
-                    echo -e "❌  更新失败 [formula] : $pkg_brew_formula (下载失败：$fail_url)" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                    updated_list+=("failure|formula|$pkg_brew_formula|fetch_failed:$fail_url")
+                    fail_url=$(echo "$fail_line" | cut -d'|' -f2)
+                    fail_reason=$(echo "$fail_line" | cut -d'|' -f3-)
+                    if [[ -n "$fail_reason" ]]; then
+                        if [[ -n "$fail_url" ]]; then
+                            echo -e "❌  更新失败 [formula] : $pkg_brew_formula (下载失败：原因：$fail_reason；下载地址：  $fail_url  )" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        else
+                            echo -e "❌  更新失败 [formula] : $pkg_brew_formula (下载失败：原因：$fail_reason)" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        fi
+                        updated_list+=("failure|formula|$pkg_brew_formula|fetch_failed:${fail_url}|${fail_reason}")
+                    else
+                        echo -e "❌  更新失败 [formula] : $pkg_brew_formula (下载失败：$fail_url)" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        updated_list+=("failure|formula|$pkg_brew_formula|fetch_failed:$fail_url")
+                    fi
                    #echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     continue
                 fi
@@ -5301,9 +5367,19 @@ EOF
             if [[ -n "$FAILED_FETCH_CASKS_FILE" && -f "$FAILED_FETCH_CASKS_FILE" ]]; then
                 fail_line=$(grep -F "${pkg_brew_cask}|" "$FAILED_FETCH_CASKS_FILE" || true)
                 if [[ -n "$fail_line" ]]; then
-                    fail_url=$(echo "$fail_line" | cut -d'|' -f2-)
-                    echo -e "❌  更新失败 [cask]    : $pkg_brew_cask (下载失败：$fail_url)" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                    updated_list+=("failure|cask|$pkg_brew_cask|fetch_failed:$fail_url")
+                    fail_url=$(echo "$fail_line" | cut -d'|' -f2)
+                    fail_reason=$(echo "$fail_line" | cut -d'|' -f3-)
+                    if [[ -n "$fail_reason" ]]; then
+                        if [[ -n "$fail_url" ]]; then
+                            echo -e "❌  更新失败 [cask]    : $pkg_brew_cask (下载失败：原因：$fail_reason；下载地址：  $fail_url  )" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        else
+                            echo -e "❌  更新失败 [cask]    : $pkg_brew_cask (下载失败：原因：$fail_reason)" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        fi
+                        updated_list+=("failure|cask|$pkg_brew_cask|fetch_failed:${fail_url}|${fail_reason}")
+                    else
+                        echo -e "❌  更新失败 [cask]    : $pkg_brew_cask (下载失败：$fail_url)" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        updated_list+=("failure|cask|$pkg_brew_cask|fetch_failed:$fail_url")
+                    fi
                    #echo -e "--------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     continue
                 fi
@@ -5803,8 +5879,21 @@ else
             line="$symbol  更新$status_text $type_display$spacing : $name (SHA-256校验失败：实际: $sha_actual, 期望: $sha_expected)"
         # 如果是失败且 brew_method 为 fetch_failed:<URL>，则追加下载失败原因
         elif [ "$status" = "failure" ] && [[ "$brew_method" == fetch_failed:* ]]; then
-            fail_url="${brew_method#fetch_failed:}"
-            line="$symbol  更新$status_text $type_display$spacing : $name (下载失败：$fail_url)"
+            fail_payload="${brew_method#fetch_failed:}"
+            fail_url="${fail_payload%%|*}"
+            fail_reason=""
+            if [[ "$fail_payload" == *"|"* ]]; then
+                fail_reason="${fail_payload#*|}"
+            fi
+            if [[ -n "$fail_reason" ]]; then
+                if [[ -n "$fail_url" ]]; then
+                    line="$symbol  更新$status_text $type_display$spacing : $name (下载失败：原因：$fail_reason；下载地址：  $fail_url  )"
+                else
+                    line="$symbol  更新$status_text $type_display$spacing : $name (下载失败：原因：$fail_reason)"
+                fi
+            else
+                line="$symbol  更新$status_text $type_display$spacing : $name (下载失败：$fail_url)"
+            fi
         fi
         # 若通过重装更新，则附加警告标记和具体命令
         if [ "$status" = "success" ]; then
