@@ -5143,9 +5143,9 @@ EOF
                     fail_reason=$(echo "$fail_line" | cut -d'|' -f3-)
                     if [[ -n "$fail_reason" ]]; then
                         if [[ -n "$fail_url" ]]; then
-                            echo -e "❌  更新失败 [formula] : $pkg_brew_formula (下载失败：原因：$fail_reason；下载地址：  $fail_url  )" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                            echo -e "❌  更新失败 [formula] : $pkg_brew_formula (下载失败：原因：${fail_reason}；下载地址：  ${fail_url}  )" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                         else
-                            echo -e "❌  更新失败 [formula] : $pkg_brew_formula (下载失败：原因：$fail_reason)" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                            echo -e "❌  更新失败 [formula] : $pkg_brew_formula (下载失败：原因：${fail_reason})" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                         fi
                         updated_list+=("failure|formula|$pkg_brew_formula|fetch_failed:${fail_url}|${fail_reason}")
                     else
@@ -5371,9 +5371,9 @@ EOF
                     fail_reason=$(echo "$fail_line" | cut -d'|' -f3-)
                     if [[ -n "$fail_reason" ]]; then
                         if [[ -n "$fail_url" ]]; then
-                            echo -e "❌  更新失败 [cask]    : $pkg_brew_cask (下载失败：原因：$fail_reason；下载地址：  $fail_url  )" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                            echo -e "❌  更新失败 [cask]    : $pkg_brew_cask (下载失败：原因：${fail_reason}；下载地址：  ${fail_url}  )" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                         else
-                            echo -e "❌  更新失败 [cask]    : $pkg_brew_cask (下载失败：原因：$fail_reason)" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                            echo -e "❌  更新失败 [cask]    : $pkg_brew_cask (下载失败：原因：${fail_reason})" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                         fi
                         updated_list+=("failure|cask|$pkg_brew_cask|fetch_failed:${fail_url}|${fail_reason}")
                     else
@@ -5887,9 +5887,9 @@ else
             fi
             if [[ -n "$fail_reason" ]]; then
                 if [[ -n "$fail_url" ]]; then
-                    line="$symbol  更新$status_text $type_display$spacing : $name (下载失败：原因：$fail_reason；下载地址：  $fail_url  )"
+                    line="$symbol  更新$status_text $type_display$spacing : $name (下载失败：原因：${fail_reason}；下载地址：  ${fail_url}  )"
                 else
-                    line="$symbol  更新$status_text $type_display$spacing : $name (下载失败：原因：$fail_reason)"
+                    line="$symbol  更新$status_text $type_display$spacing : $name (下载失败：原因：${fail_reason})"
                 fi
             else
                 line="$symbol  更新$status_text $type_display$spacing : $name (下载失败：$fail_url)"
