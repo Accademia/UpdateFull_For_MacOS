@@ -21,7 +21,7 @@ export PATH="/usr/local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/opt/local/bin:
 export HOMEBREW_NO_COLOR=1
 
 # 脚本版本号：用于调试和确认是否使用最新脚本
-SCRIPT_VERSION="2026.02.08.v2"
+SCRIPT_VERSION="2026.02.17.v14"
 # 预先解析 GNU Parallel 的绝对路径。在某些 sudo 环境下 PATH 可能被重置，导致找不到 parallel。
 if command -v parallel >/dev/null 2>&1; then
     PARALLEL_BIN="$(command -v parallel)"
@@ -103,6 +103,12 @@ DURATION_MINUTES=1     # 拒绝执行结束前 的 时间长度（10分钟，意
 # 为 mas upgrade 命令定义并行进程数。默认使用 8 个进程并行执行单个应用的升级
 # 如果希望调整并行度（例如根据 CPU 数量），请修改此变量。
 MAS_PARALLEL_JOBS=2
+
+# ===== HomeBrew 下载并行度设置 =====
+# 默认并发下载任务数。可在脚本中直接修改，或通过环境变量 HOMEBREW_FETCH_JOBS 覆盖。
+# 例如：HOMEBREW_FETCH_JOBS=32 /usr/local/bin/usercmd_updatefull_NonMacUpdater
+HOMEBREW_FETCH_JOBS="${HOMEBREW_FETCH_JOBS:-32}"
+export HOMEBREW_FETCH_JOBS
 
 # ===== MAS 扫描方式设置 =====
 # 控制 mas outdated 的执行方式。
@@ -241,11 +247,14 @@ DOWNLOAD_MAX_RETRIES=5
 # 新增：初始化下载成功记录文件。将其放在 /tmp 下，避免权限问题
 SUCCESS_FETCH_FORMULAS_FILE=$(mktemp "/tmp/success_fetch_formulas.XXXXXX")
 SUCCESS_FETCH_CASKS_FILE=$(mktemp "/tmp/success_fetch_casks.XXXXXX")
+# 记录本轮 brew update 原始输出，供后续“回退列表”解析，避免从全量日志误解析
+BREW_UPDATE_OUTDATED_SNAPSHOT_FILE=$(mktemp "/tmp/brew_update_outdated_snapshot.XXXXXX")
 # 设置权限，以便普通用户可以写入
-chmod 666 "$SUCCESS_FETCH_FORMULAS_FILE" "$SUCCESS_FETCH_CASKS_FILE"
+chmod 666 "$SUCCESS_FETCH_FORMULAS_FILE" "$SUCCESS_FETCH_CASKS_FILE" "$BREW_UPDATE_OUTDATED_SNAPSHOT_FILE"
 # 导出变量供子进程使用
 export FAILED_FETCH_FORMULAS_FILE FAILED_FETCH_CASKS_FILE DOWNLOAD_MAX_RETRIES
 export SUCCESS_FETCH_FORMULAS_FILE SUCCESS_FETCH_CASKS_FILE
+export BREW_UPDATE_OUTDATED_SNAPSHOT_FILE
 
 # -------------------------------------------------------------------------------------------------
 # 根据当前脚本的执行身份，决定 sudo 命令是否强制使用非交互模式
@@ -2686,7 +2695,7 @@ run_as_normal_user() {
   if [ "$(id -u)" -eq 0 ]; then
       local targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
       # 在 root 模式下，使用 sudo 保留环境并降权执行命令，避免重复打印提示
-      sudo -n -E -H -u "$targetUser" env PATH="/opt/homebrew/bin:/usr/local/bin:$PATH" HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" "$@"
+      sudo -n -E -H -u "$targetUser" env PATH="/opt/homebrew/bin:/usr/local/bin:$PATH" HOMEBREW_CASK_OPTS="$HOMEBREW_CASK_OPTS" TMPDIR="/tmp" TMP="/tmp" TEMP="/tmp" HOMEBREW_TEMP="/tmp" "$@"
   else
       "$@"
   fi
@@ -3215,13 +3224,15 @@ if [ "$architecture" = "arm64" ]; then
         # 初始化退出码变量，用于统计 HomeBrew 更新和 analytics 操作的执行结果
         brew_update_rc=0
         brew_analytics_rc=0
+        # 清空本轮 brew update 快照文件（仅保留当前执行的输出）
+        : > "$BREW_UPDATE_OUTDATED_SNAPSHOT_FILE"
         if [ "$(id -u)" -eq 0 ]; then
             # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
             targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
             echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 HomeBrew 自更新 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             # 以目标用户身份执行 HomeBrew 命令：更新索引
             sudo -n -H -u "$targetUser" brew update --force 2>&1 |
-                tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$BREW_UPDATE_OUTDATED_SNAPSHOT_FILE"
             brew_update_rc=${PIPESTATUS[0]}
             # 关闭匿名使用统计，提升隐私
             echo -e "✓  设置 HomeBrew analytics off" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -3234,7 +3245,7 @@ if [ "$architecture" = "arm64" ]; then
         else
             echo -e "✓   当前用户 '$USER' 为普通权限，直接运行 HomeBrew 自更新 ... "             | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             brew update --force 2>&1 |
-                tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$BREW_UPDATE_OUTDATED_SNAPSHOT_FILE"
             brew_update_rc=${PIPESTATUS[0]}
             # 关闭匿名使用统计，提升隐私
             echo -e "✓  设置 HomeBrew analytics off" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -4323,29 +4334,308 @@ printf  "\033[1;34m[Scan]\033[0m "
 printf  "[Scan] "                                                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "HomeBrew 扫描更新 ... "                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
+brew_scan_failed=0
+brew_outdated_rc=0
+brew_outdated_formulas_rc=0
+brew_outdated_casks_rc=0
+
+kill_process_tree() {
+  local root_pid="${1:-}"
+  local child_pid=""
+  [ -z "$root_pid" ] && return 0
+  for child_pid in $(pgrep -P "$root_pid" 2>/dev/null || true); do
+    kill_process_tree "$child_pid"
+  done
+  kill -TERM "$root_pid" 2>/dev/null || true
+  sleep 1
+  kill -KILL "$root_pid" 2>/dev/null || true
+}
+
+resolve_brew_lock_conflict() {
+  local lock_target="${1:-}"
+  local scope="${2:-unknown}"
+  local wait_sec="${HOMEBREW_LOCK_WAIT_SEC:-12}"
+  local holder_pids=""
+  local target_uid=""
+  local pid=""
+  local elapsed=0
+
+  [ -z "$lock_target" ] && return 1
+  if ! echo "$wait_sec" | grep -qE '^[0-9]+$' || [ "$wait_sec" -lt 3 ]; then
+    wait_sec=12
+  fi
+
+  if ! command -v lsof >/dev/null 2>&1; then
+    return 1
+  fi
+
+  holder_pids="$(lsof -t -- "$lock_target" 2>/dev/null | sort -u | tr '\n' ' ')"
+  if [ -n "$holder_pids" ]; then
+    echo -e "[Warn] 检测到占锁进程（scope=${scope}）：${holder_pids}，先等待 ${wait_sec}s 自动释放..." \
+      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    while [ "$elapsed" -lt "$wait_sec" ]; do
+      sleep 1
+      elapsed=$((elapsed + 1))
+      holder_pids="$(lsof -t -- "$lock_target" 2>/dev/null | sort -u | tr '\n' ' ')"
+      [ -z "$holder_pids" ] && break
+    done
+  fi
+
+  holder_pids="$(lsof -t -- "$lock_target" 2>/dev/null | sort -u | tr '\n' ' ')"
+  if [ -n "$holder_pids" ]; then
+    echo -e "[Warn] 占锁进程未结束，尝试自动终止相关 brew 进程..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    for pid in $holder_pids; do
+      kill_process_tree "$pid"
+    done
+    target_uid="$(id -u "${targetUser:-$USER}" 2>/dev/null || echo "")"
+    if [ -n "$target_uid" ]; then
+      pkill -TERM -U "$target_uid" -f "brew outdated --cask --greedy" 2>/dev/null || true
+      pkill -TERM -U "$target_uid" -f "brew fetch --cask" 2>/dev/null || true
+      pkill -TERM -U "$target_uid" -f "brew fetch" 2>/dev/null || true
+      pkill -TERM -U "$target_uid" -f "brew download" 2>/dev/null || true
+      sleep 1
+      pkill -KILL -U "$target_uid" -f "brew outdated --cask --greedy" 2>/dev/null || true
+      pkill -KILL -U "$target_uid" -f "brew fetch --cask" 2>/dev/null || true
+      pkill -KILL -U "$target_uid" -f "brew fetch" 2>/dev/null || true
+      pkill -KILL -U "$target_uid" -f "brew download" 2>/dev/null || true
+    fi
+    sleep 1
+  fi
+
+  holder_pids="$(lsof -t -- "$lock_target" 2>/dev/null | sort -u | tr '\n' ' ')"
+  if [ -n "$holder_pids" ]; then
+    echo -e "[Warn] 自动处理后仍有占锁进程，保留回退逻辑（scope=${scope}）。" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    return 1
+  fi
+
+  # 没有占锁进程时，删除遗留的 .incomplete 文件，避免下一次扫描再次碰撞锁路径
+  if [ -f "$lock_target" ] && [[ "$lock_target" == *.incomplete ]]; then
+    rm -f -- "$lock_target" 2>/dev/null || true
+  fi
+  echo -e "[Warn] HomeBrew 锁冲突已自动清理（scope=${scope}）。" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+  return 0
+}
+
+scan_brew_outdated() {
+  local scope="${1:-}"
+  local scan_cmd=""
+  local out_file=""
+  local err_file=""
+  local scan_rc=0
+  local default_scan_timeout=90
+  local scan_timeout=""
+  local cmd_pid=""
+  local timed_out=0
+  local elapsed=0
+  local lock_target=""
+  local first_error_line=""
+
+  if [ -z "$scope" ]; then
+    return 2
+  fi
+  case "$scope" in
+    formula) scan_cmd='HOMEBREW_NO_AUTO_UPDATE=1 brew outdated --formula --greedy 2>&1' ;;
+    cask)
+      scan_cmd='HOMEBREW_NO_AUTO_UPDATE=1 brew outdated --cask --greedy 2>&1'
+      default_scan_timeout=180
+      ;;
+    *)       return 2 ;;
+  esac
+  scan_timeout="${HOMEBREW_OUTDATED_TIMEOUT_SEC:-$default_scan_timeout}"
+  if ! echo "$scan_timeout" | grep -qE '^[0-9]+$' || [ "$scan_timeout" -lt 10 ]; then
+    scan_timeout="$default_scan_timeout"
+  fi
+  if [ "$scope" = "cask" ] && [ "$scan_timeout" -lt 120 ]; then
+    scan_timeout=120
+  fi
+
+  out_file=$(mktemp "/tmp/brew_outdated_${scope}_out.XXXXXX")
+  err_file=$(mktemp "/tmp/brew_outdated_${scope}_err.XXXXXX")
+
+  if [ "$(id -u)" -eq 0 ]; then
+    sudo -n -H -u "$targetUser" bash -lc "$scan_cmd" >"$out_file" 2>"$err_file" &
+  else
+    bash -lc "$scan_cmd" >"$out_file" 2>"$err_file" &
+  fi
+  cmd_pid=$!
+
+  # 为 brew outdated 增加超时保护，避免 HomeBrew 锁冲突导致脚本长期卡住
+  while kill -0 "$cmd_pid" 2>/dev/null; do
+    if [ "$elapsed" -ge "$scan_timeout" ]; then
+      timed_out=1
+      kill_process_tree "$cmd_pid"
+      break
+    fi
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+
+  wait "$cmd_pid" 2>/dev/null
+  scan_rc=$?
+  if [ "$timed_out" -eq 1 ]; then
+    scan_rc=124
+    echo -e "[Warn] brew outdated 扫描超时（scope=${scope}, timeout=${scan_timeout}s）" \
+      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" >&2
+  fi
+
+  # 超时或锁冲突场景不直接回显 HomeBrew Error 原文，统一转为 Warn，避免干扰主输出
+  if [ "$scan_rc" -ne 0 ] && [ "$timed_out" -eq 0 ]; then
+    if grep -q "has already locked" "$err_file" "$out_file"; then
+      lock_target="$(sed -nE 's/^Error: A `[^`]+` process has already locked (.+)\.$/\1/p' "$err_file" "$out_file" | head -n1)"
+      [ -z "$lock_target" ] && lock_target="(未知路径)"
+      echo -e "[Warn] HomeBrew 锁冲突（scope=${scope}）：${lock_target}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" >&2
+      if resolve_brew_lock_conflict "$lock_target" "$scope"; then
+        echo -e "[Warn] 已自动处理锁冲突，将在重试阶段继续扫描（scope=${scope}）。" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" >&2
+      fi
+      echo -e "[Warn] 本轮将回退使用 brew update 阶段的过期列表，避免阻塞后续流程" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" >&2
+    else
+      first_error_line="$(awk 'NF{print; exit}' "$err_file" "$out_file")"
+      [ -z "$first_error_line" ] && first_error_line="未知错误（请查看完整日志）"
+      echo -e "[Warn] brew outdated 扫描失败（scope=${scope}, rc=${scan_rc}）：${first_error_line}" \
+        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" >&2
+      {
+        echo "[Debug] brew outdated stderr (scope=${scope}, rc=${scan_rc})"
+        cat "$err_file"
+        echo "[Debug] brew outdated stdout (scope=${scope}, rc=${scan_rc})"
+        cat "$out_file"
+      } >> "$LOG_FULL_FILE"
+    fi
+  fi
+
+  awk 'NF{print $1}' "$out_file" | grep -vE '^(Error:|Please|Warning:|\[Warn\])' || true
+  rm -f "$out_file" "$err_file"
+  return "$scan_rc"
+}
+
+# 当 brew outdated 扫描失败时，回退解析“更新 HomeBrew 工具”阶段输出中的过期列表
+extract_brew_update_outdated_from_log() {
+  local scope="$1"  # formula | cask
+  local source_file="${BREW_UPDATE_OUTDATED_SNAPSHOT_FILE:-$LOG_FULL_LAST}"
+  if [ ! -s "$source_file" ]; then
+    source_file="$LOG_FULL_LAST"
+  fi
+  awk -v scope="$scope" '
+    /^==> Outdated Formulae$/ {mode="formula"; next}
+    /^==> Outdated Casks$/    {mode="cask"; next}
+    {
+      # 统一去除 CR，避免不同终端行尾差异影响匹配
+      sub(/\r$/, "", $0)
+      if (mode == scope) {
+        line=$0
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+        # 列表在空行、下一个 ==> 段、You have/You can 摘要处结束
+        if (line == "" || line ~ /^==>/ || line ~ /^You have [0-9]+ outdated / || line ~ /^You can /) {
+          mode=""
+          next
+        }
+        # 只接受 HomeBrew 包名字符集，避免把日志正文误当成包名
+        if (line ~ /^[A-Za-z0-9][A-Za-z0-9@+._\/:-]*$/) print line
+      }
+    }
+  ' "$source_file" | awk '!seen[$0]++'
+}
+
 if [ "$(id -u)" -eq 0 ]; then
   targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
   echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 brew outdated --greedy ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-  brew_outdated=$(
-    sudo -n -H -u "$targetUser" bash -lc 'brew outdated --greedy' 2>/dev/null | awk '{print $1}'
-  )
-  brew_outdated_formulas=$(
-    sudo -n -H -u "$targetUser" bash -lc 'brew outdated --formula --greedy' 2>/dev/null | awk '{print $1}'
-  )
-  brew_outdated_casks=$(
-    sudo -n -H -u "$targetUser" bash -lc 'brew outdated --cask --greedy' 2>/dev/null | awk '{print $1}'
-  )
 else
   echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 brew outdated --greedy ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-  brew_outdated=$(
-    brew outdated --greedy 2>/dev/null | awk '{print $1}'
-  )
-  brew_outdated_formulas=$(
-    brew outdated --formula --greedy 2>/dev/null | awk '{print $1}'
-  )
-  brew_outdated_casks=$(
-    brew outdated --cask --greedy 2>/dev/null | awk '{print $1}'
-  )
+fi
+
+brew_scan_used_fallback=0
+brew_scan_source="${HOMEBREW_OUTDATED_SOURCE:-update}"   # update | realtime
+
+if [ "$brew_scan_source" = "update" ]; then
+  brew_outdated_formulas="$(extract_brew_update_outdated_from_log formula)"
+  brew_outdated_casks="$(extract_brew_update_outdated_from_log cask)"
+  brew_outdated_formulas_rc=0
+  brew_outdated_casks_rc=0
+  brew_scan_used_fallback=1
+  echo -e "[Info] 已使用 brew update 阶段的过期列表（跳过 brew outdated 实时扫描，避免锁冲突/长时间等待）。" \
+    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+else
+  brew_outdated_formulas=$(scan_brew_outdated formula)
+  brew_outdated_formulas_rc=$?
+  brew_outdated_casks=$(scan_brew_outdated cask)
+  brew_outdated_casks_rc=$?
+
+  if [ "$brew_outdated_formulas_rc" -ne 0 ] || [ "$brew_outdated_casks_rc" -ne 0 ]; then
+    echo -e "[Warn] brew outdated 扫描首次执行失败，1秒后自动重试一次..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    sleep 1
+
+    if [ "$brew_outdated_formulas_rc" -ne 0 ]; then
+      brew_outdated_formulas=$(scan_brew_outdated formula)
+      brew_outdated_formulas_rc=$?
+    fi
+
+    if [ "$brew_outdated_casks_rc" -ne 0 ]; then
+      # 若 update 阶段已经拿到 cask 过期列表，优先直接使用，避免二次 cask 扫描再次卡在锁冲突
+      fallback_casks_retry="$(extract_brew_update_outdated_from_log cask)"
+      if [ -n "$fallback_casks_retry" ]; then
+        brew_outdated_casks="$fallback_casks_retry"
+        brew_outdated_casks_rc=0
+        brew_scan_used_fallback=1
+        echo -e "[Warn] 重试阶段已直接使用 brew update 的 Cask 过期列表（跳过二次 cask 扫描，避免锁冲突阻塞）" \
+          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+      else
+        brew_outdated_casks=$(scan_brew_outdated cask)
+        brew_outdated_casks_rc=$?
+      fi
+    fi
+  fi
+fi
+
+# 第二次仍失败时，回退到 brew update 输出解析（尽量避免漏报更新）
+if [ "$brew_outdated_formulas_rc" -ne 0 ]; then
+  fallback_formulas="$(extract_brew_update_outdated_from_log formula)"
+  if [ -n "$fallback_formulas" ]; then
+    brew_outdated_formulas="$fallback_formulas"
+    brew_outdated_formulas_rc=0
+    brew_scan_used_fallback=1
+    echo -e "[Warn] Formula 扫描失败，已回退使用 brew update 阶段的过期列表" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+  fi
+fi
+if [ "$brew_outdated_casks_rc" -ne 0 ]; then
+  fallback_casks="$(extract_brew_update_outdated_from_log cask)"
+  if [ -n "$fallback_casks" ]; then
+    brew_outdated_casks="$fallback_casks"
+    brew_outdated_casks_rc=0
+    brew_scan_used_fallback=1
+    echo -e "[Warn] Cask 扫描失败，已回退使用 brew update 阶段的过期列表" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+  fi
+fi
+
+# 对扫描结果做二次净化：只保留合法包名，防止回退解析时误混入普通日志词汇
+sanitize_brew_pkg_list() {
+  awk '
+    {
+      line=$0
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+      if (line ~ /^[A-Za-z0-9][A-Za-z0-9@+._\/:-]*$/) print line
+    }
+  ' | awk '!seen[$0]++'
+}
+brew_outdated_formulas="$(printf '%s\n' "$brew_outdated_formulas" | sanitize_brew_pkg_list)"
+brew_outdated_casks="$(printf '%s\n' "$brew_outdated_casks" | sanitize_brew_pkg_list)"
+
+# 合并 Formula/Cask 列表，生成统一的过期包列表（去重）
+brew_outdated="$(printf '%s\n%s\n' "$brew_outdated_formulas" "$brew_outdated_casks" | sanitize_brew_pkg_list)"
+if [ "$brew_outdated_formulas_rc" -eq 0 ] && [ "$brew_outdated_casks_rc" -eq 0 ]; then
+  brew_outdated_rc=0
+else
+  brew_outdated_rc=1
+fi
+
+# 任一维度最终仍失败时，标记扫描异常并给出明确提示，避免“误判为无需更新”
+if [ "$brew_outdated_formulas_rc" -ne 0 ] || [ "$brew_outdated_casks_rc" -ne 0 ]; then
+  brew_scan_failed=1
+  echo -e "[Warn] HomeBrew 扫描异常：brew outdated 执行失败（formula=$brew_outdated_formulas_rc, cask=$brew_outdated_casks_rc）" \
+    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+  echo -e "[Warn] 可能原因：HomeBrew 锁文件权限异常、并发任务冲突或网络/API 错误；请先处理上方 brew 报错后重试" \
+    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+elif [ "$brew_scan_used_fallback" -eq 1 ]; then
+  echo -e "[Warn] HomeBrew 本轮使用了回退列表，建议后续修复 brew 锁冲突后再次执行以确保结果完全准确" \
+    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 fi
 
 # 兼容 bash 3.2：逐行构建数组（避免 read -a 只读到第一行）
@@ -4406,6 +4696,25 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
     # 记录每个缓存条目的详细信息（包名与 sha），供后续打印
     cached_formula_entries=()
     cached_cask_entries=()
+    skip_sha256_prefetch_check=0
+    if [ "${HOMEBREW_SKIP_SHA256_PREFLIGHT_ON_FALLBACK:-1}" = "1" ] && [ "${brew_scan_used_fallback:-0}" -eq 1 ]; then
+        skip_sha256_prefetch_check=1
+        echo -e "⚠️  检测到 brew 扫描回退，本轮跳过 SHA256 预检查，直接下载以避免锁冲突阻塞。" \
+          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    fi
+
+    get_brew_info_json() {
+        local __pkg="$1"
+        local __kind="$2"    # formula | cask（仅用于日志）
+        local __json=""
+        if [ "$(id -u)" -eq 0 ]; then
+            targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+            __json=$(sudo -n -H -u "$targetUser" /bin/bash -lc "HOMEBREW_NO_AUTO_UPDATE=1 brew info --json=v2 \"$__pkg\"" 2>/dev/null || true)
+        else
+            __json=$(HOMEBREW_NO_AUTO_UPDATE=1 brew info --json=v2 "$__pkg" 2>/dev/null || true)
+        fi
+        printf '%s' "$__json"
+    }
 
     # 构造平台键：Apple Silicon 带前缀，Intel 不带前缀
     platform_key=""
@@ -4424,158 +4733,110 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
 
 
 
-    # 筛选需要下载的 formula 软件包：如果缓存中已有完整的新版本则跳过
+    # 筛选需要下载的 formula / cask 软件包：若缓存命中则跳过下载
     packages_to_fetch_formulas=()
-    for pkg_brew_formula in "${packages_brew_formulas[@]}"; do
-
-        [[ -z "$pkg_brew_formula" ]] && continue  # 跳过空名称项（以防万一）
-
-        #brew_cache_path=$(brew --cache --formula "$pkg_brew_formula")
-        # 获取 HomeBrew 缓存包路径（在 Root 权限下通过目标用户环境获取正确路径）
-        if [ "$(id -u)" -eq 0 ]; then
-            targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
-            brew_cache_path=$(sudo -n -H -u "$targetUser" /bin/bash -lc "brew --cache --formula \"$pkg_brew_formula\"" 2>/dev/null)
-        else
-            brew_cache_path=$(brew --cache --formula "$pkg_brew_formula")
-        fi
-        #echo -e "brew_cache_path = $brew_cache_path"                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        
-        if [ -f "$brew_cache_path" ]; then
-            ################################################################
-            # 修正：brew --cache 可能返回 bottle_manifest.json 路径，这不是实际瓶子文件
-            # manifest 与真正的 .bottle.tar.gz 文件的 SHA256 不一致，导致误判
-            # 如果检测到 manifest 文件，则尝试在同目录寻找匹配包名的 .bottle*.tar.gz 文件
-            ################################################################
-            if [[ "$brew_cache_path" == *.bottle_manifest.json ]]; then
-                cache_dir="$(dirname "$brew_cache_path")"
-                # 使用通配符查找匹配的瓶子文件
-                candidate=""
-                for f in "$cache_dir"/*"${pkg_brew_formula}"*.bottle*.tar.gz; do
-                    # 只取第一个匹配
-                    candidate="$f"
-                    break
-                done
-                if [ -n "$candidate" ] && [ -f "$candidate" ]; then
-                    brew_cache_path="$candidate"
-                fi
-            fi
-            local_sha=$(shasum -a 256 "$brew_cache_path" | awk '{print $1}')
-            ############################################
-            # 计算 brew_expected_sha —— 自动降权 + 双日志输出
-            ############################################
-            if [ "$(id -u)" -eq 0 ]; then
-                # 1. 解析目标普通用户（Lingon 经 sudo 调用时 SUDO_USER 存在）
-                targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
-
-                # 2. 日志提示
-                #echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_formula 的 SHA256 查询 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-
-                # 3. 在目标用户登录环境中执行 brew info 获取 JSON
-                json=$(sudo -n -H -u "$targetUser" /bin/bash -lc "brew info --json=v2 \"$pkg_brew_formula\"" 2>/dev/null)
-            else
-                # ------- 已是普通用户 -------
-                #echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 $pkg_brew_formula 的 SHA256 查询 ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-
-                # 在当前用户环境中执行 brew info 获取 JSON
-                json=$(brew info --json=v2 "$pkg_brew_formula" 2>/dev/null)
-            fi
-
-            # 提取对应的 SHA256（优先当前平台的 bottle，其次通用 bottle，最后源码 checksum）
-            brew_expected_sha=""
-            if [ -n "$json" ]; then
-                if [ -n "$platform_key" ]; then
-                    brew_expected_sha=$(/usr/bin/plutil -extract "formulae.0.bottle.stable.files.${platform_key}.sha256" \
-                                 raw -o - - <<< "$json" 2>/dev/null)
-                fi
-                if [ -z "$brew_expected_sha" ]; then
-                    brew_expected_sha=$(/usr/bin/plutil -extract "formulae.0.bottle.stable.files.all.sha256" \
-                                 raw -o - - <<< "$json" 2>/dev/null)
-                fi
-                if [ -z "$brew_expected_sha" ]; then
-                    brew_expected_sha=$(/usr/bin/plutil -extract "formulae.0.urls.stable.checksum" \
-                                 raw -o - - <<< "$json" 2>/dev/null)
-                fi
-            fi
-
-            if [ -n "$brew_expected_sha" ] && [ "$local_sha" = "$brew_expected_sha" ]; then
-                # 该 formula 已有最新缓存，记录到缓存列表和详细条目，后续汇总输出
-                cached_formulas+=("$pkg_brew_formula")
-                cached_formula_entries+=("$pkg_brew_formula|$brew_expected_sha")
-                continue  # 略过重新下载
-            else
-                echo -e "⚠️  [SHA256异常] $pkg_brew_formula [formula]" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                echo -e "   -  已下载包 ：$local_sha "    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                echo -e "   -  homebrew ：$brew_expected_sha " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-            fi
-        fi
-
-        packages_to_fetch_formulas+=("$pkg_brew_formula")
-
-    done
-
-
-    # 筛选需要下载的 cask 软件包：如果缓存中已有完整的新版本则跳过
     packages_to_fetch_casks=()
-    for pkg_brew_cask in "${packages_brew_casks[@]}"; do
 
-        [[ -z "$pkg_brew_cask" ]] && continue  # 跳过空名称项
+    if [ "$skip_sha256_prefetch_check" -eq 1 ]; then
+        packages_to_fetch_formulas=("${packages_brew_formulas[@]}")
+        packages_to_fetch_casks=("${packages_brew_casks[@]}")
+    else
+        formula_total=${#packages_brew_formulas[@]}
+        formula_idx=0
+        for pkg_brew_formula in "${packages_brew_formulas[@]}"; do
+            [[ -z "$pkg_brew_formula" ]] && continue
+            formula_idx=$((formula_idx + 1))
+            echo -e "•  [SHA256][formula] (${formula_idx}/${formula_total}) : $pkg_brew_formula" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
-        #brew_cache_path=$(brew --cache --cask "$pkg_brew_cask")
-        # 获取 HomeBrew 缓存包路径（在 Root 权限下通过目标用户环境获取正确路径）
-        if [ "$(id -u)" -eq 0 ]; then
-            targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
-            brew_cache_path=$(sudo -n -H -u "$targetUser" /bin/bash -lc "brew --cache --cask \"$pkg_brew_cask\"" 2>/dev/null)
-        else
-            brew_cache_path=$(brew --cache --cask "$pkg_brew_cask")
-        fi
-        #echo -e "brew_cache_path = $brew_cache_path"                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-
-        if [ -f "$brew_cache_path" ]; then
-            local_sha=$(shasum -a 256 "$brew_cache_path" | awk '{print $1}')
-            ############################################
-            # 计算 brew_expected_sha —— 自动降权 + 双日志输出
-            ############################################
             if [ "$(id -u)" -eq 0 ]; then
-                # 1. 解析目标普通用户（Lingon 经 sudo 调用时 SUDO_USER 存在）
                 targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
-
-                # 2. 日志提示
-                #echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_cask 的 SHA256 查询 ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-
-                # 3. 在目标用户登录环境中执行 brew info 获取 JSON
-                json=$(sudo -n -H -u "$targetUser" /bin/bash -lc "brew info --json=v2 \"$pkg_brew_cask\"" 2>/dev/null)
+                brew_cache_path=$(sudo -n -H -u "$targetUser" /bin/bash -lc "brew --cache --formula \"$pkg_brew_formula\"" 2>/dev/null)
             else
-                # ------- 已是普通用户 -------
-                #echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 $pkg_brew_cask 的 SHA256 查询 ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-
-                # 在当前用户环境中执行 brew info 获取 JSON
-                json=$(brew info --json=v2 "$pkg_brew_cask" 2>/dev/null)
+                brew_cache_path=$(brew --cache --formula "$pkg_brew_formula")
             fi
 
-            # 提取 cask 的 SHA256（某些 cask 可能无 SHA 信息，例如 :latest 或 auto_updates）
-            brew_expected_sha=""
-            if [ -n "$json" ]; then
-                brew_expected_sha=$(/usr/bin/plutil -extract "casks.0.sha256" raw -o - - <<< "$json" 2>/dev/null)
+            if [ -f "$brew_cache_path" ]; then
+                if [[ "$brew_cache_path" == *.bottle_manifest.json ]]; then
+                    cache_dir="$(dirname "$brew_cache_path")"
+                    candidate=""
+                    for f in "$cache_dir"/*"${pkg_brew_formula}"*.bottle*.tar.gz; do
+                        candidate="$f"
+                        break
+                    done
+                    if [ -n "$candidate" ] && [ -f "$candidate" ]; then
+                        brew_cache_path="$candidate"
+                    fi
+                fi
+
+                local_sha=$(shasum -a 256 "$brew_cache_path" | awk '{print $1}')
+                json="$(get_brew_info_json "$pkg_brew_formula" formula)"
+                brew_expected_sha=""
+                if [ -n "$json" ]; then
+                    if [ -n "$platform_key" ]; then
+                        brew_expected_sha=$(/usr/bin/plutil -extract "formulae.0.bottle.stable.files.${platform_key}.sha256" \
+                                     raw -o - - <<< "$json" 2>/dev/null)
+                    fi
+                    if [ -z "$brew_expected_sha" ]; then
+                        brew_expected_sha=$(/usr/bin/plutil -extract "formulae.0.bottle.stable.files.all.sha256" \
+                                     raw -o - - <<< "$json" 2>/dev/null)
+                    fi
+                    if [ -z "$brew_expected_sha" ]; then
+                        brew_expected_sha=$(/usr/bin/plutil -extract "formulae.0.urls.stable.checksum" \
+                                     raw -o - - <<< "$json" 2>/dev/null)
+                    fi
+                fi
+
+                if [ -n "$brew_expected_sha" ] && [ "$local_sha" = "$brew_expected_sha" ]; then
+                    cached_formulas+=("$pkg_brew_formula")
+                    cached_formula_entries+=("$pkg_brew_formula|$brew_expected_sha")
+                    continue
+                else
+                    echo -e "⚠️  [SHA256异常] $pkg_brew_formula [formula]" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    echo -e "   -  已下载包 ：$local_sha " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    echo -e "   -  homebrew ：$brew_expected_sha " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                fi
             fi
 
-            # 处理 cask 的 SHA256: 如果为 null/no_check 或为空，则认为无需校验并视为已缓存
-            if [[ "$brew_expected_sha" == "null" || -z "$brew_expected_sha" || "$brew_expected_sha" == "no_check" ]]; then
-                cached_casks+=("$pkg_brew_cask")
-                # 保存详细信息标记为 no_check
-                cached_cask_entries+=("$pkg_brew_cask|no_check")
-                continue
-            fi
-            if [ "$local_sha" = "$brew_expected_sha" ]; then
-                # cask 已有最新缓存，记录到缓存列表
-                cached_casks+=("$pkg_brew_cask")
-                cached_cask_entries+=("$pkg_brew_cask|$brew_expected_sha")
-                continue
-            fi
-        fi
+            packages_to_fetch_formulas+=("$pkg_brew_formula")
+        done
 
-        packages_to_fetch_casks+=("$pkg_brew_cask")
+        cask_total=${#packages_brew_casks[@]}
+        cask_idx=0
+        for pkg_brew_cask in "${packages_brew_casks[@]}"; do
+            [[ -z "$pkg_brew_cask" ]] && continue
+            cask_idx=$((cask_idx + 1))
+            echo -e "•  [SHA256][cask]    (${cask_idx}/${cask_total}) : $pkg_brew_cask" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
-    done
+            if [ "$(id -u)" -eq 0 ]; then
+                targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+                brew_cache_path=$(sudo -n -H -u "$targetUser" /bin/bash -lc "brew --cache --cask \"$pkg_brew_cask\"" 2>/dev/null)
+            else
+                brew_cache_path=$(brew --cache --cask "$pkg_brew_cask")
+            fi
+
+            if [ -f "$brew_cache_path" ]; then
+                local_sha=$(shasum -a 256 "$brew_cache_path" | awk '{print $1}')
+                json="$(get_brew_info_json "$pkg_brew_cask" cask)"
+                brew_expected_sha=""
+                if [ -n "$json" ]; then
+                    brew_expected_sha=$(/usr/bin/plutil -extract "casks.0.sha256" raw -o - - <<< "$json" 2>/dev/null)
+                fi
+
+                if [[ "$brew_expected_sha" == "null" || -z "$brew_expected_sha" || "$brew_expected_sha" == "no_check" ]]; then
+                    cached_casks+=("$pkg_brew_cask")
+                    cached_cask_entries+=("$pkg_brew_cask|no_check")
+                    continue
+                fi
+                if [ "$local_sha" = "$brew_expected_sha" ]; then
+                    cached_casks+=("$pkg_brew_cask")
+                    cached_cask_entries+=("$pkg_brew_cask|$brew_expected_sha")
+                    continue
+                fi
+            fi
+
+            packages_to_fetch_casks+=("$pkg_brew_cask")
+        done
+    fi
 
 
     # 根据缓存列表打印缓存摘要。如果存在缓存条目则打印详细信息；否则提示无缓存。
@@ -4667,12 +4928,12 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                 # 重试下载
                 echo -e "✔︎  重试中   [formula] ：$pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             fi
-            # 调用 brew fetch 下载 formula，去重输出并过滤掉 Bottle Manifest 行，仅保留实际瓶子下载信息
-            brew fetch --formula --retry "$pkg" 2>&1 \
-                | awk '!seen[$0]++' \
-                | grep -v 'Bottle Manifest' \
-                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" \
-                | tee "$tmpfile" >/dev/null
+            # 调用 brew fetch 下载 formula（不设置超时，按用户要求无限等待）
+            env HOMEBREW_NO_AUTO_UPDATE=1 brew fetch --formula --retry "$pkg" 2>&1 \
+            | awk '!seen[$0]++' \
+            | grep -v 'Bottle Manifest' \
+            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" \
+            | tee "$tmpfile" >/dev/null
             fetch_exit=${PIPESTATUS[0]}
             if [ $fetch_exit -ne 0 ]; then
                 # 校验失败仅再尝试一次（总计两次）；其他网络失败按常规重试次数执行
@@ -4702,11 +4963,11 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             local json=""
             if [ "$(id -u)" -eq 0 ]; then
                 local targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
-                brew_cache_path=$(sudo -n -H -u "$targetUser" /bin/bash -lc "brew --cache --formula \"$pkg\"" 2>/dev/null)
-                json=$(sudo -n -H -u "$targetUser" /bin/bash -lc "brew info --json=v2 \"$pkg\"" 2>/dev/null)
+                brew_cache_path=$(sudo -n -H -u "$targetUser" /bin/bash -lc "HOMEBREW_NO_AUTO_UPDATE=1 brew --cache --formula \"$pkg\"" 2>/dev/null)
+                json=$(sudo -n -H -u "$targetUser" /bin/bash -lc "HOMEBREW_NO_AUTO_UPDATE=1 brew info --json=v2 \"$pkg\"" 2>/dev/null)
             else
-                brew_cache_path=$(brew --cache --formula "$pkg")
-                json=$(brew info --json=v2 "$pkg" 2>/dev/null)
+                brew_cache_path=$(HOMEBREW_NO_AUTO_UPDATE=1 brew --cache --formula "$pkg")
+                json=$(HOMEBREW_NO_AUTO_UPDATE=1 brew info --json=v2 "$pkg" 2>/dev/null)
             fi
             if [ -n "$brew_cache_path" ] && [ -f "$brew_cache_path" ]; then
                 ################################################################
@@ -4775,6 +5036,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         # 根据成功与否记录结果：成功(1/2)则写入成功文件，其余视为失败
         if [ "$success" -eq 1 ] || [ "$success" -eq 2 ]; then
             # 成功下载 formula，将包名记录到成功文件。此处不输出成功信息，由汇总阶段统一处理
+            echo -e "✔︎  下载完成 [formula] ：$pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             echo "$pkg" >> "$SUCCESS_FETCH_FORMULAS_FILE"
         else
             echo -e "❌  下载失败 [formula] ：$pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -4797,7 +5059,13 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                 elif grep -qiE 'failed to connect|connection refused|connection reset|network is unreachable|no route to host' "$tmpfile"; then
                     fail_reason="网络连接失败（无法连到下载源）"
                 else
-                    fail_reason="未知错误（详见日志）"
+                    raw_err=$(awk 'NF{line=$0} END{print line}' "$tmpfile" 2>/dev/null | sed -E 's/[[:space:]]+/ /g')
+                    raw_err="${raw_err:0:160}"
+                    if [ -n "$raw_err" ]; then
+                        fail_reason="未知错误：${raw_err}"
+                    else
+                        fail_reason="未知错误（详见日志）"
+                    fi
                 fi
             else
                 url=""
@@ -4834,12 +5102,12 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             else
                 echo -e "✔︎  重试中   [cask]    ：$pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             fi
-            # 调用 brew fetch 下载 cask，去重输出并过滤 Bottle Manifest 行
-            env HOMEBREW_CASK_OPTS="" brew fetch --cask --retry "$pkg" 2>&1 \
-                | awk '!seen[$0]++' \
-                | grep -v 'Bottle Manifest' \
-                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" \
-                | tee "$tmpfile" >/dev/null
+            # 调用 brew fetch 下载 cask（不设置超时，按用户要求无限等待）
+            env HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_CASK_OPTS="" brew fetch --cask --retry "$pkg" 2>&1 \
+            | awk '!seen[$0]++' \
+            | grep -v 'Bottle Manifest' \
+            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" \
+            | tee "$tmpfile" >/dev/null
             fetch_exit=${PIPESTATUS[0]}
             if [ $fetch_exit -ne 0 ]; then
                 # 校验失败仅再尝试一次（总计两次）；其他网络失败按常规重试次数执行
@@ -4866,11 +5134,11 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             local json=""
             if [ "$(id -u)" -eq 0 ]; then
                 local targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
-                brew_cache_path=$(sudo -n -H -u "$targetUser" /bin/bash -lc "brew --cache --cask \"$pkg\"" 2>/dev/null)
-                json=$(sudo -n -H -u "$targetUser" /bin/bash -lc "brew info --json=v2 \"$pkg\"" 2>/dev/null)
+                brew_cache_path=$(sudo -n -H -u "$targetUser" /bin/bash -lc "HOMEBREW_NO_AUTO_UPDATE=1 brew --cache --cask \"$pkg\"" 2>/dev/null)
+                json=$(sudo -n -H -u "$targetUser" /bin/bash -lc "HOMEBREW_NO_AUTO_UPDATE=1 brew info --json=v2 \"$pkg\"" 2>/dev/null)
             else
-                brew_cache_path=$(brew --cache --cask "$pkg")
-                json=$(brew info --json=v2 "$pkg" 2>/dev/null)
+                brew_cache_path=$(HOMEBREW_NO_AUTO_UPDATE=1 brew --cache --cask "$pkg")
+                json=$(HOMEBREW_NO_AUTO_UPDATE=1 brew info --json=v2 "$pkg" 2>/dev/null)
             fi
             if [ -n "$brew_cache_path" ] && [ -f "$brew_cache_path" ]; then
                 local_sha=$(shasum -a 256 "$brew_cache_path" | awk '{print $1}')
@@ -4899,6 +5167,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         # 根据成功与否记录结果：成功(1/2)则写入成功文件，其余视为失败
         if [ "$success" -eq 1 ] || [ "$success" -eq 2 ]; then
             # 成功下载 cask，将包名记录到成功文件。此处不输出成功信息，由汇总阶段统一处理
+            echo -e "✔︎  下载完成 [cask]    ：$pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             echo "$pkg" >> "$SUCCESS_FETCH_CASKS_FILE"
         else
             echo -e "❌  下载失败 [cask] ：$pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -4920,7 +5189,13 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                 elif grep -qiE 'failed to connect|connection refused|connection reset|network is unreachable|no route to host' "$tmpfile"; then
                     fail_reason="网络连接失败（无法连到下载源）"
                 else
-                    fail_reason="未知错误（详见日志）"
+                    raw_err=$(awk 'NF{line=$0} END{print line}' "$tmpfile" 2>/dev/null | sed -E 's/[[:space:]]+/ /g')
+                    raw_err="${raw_err:0:160}"
+                    if [ -n "$raw_err" ]; then
+                        fail_reason="未知错误：${raw_err}"
+                    else
+                        fail_reason="未知错误（详见日志）"
+                    fi
                 fi
             else
                 url=""
@@ -4936,8 +5211,27 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
 
     # ---------------- ① 并行下载 formula/cask ----------------
     # 采用临时函数文件配合 GNU parallel 的 :::: 文件输入方式。在 root 环境下通过 run_as_normal_user 调用 parallel，避免 sudo 环境丢失函数定义。
+    brew_fetch_jobs="${HOMEBREW_FETCH_JOBS:-$PARALLEL_JOBS}"
+    if ! echo "$brew_fetch_jobs" | grep -qE '^[0-9]+$' || [ "$brew_fetch_jobs" -lt 1 ]; then
+      brew_fetch_jobs="$PARALLEL_JOBS"
+    fi
+    [ "$brew_fetch_jobs" -gt 64 ] && brew_fetch_jobs=64
+    echo -e "[Info] HomeBrew 并行下载参数：jobs=${brew_fetch_jobs}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
     total_formula_count=${#packages_to_fetch_formulas[@]}
     total_cask_count=${#packages_to_fetch_casks[@]}
+    # formula/cask 两条并行链路分别独立使用并发参数，避免一侧被另一侧“分流”导致看起来不并行
+    formula_jobs="${HOMEBREW_FETCH_FORMULA_JOBS:-$brew_fetch_jobs}"
+    cask_jobs="${HOMEBREW_FETCH_CASK_JOBS:-$brew_fetch_jobs}"
+    if ! echo "$formula_jobs" | grep -qE '^[0-9]+$' || [ "$formula_jobs" -lt 1 ]; then
+      formula_jobs="$brew_fetch_jobs"
+    fi
+    if ! echo "$cask_jobs" | grep -qE '^[0-9]+$' || [ "$cask_jobs" -lt 1 ]; then
+      cask_jobs="$brew_fetch_jobs"
+    fi
+    [ "$formula_jobs" -gt 64 ] && formula_jobs=64
+    [ "$cask_jobs" -gt 64 ] && cask_jobs=64
+    echo -e "[Info] HomeBrew 下载并发分配：formula=${formula_jobs}，cask=${cask_jobs}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     if [ $total_formula_count -gt 0 ] || [ $total_cask_count -gt 0 ]; then
       # 将下载函数定义写入临时文件
       # 在 /tmp 下创建函数定义文件，避免目录权限限制导致普通用户无法读取
@@ -4964,6 +5258,10 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
       if [ "$(id -u)" -eq 0 ]; then
         # 在 root 模式下，使用 xargs + run_as_normal_user 执行并行下载。为每个软件包生成一个小脚本，在脚本内部调用
         # run_as_normal_user 将下载函数在普通用户环境下执行。这样可以避免 sudo 在并行环境下的复杂权限问题。
+        xargs_formula_script=""
+        xargs_cask_script=""
+        formula_dl_pid=""
+        cask_dl_pid=""
         if [ $total_formula_count -gt 0 ]; then
           # 创建临时脚本用于 formula 下载
           xargs_formula_script=$(mktemp "/tmp/brew_xargs_formula.XXXXXX")
@@ -4976,8 +5274,8 @@ run_as_normal_user bash -lc "source \"${functions_file}\"; fetch_brew_formula \"
 EOF
           chmod +x "$xargs_formula_script"
           # 使用 xargs 在 root 环境下并行运行脚本。传入包名和函数文件路径
-          printf '%s\n' "${packages_to_fetch_formulas[@]}" | xargs -n1 -P"$PARALLEL_JOBS" -I {} bash "$xargs_formula_script" "{}" "$functions_file"
-          rm -f "$xargs_formula_script"
+          printf '%s\n' "${packages_to_fetch_formulas[@]}" | xargs -n1 -P"$formula_jobs" -I {} bash "$xargs_formula_script" "{}" "$functions_file" &
+          formula_dl_pid=$!
         fi
         if [ $total_cask_count -gt 0 ]; then
           xargs_cask_script=$(mktemp "/tmp/brew_xargs_cask.XXXXXX")
@@ -4988,18 +5286,28 @@ functions_file="$2"
 run_as_normal_user bash -lc "source \"${functions_file}\"; fetch_brew_cask \"${pkg}\""
 EOF
           chmod +x "$xargs_cask_script"
-          printf '%s\n' "${packages_to_fetch_casks[@]}" | xargs -n1 -P"$PARALLEL_JOBS" -I {} bash "$xargs_cask_script" "{}" "$functions_file"
-          rm -f "$xargs_cask_script"
+          printf '%s\n' "${packages_to_fetch_casks[@]}" | xargs -n1 -P"$cask_jobs" -I {} bash "$xargs_cask_script" "{}" "$functions_file" &
+          cask_dl_pid=$!
         fi
+        [ -n "$formula_dl_pid" ] && wait "$formula_dl_pid" || true
+        [ -n "$cask_dl_pid" ] && wait "$cask_dl_pid" || true
+        [ -n "$xargs_formula_script" ] && rm -f "$xargs_formula_script"
+        [ -n "$xargs_cask_script" ] && rm -f "$xargs_cask_script"
       else
         # 非 root 时，不使用临时函数文件，直接调用导出的函数进行并行下载。
         # fetch_brew_formula 与 fetch_brew_cask 已在前文通过 export -f 导出，可直接供 GNU parallel 调用。
+        formula_dl_pid=""
+        cask_dl_pid=""
         if [ $total_formula_count -gt 0 ]; then
-          "$PARALLEL_BIN" --will-cite --line-buffer --unsafe -j"$PARALLEL_JOBS" fetch_brew_formula ::: "${packages_to_fetch_formulas[@]}"
+          "$PARALLEL_BIN" --will-cite --line-buffer --unsafe -j"$formula_jobs" fetch_brew_formula ::: "${packages_to_fetch_formulas[@]}" &
+          formula_dl_pid=$!
         fi
         if [ $total_cask_count -gt 0 ]; then
-          "$PARALLEL_BIN" --will-cite --line-buffer --unsafe -j"$PARALLEL_JOBS" fetch_brew_cask ::: "${packages_to_fetch_casks[@]}"
+          "$PARALLEL_BIN" --will-cite --line-buffer --unsafe -j"$cask_jobs" fetch_brew_cask ::: "${packages_to_fetch_casks[@]}" &
+          cask_dl_pid=$!
         fi
+        [ -n "$formula_dl_pid" ] && wait "$formula_dl_pid" || true
+        [ -n "$cask_dl_pid" ] && wait "$cask_dl_pid" || true
       fi
       # 清理临时文件
       rm -f "$functions_file"
@@ -5083,7 +5391,7 @@ EOF
         fi
         if [ "$failed_cask" -gt 0 ]; then
             cask_fail_list=$(cut -d'|' -f1 < "$FAILED_FETCH_CASKS_FILE" | xargs)
-            echo -e "✘  未完成的 cask    列表：$cask_fail_list" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            echo -e "❌  下载失败 [cask]    : $cask_fail_list" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         fi
         # 输出未知软件列表 [WARNING]
         if [ ${#unknown_formulas[@]} -gt 0 ]; then
@@ -5157,7 +5465,8 @@ EOF
                 fi
             fi
 
-            brew_formula_tmpfile=$(mktemp)
+            brew_formula_tmpfile=$(mktemp "/tmp/brew_formula_upgrade.XXXXXX")
+            chmod 666 "$brew_formula_tmpfile" 2>/dev/null || true
 
             # ---------- 尝试升级 ----------
             # 检查是否以 root 身份运行
@@ -5166,7 +5475,7 @@ EOF
                 targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
                 echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_formula 升级 ( brew upgrade $pkg_brew_formula --verbose --debug ) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
                 # 以目标用户身份执行 HomeBrew 命令
-                sudo -n -H -u "$targetUser" bash -c "brew upgrade $pkg_brew_formula 2>&1" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_formula_tmpfile"
+                sudo -n -H -u "$targetUser" env TMPDIR="/tmp" TMP="/tmp" TEMP="/tmp" HOMEBREW_TEMP="/tmp" bash -c "brew upgrade $pkg_brew_formula 2>&1" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_formula_tmpfile"
             else
                 echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 $pkg_brew_formula 升级 ( brew upgrade $pkg_brew_formula --verbose --debug ) ... "                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
                 brew upgrade "$pkg_brew_formula" 2>&1                                                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_formula_tmpfile" 
@@ -5216,7 +5525,7 @@ EOF
                         targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
                         echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_formula 重装 ( brew link --overwrite $pkg_brew_formula )  ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                         # 以目标用户身份执行 HomeBrew 命令
-                        sudo -n -H -u "$targetUser" bash -c "brew link --overwrite $pkg_brew_formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        sudo -n -H -u "$targetUser" env TMPDIR="/tmp" TMP="/tmp" TEMP="/tmp" HOMEBREW_TEMP="/tmp" bash -c "brew link --overwrite $pkg_brew_formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     else
                         echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 $pkg_brew_formula 重装 ( brew link --overwrite $pkg_brew_formula ) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                         brew link --overwrite "$pkg_brew_formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -5263,7 +5572,7 @@ EOF
                     targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
                     echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_formula 重装 ( brew reinstall $pkg_brew_formula --verbose --debug )  ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     # 以目标用户身份执行 HomeBrew 命令
-                    sudo -n -H -u "$targetUser" bash -c "brew reinstall $pkg_brew_formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    sudo -n -H -u "$targetUser" env TMPDIR="/tmp" TMP="/tmp" TEMP="/tmp" HOMEBREW_TEMP="/tmp" bash -c "brew reinstall $pkg_brew_formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 else
                     echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 $pkg_brew_formula 重装 ( brew reinstall $pkg_brew_formula --verbose --debug ) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     brew reinstall "$pkg_brew_formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -5281,7 +5590,7 @@ EOF
                         targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
                         echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_formula 强制重装 ( brew reinstall --force $pkg_brew_formula --verbose --debug )  ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                         # 以目标用户身份执行 HomeBrew 命令
-                        sudo -n -H -u "$targetUser" bash -c "brew reinstall --force $pkg_brew_formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        sudo -n -H -u "$targetUser" env TMPDIR="/tmp" TMP="/tmp" TEMP="/tmp" HOMEBREW_TEMP="/tmp" bash -c "brew reinstall --force $pkg_brew_formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     else
                         echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 $pkg_brew_formula 强制重装 ( brew reinstall --force $pkg_brew_formula --verbose --debug ) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                         brew reinstall --force "$pkg_brew_formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -5386,7 +5695,8 @@ EOF
             fi
 
             # 新增：为 cask 升级输出创建临时文件，避免变量未定义导致 tee 报错
-            brew_cask_tmpfile=$(mktemp)
+            brew_cask_tmpfile=$(mktemp "/tmp/brew_cask_upgrade.XXXXXX")
+            chmod 666 "$brew_cask_tmpfile" 2>/dev/null || true
 
             # 初始化每个 cask 应用的状态变量
             brew_cask_app_name=""
@@ -5788,15 +6098,23 @@ EOF
  #  brew upgrade --greedy --debug --force                                                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE""  ###### 仅作为Debug使用！！！
 
 else    
-
-    echo -e "✓  未检测到新版本 ：HomeBrew Formula ... "                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    echo -e "✓  未检测到新版本 ：HomeBrew Cask ... "                                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    if [ "${brew_scan_failed:-0}" -ne 0 ]; then
+        echo -e "[Warn] HomeBrew 扫描未成功完成，本轮待更新列表可能不完整"                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "[Warn] 请先处理上方 brew 报错，再重新执行脚本"                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    else
+        echo -e "✓  未检测到新版本 ：HomeBrew Formula ... "                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✓  未检测到新版本 ：HomeBrew Cask ... "                                          | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    fi
     echo -e ""                                                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     printf  "\033[1;34m[Download & Install]\033[0m "    
     printf  "[Download & Install] "                                                       | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
     echo -e "HomeBrew 下载安装 ... "                                         | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    echo -e "✓  所有APP已经是 最新版本 ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+    if [ "${brew_scan_failed:-0}" -ne 0 ]; then
+        echo -e "[Warn] 本轮扫描异常：无法确认“全部最新”，已跳过下载与安装"                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    else
+        echo -e "✓  所有APP已经是 最新版本 ... "                                                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    fi
     echo -e ""                                                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
 fi
@@ -5820,7 +6138,7 @@ if [ "$(id -u)" -eq 0 ]; then
     run_as_normal_user brew autoremove 2>&1                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     # 列出缺失依赖，仅提示，不影响退出码
     echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 brew missing ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    run_as_normal_user brew missing || true                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    (run_as_normal_user brew missing || true) 2>&1                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 else
     # 执行清理
     echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 brew cleanup ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
@@ -5830,7 +6148,7 @@ else
     brew autoremove 2>&1                                                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     # 列出缺失依赖，仅提示，不影响退出码
     echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 brew missing ... "                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-    brew missing || true                                                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    (brew missing || true) 2>&1                                                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 fi
 
 
@@ -5843,8 +6161,12 @@ printf "[Final] " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
 echo -e "HomeBrew 更新结果 ... " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
 if [ ${#packages_brew[@]} -eq 0 ]; then
-    # 没有任何软件需要更新的情况
-    echo -e "✓  没有APP被更新 !!! " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    # 没有任何软件需要更新的情况（扫描异常时避免误报“全部已更新”）
+    if [ "${brew_scan_failed:-0}" -ne 0 ]; then
+        echo -e "[Warn] HomeBrew 扫描异常，更新结果未知（请修复扫描错误后重试）" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    else
+        echo -e "✓  没有APP被更新 !!! " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    fi
 else
     # 逐条输出更新结果
     for entry in "${updated_list[@]}"; do
