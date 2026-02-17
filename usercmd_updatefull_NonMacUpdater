@@ -5170,7 +5170,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             echo -e "✔︎  下载完成 [cask]    ：$pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             echo "$pkg" >> "$SUCCESS_FETCH_CASKS_FILE"
         else
-            echo -e "❌  下载失败 [cask] ：$pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            echo -e "✘  下载失败 [cask]    : $pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             # 在提取下载链接前确认临时文件存在，避免 grep 对已删除文件报错
             if [[ -f "$tmpfile" ]]; then
                 url=$(grep -oE 'https?://[^[:space:]]+' "$tmpfile" 2>/dev/null | tail -n1 || true)
@@ -5391,7 +5391,7 @@ EOF
         fi
         if [ "$failed_cask" -gt 0 ]; then
             cask_fail_list=$(cut -d'|' -f1 < "$FAILED_FETCH_CASKS_FILE" | xargs)
-            echo -e "❌  下载失败 [cask]    : $cask_fail_list" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            echo -e "✘  下载失败 [cask]    : $cask_fail_list" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         fi
         # 输出未知软件列表 [WARNING]
         if [ ${#unknown_formulas[@]} -gt 0 ]; then
