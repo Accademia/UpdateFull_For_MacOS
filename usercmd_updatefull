@@ -21,7 +21,7 @@ export PATH="/usr/local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/opt/local/bin:
 export HOMEBREW_NO_COLOR=1
 
 # 脚本版本号：用于调试和确认是否使用最新脚本
-SCRIPT_VERSION="2026.02.17.v14"
+SCRIPT_VERSION="2026.02.17.v15"
 # 预先解析 GNU Parallel 的绝对路径。在某些 sudo 环境下 PATH 可能被重置，导致找不到 parallel。
 if command -v parallel >/dev/null 2>&1; then
     PARALLEL_BIN="$(command -v parallel)"
@@ -109,6 +109,13 @@ MAS_PARALLEL_JOBS=2
 # 例如：HOMEBREW_FETCH_JOBS=32 /usr/local/bin/usercmd_updatefull_NonMacUpdater
 HOMEBREW_FETCH_JOBS="${HOMEBREW_FETCH_JOBS:-32}"
 export HOMEBREW_FETCH_JOBS
+
+# ===== TopGrade Cursor 扩展失败自动修复 =====
+# 当 TopGrade 的 Cursor extensions 步骤失败时，自动重试 cursor --update-extensions
+CURSOR_EXT_AUTO_RETRY="${CURSOR_EXT_AUTO_RETRY:-1}"
+CURSOR_EXT_MAX_RETRIES="${CURSOR_EXT_MAX_RETRIES:-3}"
+CURSOR_EXT_RETRY_DELAY_SEC="${CURSOR_EXT_RETRY_DELAY_SEC:-5}"
+export CURSOR_EXT_AUTO_RETRY CURSOR_EXT_MAX_RETRIES CURSOR_EXT_RETRY_DELAY_SEC
 
 # ===== MAS 扫描方式设置 =====
 # 控制 mas outdated 的执行方式。
@@ -247,11 +254,14 @@ DOWNLOAD_MAX_RETRIES=5
 # 新增：初始化下载成功记录文件。将其放在 /tmp 下，避免权限问题
 SUCCESS_FETCH_FORMULAS_FILE=$(mktemp "/tmp/success_fetch_formulas.XXXXXX")
 SUCCESS_FETCH_CASKS_FILE=$(mktemp "/tmp/success_fetch_casks.XXXXXX")
+# 记录本轮 brew update 原始输出，供后续“回退列表”解析，避免从全量日志误解析
+BREW_UPDATE_OUTDATED_SNAPSHOT_FILE=$(mktemp "/tmp/brew_update_outdated_snapshot.XXXXXX")
 # 设置权限，以便普通用户可以写入
-chmod 666 "$SUCCESS_FETCH_FORMULAS_FILE" "$SUCCESS_FETCH_CASKS_FILE"
+chmod 666 "$SUCCESS_FETCH_FORMULAS_FILE" "$SUCCESS_FETCH_CASKS_FILE" "$BREW_UPDATE_OUTDATED_SNAPSHOT_FILE"
 # 导出变量供子进程使用
 export FAILED_FETCH_FORMULAS_FILE FAILED_FETCH_CASKS_FILE DOWNLOAD_MAX_RETRIES
 export SUCCESS_FETCH_FORMULAS_FILE SUCCESS_FETCH_CASKS_FILE
+export BREW_UPDATE_OUTDATED_SNAPSHOT_FILE
 
 # -------------------------------------------------------------------------------------------------
 # 根据当前脚本的执行身份，决定 sudo 命令是否强制使用非交互模式
@@ -7459,6 +7469,70 @@ fi
 echo -e ""                                                                              | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 echo -e ""                                                                                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
 
+# TopGrade 报告 Cursor extensions 失败时，额外做一次自动化补救（带重试）
+auto_retry_cursor_extensions_update() {
+    local cursor_bin=""
+    local max_retries="${CURSOR_EXT_MAX_RETRIES:-3}"
+    local retry_delay="${CURSOR_EXT_RETRY_DELAY_SEC:-5}"
+    local attempt=1
+    local rc=1
+    local output=""
+    local last_line=""
+
+    if [ "$CURSOR_EXT_AUTO_RETRY" != "1" ]; then
+        return 0
+    fi
+
+    if ! echo "$max_retries" | grep -qE '^[0-9]+$' || [ "$max_retries" -lt 1 ]; then
+        max_retries=3
+    fi
+    if ! echo "$retry_delay" | grep -qE '^[0-9]+$' || [ "$retry_delay" -lt 1 ]; then
+        retry_delay=5
+    fi
+
+    if [ -x "/opt/homebrew/bin/cursor" ]; then
+        cursor_bin="/opt/homebrew/bin/cursor"
+    elif command -v cursor >/dev/null 2>&1; then
+        cursor_bin="$(command -v cursor)"
+    else
+        echo -e "[Warn] 未找到 cursor 命令，跳过 Cursor extensions 自动修复。" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        return 0
+    fi
+
+    while [ "$attempt" -le "$max_retries" ]; do
+        echo -e "[Retry] Cursor extensions 自动修复：第 ${attempt}/${max_retries} 次（${cursor_bin} --update-extensions）" \
+            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
+        if [ "$(id -u)" -eq 0 ]; then
+            output="$(run_as_normal_user /bin/bash -lc "\"${cursor_bin}\" --update-extensions" 2>&1)"
+            rc=$?
+        else
+            output="$(/bin/bash -lc "\"${cursor_bin}\" --update-extensions" 2>&1)"
+            rc=$?
+        fi
+
+        printf "%s\n" "$output" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
+        if [ "$rc" -eq 0 ] || echo "$output" | grep -qiE 'No extension to update|No extension to install|No extension to upgrade'; then
+            echo -e "✅  Cursor extensions 自动修复成功。" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            return 0
+        fi
+
+        last_line="$(printf "%s\n" "$output" | awk 'NF{line=$0} END{print line}')"
+        [ -z "$last_line" ] && last_line="未知错误"
+        if [ "$attempt" -lt "$max_retries" ]; then
+            echo -e "[Warn] Cursor extensions 自动修复失败：${last_line}；${retry_delay}s 后重试..." \
+                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            sleep "$retry_delay"
+        else
+            echo -e "❌  Cursor extensions 自动修复最终失败：${last_line}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        fi
+        attempt=$((attempt + 1))
+    done
+
+    return 1
+}
+
 
 
 
@@ -7486,6 +7560,8 @@ echo -e ""                                                                      
 check_time_range "$STOP_TIME" "$DURATION_MINUTES" "$LOG_ERROR_FILE"
 
 targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+topgrade_output=""
+topgrade_rc=0
 if [[ $(id -u) -eq 0 ]]; then
     #—— root 环境：切换到桌面用户执行 ——#
     echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 topgrade 进行升级 ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -7493,6 +7569,7 @@ if [[ $(id -u) -eq 0 ]]; then
    #topgrade_output=$(sudo -n -H -u "$targetUser"  /bin/bash -c 'topgrade --disable brew_formula --disable brew_cask --disable sparkle --disable mas --disable macports --disable system --disable node --disable pnpm --disable powershell --disable tldr --disable tlmgr --disable ruby_gems --disable gem --disable containers --cleanup' 2>&1)
     echo -e "✓  不参与更新的模块 ：brew_formula \ brew_cask \ sparkle \ mas \ macports \ system \ tldr \ tlmgr \ ruby_gems \ gem \ containers ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     topgrade_output=$(sudo -n -H -u "$targetUser"  /bin/bash -c 'topgrade --disable brew_formula --disable brew_cask --disable sparkle --disable mas --disable macports --disable system --disable tldr --disable tlmgr --disable ruby_gems --disable gem --disable containers --cleanup' 2>&1)
+    topgrade_rc=$?
     printf "%s\n" "$topgrade_output"        | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 else
     #—— 非 root 环境：直接执行 ——#
@@ -7500,7 +7577,19 @@ else
    #echo -e "✓  不参与更新的模块 ：brew_formula \ brew_cask \ sparkle \ mas \ macports \ system \ node \ pnpm \ tldr \ tlmgr \ ruby_gems \ gem \ powershell \ containers ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
    #topgrade --disable brew_formula --disable brew_cask --disable sparkle --disable mas --disable macports --disable system --disable node --disable pnpm --disable powershell --disable tldr --disable tlmgr --disable ruby_gems --disable gem --disable containers --cleanup 2>&1   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     echo -e "✓  不参与更新的模块 ：brew_formula \ brew_cask \ sparkle \ mas \ macports \ system \ tldr \ tlmgr \ ruby_gems \ gem \ containers ... "  | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-    topgrade --disable brew_formula --disable brew_cask --disable sparkle --disable mas --disable macports --disable system --disable tldr --disable tlmgr --disable ruby_gems --disable gem --disable containers --cleanup 2>&1   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    topgrade_output=$(topgrade --disable brew_formula --disable brew_cask --disable sparkle --disable mas --disable macports --disable system --disable tldr --disable tlmgr --disable ruby_gems --disable gem --disable containers --cleanup 2>&1)
+    topgrade_rc=$?
+    printf "%s\n" "$topgrade_output" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+fi
+
+# TopGrade 内部 Cursor extensions 失败时，自动执行一次额外修复流程
+if printf "%s\n" "$topgrade_output" | grep -qiE 'Cursor extensions failed|Cursor extensions:[[:space:]]*FAILED|cursor --update-extensions'; then
+    echo -e "[Warn] 检测到 TopGrade 的 Cursor extensions 失败，开始自动修复..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    auto_retry_cursor_extensions_update || true
+fi
+
+if [ "$topgrade_rc" -ne 0 ]; then
+    echo -e "[Warn] TopGrade 返回非零退出码（rc=${topgrade_rc}），已继续执行后续流程。" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 fi
 
 
