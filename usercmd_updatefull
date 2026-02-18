@@ -21,7 +21,7 @@ export PATH="/usr/local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/opt/local/bin:
 export HOMEBREW_NO_COLOR=1
 
 # 脚本版本号：用于调试和确认是否使用最新脚本
-SCRIPT_VERSION="2026.02.19.v25"
+SCRIPT_VERSION="2026.02.19.v26"
 # 预先解析 GNU Parallel 的绝对路径。在某些 sudo 环境下 PATH 可能被重置，导致找不到 parallel。
 if command -v parallel >/dev/null 2>&1; then
     PARALLEL_BIN="$(command -v parallel)"
@@ -4696,10 +4696,10 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
 
     echo -e ""                                                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
-    # 第 2 步：并行下载（提高下载速度）
-    printf "\033[1;34m[Download]\033[0m "
-    printf "[Download] "                                                                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
-    echo -e "开始下载：HomeBrew Formula / Cask（ 并行 ） ... "                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    # 第 2 步：下载前缓存 / SHA256 预检查
+    printf "\033[1;34m[PreCheck]\033[0m "
+    printf "[PreCheck] "                                                                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "开始执行：HomeBrew 缓存 / SHA256 预检查 ... "                               | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     # 在下载前打印 SHA256 检查信息
     if [ "$(id -u)" -eq 0 ]; then
@@ -4913,6 +4913,12 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
     # 输出分隔线，表示缓存检查结束
    #echo -e "------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
+    # 进入真正下载阶段（将下载头与 SHA256 预检查分段，避免日志混淆）
+    echo -e ""                                                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    printf "\033[1;34m[Download]\033[0m "
+    printf "[Download] "                                                                | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" > /dev/null
+    echo -e "开始下载：HomeBrew Formula / Cask（ 并行 ） ... "                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
     # 输出并行下载提示信息，根据身份决定降权或直接运行
     if [ "$(id -u)" -eq 0 ]; then
         targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
@@ -4970,8 +4976,8 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             download_attempt=$((download_attempt + 1))
             # 在首次下载与重试之间增加头部提示，便于区分本次尝试是初次还是重试
             if [ "$download_attempt" -eq 1 ]; then
-                # 第一次下载
-                echo -e "✔︎  开始下载 [formula] : $pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                # 第一次下载：按要求不打印“开始下载”，仅在完成/重试时输出
+                :
             else
                 # 重试下载（给出上一次失败的大类原因）
                 retry_reason="网络或源站异常"
@@ -5169,7 +5175,8 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             # 清空 HOMEBREW_CASK_OPTS 环境变量，保证 brew fetch 只接受必要参数。
             # 在首次下载与重试之间增加头部提示
             if [ "$download_attempt" -eq 1 ]; then
-                echo -e "✔︎  开始下载 [cask]    : $pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                # 第一次下载：按要求不打印“开始下载”，仅在完成/重试时输出
+                :
             else
                 retry_reason="网络或源站异常"
                 retry_url=""
@@ -5257,7 +5264,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             echo -e "✔︎  下载完成 [cask]    : $pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             echo "$pkg" >> "$SUCCESS_FETCH_CASKS_FILE"
         else
-            echo -e "✘  下载失败 [cask]    : $pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            # 失败包统一在阶段汇总里用“❌ 下载失败 [cask]”输出，避免重复打印
             # 在提取下载链接前确认临时文件存在，避免 grep 对已删除文件报错
             if [[ -f "$tmpfile" ]]; then
                 url=$(grep -oE 'https?://[^[:space:]]+' "$tmpfile" 2>/dev/null | tail -n1 || true)
