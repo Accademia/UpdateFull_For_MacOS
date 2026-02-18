@@ -21,7 +21,7 @@ export PATH="/usr/local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/opt/local/bin:
 export HOMEBREW_NO_COLOR=1
 
 # 脚本版本号：用于调试和确认是否使用最新脚本
-SCRIPT_VERSION="2026.02.19.v24"
+SCRIPT_VERSION="2026.02.19.v25"
 # 预先解析 GNU Parallel 的绝对路径。在某些 sudo 环境下 PATH 可能被重置，导致找不到 parallel。
 if command -v parallel >/dev/null 2>&1; then
     PARALLEL_BIN="$(command -v parallel)"
@@ -109,6 +109,13 @@ MAS_PARALLEL_JOBS=2
 # 例如：HOMEBREW_FETCH_JOBS=32 /usr/local/bin/usercmd_updatefull_NonMacUpdater
 HOMEBREW_FETCH_JOBS="${HOMEBREW_FETCH_JOBS:-32}"
 export HOMEBREW_FETCH_JOBS
+
+# ===== HomeBrew 过期扫描来源设置 =====
+# update   : 仅使用 brew update 阶段列表（快，但会漏掉大量 --greedy cask）
+# auto     : 优先执行 brew outdated --greedy，失败时回退到 update 列表（推荐）
+# realtime : 仅执行 brew outdated --greedy，不回退
+HOMEBREW_OUTDATED_SOURCE="${HOMEBREW_OUTDATED_SOURCE:-auto}"
+export HOMEBREW_OUTDATED_SOURCE
 
 # ===== TopGrade Cursor 扩展失败自动修复 =====
 # 当 TopGrade 的 Cursor extensions 步骤失败时，自动重试 cursor --update-extensions
@@ -4551,7 +4558,7 @@ fi
 
 brew_scan_used_fallback=0
 brew_scan_force_update=0
-brew_scan_source="${HOMEBREW_OUTDATED_SOURCE:-update}"   # update | auto | realtime
+brew_scan_source="${HOMEBREW_OUTDATED_SOURCE:-auto}"   # update | auto | realtime
 
 if [ "$brew_scan_source" = "update" ]; then
   brew_scan_force_update=1
