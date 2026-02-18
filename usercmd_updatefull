@@ -21,7 +21,7 @@ export PATH="/usr/local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/opt/local/bin:
 export HOMEBREW_NO_COLOR=1
 
 # 脚本版本号：用于调试和确认是否使用最新脚本
-SCRIPT_VERSION="2026.02.18.v22"
+SCRIPT_VERSION="2026.02.19.v23"
 # 预先解析 GNU Parallel 的绝对路径。在某些 sudo 环境下 PATH 可能被重置，导致找不到 parallel。
 if command -v parallel >/dev/null 2>&1; then
     PARALLEL_BIN="$(command -v parallel)"
@@ -5556,12 +5556,12 @@ EOF
             if [ "$(id -u)" -eq 0 ]; then
                 # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
                 targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-                echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_formula 升级 ( brew upgrade $pkg_brew_formula --verbose --debug ) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+                echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_formula 升级 ( brew upgrade --formula $pkg_brew_formula --verbose --debug ) ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
                 # 以目标用户身份执行 HomeBrew 命令
-                sudo -n -H -u "$targetUser" env TMPDIR="/tmp" TMP="/tmp" TEMP="/tmp" HOMEBREW_TEMP="/tmp" bash -c "brew upgrade $pkg_brew_formula 2>&1" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_formula_tmpfile"
+                sudo -n -H -u "$targetUser" env TMPDIR="/tmp" TMP="/tmp" TEMP="/tmp" HOMEBREW_TEMP="/tmp" bash -c "brew upgrade --formula \"$pkg_brew_formula\" 2>&1" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_formula_tmpfile"
             else
-                echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 $pkg_brew_formula 升级 ( brew upgrade $pkg_brew_formula --verbose --debug ) ... "                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
-                brew upgrade "$pkg_brew_formula" 2>&1                                                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_formula_tmpfile" 
+                echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 $pkg_brew_formula 升级 ( brew upgrade --formula $pkg_brew_formula --verbose --debug ) ... "                 | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" 
+                brew upgrade --formula "$pkg_brew_formula" 2>&1                                                                    | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE" "$brew_formula_tmpfile" 
             fi
 
             brew_formula_upgrade_exit=${PIPESTATUS[0]}        # 取 brew upgrade 的退出码
@@ -5641,24 +5641,24 @@ EOF
                         rm -f "$brew_formula_tmpfile"
                         continue   # 进入下一个 formula 处理
                     else
-                        echo -e "⚠️  符号链接 失败 [formula] $pkg_brew_formula ，继续尝试 重新安装 ( brew reinstall $pkg_brew_formula --verbose --debug ) ... "                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        echo -e "⚠️  符号链接 失败 [formula] $pkg_brew_formula ，继续尝试 重新安装 ( brew reinstall --formula $pkg_brew_formula --verbose --debug ) ... "                   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     fi
 
                     # 若强制链接仍失败，下面会继续执行重装逻辑
                 fi
 
                 # 第三次尝试升级：通过 brew reinstall  升级 formula APP
-                echo -e "⚠️ upgrade 失败，尝试 重装 ( brew reinstall $pkg_brew_formula --verbose --debug ) ... "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "⚠️ upgrade 失败，尝试 重装 ( brew reinstall --formula $pkg_brew_formula --verbose --debug ) ... "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 # 检查是否以 root 身份运行
                 if [ "$(id -u)" -eq 0 ]; then
                     # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
                     targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-                    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_formula 重装 ( brew reinstall $pkg_brew_formula --verbose --debug )  ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_formula 重装 ( brew reinstall --formula $pkg_brew_formula --verbose --debug )  ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     # 以目标用户身份执行 HomeBrew 命令
-                    sudo -n -H -u "$targetUser" env TMPDIR="/tmp" TMP="/tmp" TEMP="/tmp" HOMEBREW_TEMP="/tmp" bash -c "brew reinstall $pkg_brew_formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    sudo -n -H -u "$targetUser" env TMPDIR="/tmp" TMP="/tmp" TEMP="/tmp" HOMEBREW_TEMP="/tmp" bash -c "brew reinstall --formula \"$pkg_brew_formula\" 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 else
-                    echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 $pkg_brew_formula 重装 ( brew reinstall $pkg_brew_formula --verbose --debug ) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                    brew reinstall "$pkg_brew_formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 $pkg_brew_formula 重装 ( brew reinstall --formula $pkg_brew_formula --verbose --debug ) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    brew reinstall --formula "$pkg_brew_formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 fi
 
                 brew_formula_reinstall_exit=${PIPESTATUS[0]}  # 取 brew reinstall 的退出码
@@ -5666,17 +5666,17 @@ EOF
 
                 # 第四次尝试升级：通过 brew reinstall --force 升级 formula APP
                 if [ $brew_formula_reinstall_exit -ne 0 ]; then
-                    echo -e "⚠️ reinstall 失败，尝试 强制重装 ( brew reinstall --force $pkg_brew_formula --verbose --debug ) ... "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    echo -e "⚠️ reinstall 失败，尝试 强制重装 ( brew reinstall --formula --force $pkg_brew_formula --verbose --debug ) ... "                                            | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     # 检查是否以 root 身份运行
                     if [ "$(id -u)" -eq 0 ]; then
                         # 获取目标普通用户（优先用SUDO_USER，否则尝试控制台登录用户）
                         targetUser="${SUDO_USER:-$(stat -f "%Su" /dev/console)}"
-                        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_formula 强制重装 ( brew reinstall --force $pkg_brew_formula --verbose --debug )  ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        echo -e "✓  Root权限 降权至 普通权限 ( $targetUser ) 后 , 再运行 $pkg_brew_formula 强制重装 ( brew reinstall --formula --force $pkg_brew_formula --verbose --debug )  ... "   | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                         # 以目标用户身份执行 HomeBrew 命令
-                        sudo -n -H -u "$targetUser" env TMPDIR="/tmp" TMP="/tmp" TEMP="/tmp" HOMEBREW_TEMP="/tmp" bash -c "brew reinstall --force $pkg_brew_formula 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        sudo -n -H -u "$targetUser" env TMPDIR="/tmp" TMP="/tmp" TEMP="/tmp" HOMEBREW_TEMP="/tmp" bash -c "brew reinstall --formula --force \"$pkg_brew_formula\" 2>&1"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     else
-                        echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 $pkg_brew_formula 强制重装 ( brew reinstall --force $pkg_brew_formula --verbose --debug ) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                        brew reinstall --force "$pkg_brew_formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        echo -e "✓  当前用户 '$USER' 为普通权限，直接运行 $pkg_brew_formula 强制重装 ( brew reinstall --formula --force $pkg_brew_formula --verbose --debug ) ... "                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                        brew reinstall --formula --force "$pkg_brew_formula" 2>&1                                                      | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                     fi
                     brew_formula_reinstall_force_exit=${PIPESTATUS[0]}  # 取 brew reinstall 的退出码
                     brew_formula_final_exit=$brew_formula_reinstall_force_exit
