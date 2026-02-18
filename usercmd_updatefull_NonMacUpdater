@@ -21,7 +21,7 @@ export PATH="/usr/local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/opt/local/bin:
 export HOMEBREW_NO_COLOR=1
 
 # 脚本版本号：用于调试和确认是否使用最新脚本
-SCRIPT_VERSION="2026.02.19.v23"
+SCRIPT_VERSION="2026.02.19.v24"
 # 预先解析 GNU Parallel 的绝对路径。在某些 sudo 环境下 PATH 可能被重置，导致找不到 parallel。
 if command -v parallel >/dev/null 2>&1; then
     PARALLEL_BIN="$(command -v parallel)"
@@ -4980,9 +4980,9 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                     retry_url=$(grep -oE 'https?://[^[:space:]]+' "$tmpfile" 2>/dev/null | tail -n1 || true)
                 fi
                 if [ -n "$retry_url" ]; then
-                    echo -e "✔︎  重试中   [formula] : $pkg  ( 原因 : $retry_reason ; 下载地址 :  $retry_url  )" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    echo -e "↺  重试中   [formula] : $pkg  ( 原因 : $retry_reason ; 下载地址 :  $retry_url  )" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 else
-                    echo -e "✔︎  重试中   [formula] : $pkg  ( 原因 : $retry_reason )" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    echo -e "↺  重试中   [formula] : $pkg  ( 原因 : $retry_reason )" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 fi
             fi
             # 调用 brew fetch 下载 formula（不设置超时，按用户要求无限等待）
@@ -5177,9 +5177,9 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                     retry_url=$(grep -oE 'https?://[^[:space:]]+' "$tmpfile" 2>/dev/null | tail -n1 || true)
                 fi
                 if [ -n "$retry_url" ]; then
-                    echo -e "✔︎  重试中   [cask]    : $pkg  ( 原因 : $retry_reason ; 下载地址 :  $retry_url  )" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    echo -e "↺  重试中   [cask]    : $pkg  ( 原因 : $retry_reason ; 下载地址 :  $retry_url  )" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 else
-                    echo -e "✔︎  重试中   [cask]    : $pkg  ( 原因 : $retry_reason )" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    echo -e "↺  重试中   [cask]    : $pkg  ( 原因 : $retry_reason )" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
                 fi
             fi
             # 调用 brew fetch 下载 cask（不设置超时，按用户要求无限等待）
@@ -5343,8 +5343,6 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         # run_as_normal_user 将下载函数在普通用户环境下执行。这样可以避免 sudo 在并行环境下的复杂权限问题。
         xargs_formula_script=""
         xargs_cask_script=""
-        formula_dl_pid=""
-        cask_dl_pid=""
         if [ $total_formula_count -gt 0 ]; then
           # 创建临时脚本用于 formula 下载
           xargs_formula_script=$(mktemp "/tmp/brew_xargs_formula.XXXXXX")
@@ -5356,9 +5354,8 @@ functions_file="$2"
 run_as_normal_user bash -lc "source \"${functions_file}\"; fetch_brew_formula \"${pkg}\""
 EOF
           chmod +x "$xargs_formula_script"
-          # 使用 xargs 在 root 环境下并行运行脚本。传入包名和函数文件路径
-          printf '%s\n' "${packages_to_fetch_formulas[@]}" | xargs -n1 -P"$formula_jobs" -I {} bash "$xargs_formula_script" "{}" "$functions_file" &
-          formula_dl_pid=$!
+          # 先并行下载 formula，待全部完成后再进入 cask 下载阶段，保证日志输出更规整
+          printf '%s\n' "${packages_to_fetch_formulas[@]}" | xargs -n1 -P"$formula_jobs" -I {} bash "$xargs_formula_script" "{}" "$functions_file"
         fi
         if [ $total_cask_count -gt 0 ]; then
           xargs_cask_script=$(mktemp "/tmp/brew_xargs_cask.XXXXXX")
@@ -5369,28 +5366,22 @@ functions_file="$2"
 run_as_normal_user bash -lc "source \"${functions_file}\"; fetch_brew_cask \"${pkg}\""
 EOF
           chmod +x "$xargs_cask_script"
-          printf '%s\n' "${packages_to_fetch_casks[@]}" | xargs -n1 -P"$cask_jobs" -I {} bash "$xargs_cask_script" "{}" "$functions_file" &
-          cask_dl_pid=$!
+          # formula 阶段完成后，再并行下载 cask
+          printf '%s\n' "${packages_to_fetch_casks[@]}" | xargs -n1 -P"$cask_jobs" -I {} bash "$xargs_cask_script" "{}" "$functions_file"
         fi
-        [ -n "$formula_dl_pid" ] && wait "$formula_dl_pid" || true
-        [ -n "$cask_dl_pid" ] && wait "$cask_dl_pid" || true
         [ -n "$xargs_formula_script" ] && rm -f "$xargs_formula_script"
         [ -n "$xargs_cask_script" ] && rm -f "$xargs_cask_script"
       else
         # 非 root 时，不使用临时函数文件，直接调用导出的函数进行并行下载。
         # fetch_brew_formula 与 fetch_brew_cask 已在前文通过 export -f 导出，可直接供 GNU parallel 调用。
-        formula_dl_pid=""
-        cask_dl_pid=""
         if [ $total_formula_count -gt 0 ]; then
-          "$PARALLEL_BIN" --will-cite --line-buffer --unsafe -j"$formula_jobs" fetch_brew_formula ::: "${packages_to_fetch_formulas[@]}" &
-          formula_dl_pid=$!
+          # 先并行下载 formula，待全部完成后再进入 cask 下载阶段，保证日志输出更规整
+          "$PARALLEL_BIN" --will-cite --line-buffer --unsafe -j"$formula_jobs" fetch_brew_formula ::: "${packages_to_fetch_formulas[@]}"
         fi
         if [ $total_cask_count -gt 0 ]; then
-          "$PARALLEL_BIN" --will-cite --line-buffer --unsafe -j"$cask_jobs" fetch_brew_cask ::: "${packages_to_fetch_casks[@]}" &
-          cask_dl_pid=$!
+          # formula 阶段完成后，再并行下载 cask
+          "$PARALLEL_BIN" --will-cite --line-buffer --unsafe -j"$cask_jobs" fetch_brew_cask ::: "${packages_to_fetch_casks[@]}"
         fi
-        [ -n "$formula_dl_pid" ] && wait "$formula_dl_pid" || true
-        [ -n "$cask_dl_pid" ] && wait "$cask_dl_pid" || true
       fi
       # 清理临时文件
       rm -f "$functions_file"
