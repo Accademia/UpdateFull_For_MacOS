@@ -21,7 +21,7 @@ export PATH="/usr/local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/opt/local/bin:
 export HOMEBREW_NO_COLOR=1
 
 # 脚本版本号：用于调试和确认是否使用最新脚本
-SCRIPT_VERSION="2026.02.17.v15"
+SCRIPT_VERSION="2026.02.18.v22"
 # 预先解析 GNU Parallel 的绝对路径。在某些 sudo 环境下 PATH 可能被重置，导致找不到 parallel。
 if command -v parallel >/dev/null 2>&1; then
     PARALLEL_BIN="$(command -v parallel)"
@@ -4550,17 +4550,24 @@ else
 fi
 
 brew_scan_used_fallback=0
-brew_scan_source="${HOMEBREW_OUTDATED_SOURCE:-update}"   # update | realtime
+brew_scan_force_update=0
+brew_scan_source="${HOMEBREW_OUTDATED_SOURCE:-update}"   # update | auto | realtime
 
 if [ "$brew_scan_source" = "update" ]; then
+  brew_scan_force_update=1
   brew_outdated_formulas="$(extract_brew_update_outdated_from_log formula)"
   brew_outdated_casks="$(extract_brew_update_outdated_from_log cask)"
   brew_outdated_formulas_rc=0
   brew_outdated_casks_rc=0
   brew_scan_used_fallback=1
-  echo -e "[Info] 已使用 brew update 阶段的过期列表（跳过 brew outdated 实时扫描，避免锁冲突/长时间等待）。" \
+  echo -e "[Info] 已按配置使用 brew update 阶段的过期列表（跳过 brew outdated 实时扫描）。" \
     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 else
+  if [ "$brew_scan_source" != "realtime" ] && [ "$brew_scan_source" != "auto" ]; then
+    echo -e "[Warn] HOMEBREW_OUTDATED_SOURCE='${brew_scan_source}' 无效，已回退为 auto。" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    brew_scan_source="auto"
+  fi
+
   brew_outdated_formulas=$(scan_brew_outdated formula)
   brew_outdated_formulas_rc=$?
   brew_outdated_casks=$(scan_brew_outdated cask)
@@ -4640,7 +4647,7 @@ if [ "$brew_outdated_formulas_rc" -ne 0 ] || [ "$brew_outdated_casks_rc" -ne 0 ]
     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
   echo -e "[Warn] 可能原因：HomeBrew 锁文件权限异常、并发任务冲突或网络/API 错误；请先处理上方 brew 报错后重试" \
     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-elif [ "$brew_scan_used_fallback" -eq 1 ]; then
+elif [ "$brew_scan_used_fallback" -eq 1 ] && [ "${brew_scan_force_update:-0}" -ne 1 ]; then
   echo -e "[Warn] HomeBrew 本轮使用了回退列表，建议后续修复 brew 锁冲突后再次执行以确保结果完全准确" \
     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 fi
@@ -4704,7 +4711,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
     cached_formula_entries=()
     cached_cask_entries=()
     skip_sha256_prefetch_check=0
-    if [ "${HOMEBREW_SKIP_SHA256_PREFLIGHT_ON_FALLBACK:-1}" = "1" ] && [ "${brew_scan_used_fallback:-0}" -eq 1 ]; then
+    if [ "${HOMEBREW_SKIP_SHA256_PREFLIGHT_ON_FALLBACK:-1}" = "1" ] && [ "${brew_scan_used_fallback:-0}" -eq 1 ] && [ "${brew_scan_force_update:-0}" -ne 1 ]; then
         skip_sha256_prefetch_check=1
         echo -e "⚠️  检测到 brew 扫描回退，本轮跳过 SHA256 预检查，直接下载以避免锁冲突阻塞。" \
           | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -4798,9 +4805,22 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                     cached_formula_entries+=("$pkg_brew_formula|$brew_expected_sha")
                     continue
                 else
-                    echo -e "⚠️  [SHA256异常] $pkg_brew_formula [formula]" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                    echo -e "   -  已下载包 ：$local_sha " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                    echo -e "   -  homebrew ：$brew_expected_sha " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                    local_sha_short="$local_sha"
+                    if [ -n "$local_sha_short" ] && [ "${#local_sha_short}" -gt 20 ]; then
+                        local_sha_short="${local_sha_short:0:12}...${local_sha_short:$((${#local_sha_short}-8)):8}"
+                    fi
+                    if [ -n "$brew_expected_sha" ]; then
+                        expected_sha_short="$brew_expected_sha"
+                        if [ "${#expected_sha_short}" -gt 20 ]; then
+                            expected_sha_short="${expected_sha_short:0:12}...${expected_sha_short:$((${#expected_sha_short}-8)):8}"
+                        fi
+                        sha_reason="缓存包与 HomeBrew 记录不一致"
+                    else
+                        expected_sha_short="(未获取)"
+                        sha_reason="未获取到 HomeBrew 期望校验值"
+                    fi
+                    # 预检查阶段仅记录日志，不额外打印“校验提示”，避免与下载阶段提示重复。
+                    echo "[Debug] [prefetch][formula:$pkg_brew_formula] reason=$sha_reason ; cache=$brew_cache_path ; local=$local_sha ; expected=$brew_expected_sha ; local_short=$local_sha_short ; expected_short=$expected_sha_short" >> "$LOG_FULL_FILE"
                 fi
             fi
 
@@ -4838,6 +4858,17 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                     cached_casks+=("$pkg_brew_cask")
                     cached_cask_entries+=("$pkg_brew_cask|$brew_expected_sha")
                     continue
+                else
+                    local_sha_short="$local_sha"
+                    if [ -n "$local_sha_short" ] && [ "${#local_sha_short}" -gt 20 ]; then
+                        local_sha_short="${local_sha_short:0:12}...${local_sha_short:$((${#local_sha_short}-8)):8}"
+                    fi
+                    expected_sha_short="$brew_expected_sha"
+                    if [ -n "$expected_sha_short" ] && [ "${#expected_sha_short}" -gt 20 ]; then
+                        expected_sha_short="${expected_sha_short:0:12}...${expected_sha_short:$((${#expected_sha_short}-8)):8}"
+                    fi
+                    # 预检查阶段仅记录日志，不额外打印“校验提示”，避免与下载阶段提示重复。
+                    echo "[Debug] [prefetch][cask:$pkg_brew_cask] reason=缓存包与 HomeBrew 记录不一致 ; cache=$brew_cache_path ; local=$local_sha ; expected=$brew_expected_sha ; local_short=$local_sha_short ; expected_short=$expected_sha_short" >> "$LOG_FULL_FILE"
                 fi
             fi
 
@@ -4846,9 +4877,11 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
     fi
 
 
-    # 根据缓存列表打印缓存摘要。如果存在缓存条目则打印详细信息；否则提示无缓存。
-    if [ ${#cached_formula_entries[@]} -eq 0 ] && [ ${#cached_cask_entries[@]} -eq 0 ]; then
-        echo -e "✔︎  无缓存的安装包" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    # 根据缓存列表打印缓存摘要。如果跳过预检查则提示“状态未知”；否则按命中情况输出。
+    if [ "$skip_sha256_prefetch_check" -eq 1 ]; then
+        echo -e "⚠️  已跳过缓存预检查（缓存状态未知）。" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    elif [ ${#cached_formula_entries[@]} -eq 0 ] && [ ${#cached_cask_entries[@]} -eq 0 ]; then
+        echo -e "✔︎  无缓存的安装包（经 SHA256 预检查确认）" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     else
         # 打印 formula 缓存详细信息
         for entry in "${cached_formula_entries[@]}"; do
@@ -4864,7 +4897,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             sha="${entry#*|}"
             # 如果 sha 标记为 no_check 或为空，则打印无校验版
             if [ "$sha" = "no_check" ] || [ -z "$sha" ] || [ "$sha" = "null" ]; then
-                echo -e "✅  [已缓存] 无校验版 ｜ [cask] ：：$pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "✅  [已缓存] 无校验版 ｜ [cask] : $pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             else
                 echo -e "✅  [已缓存] 最新版 ｜ SHA256 ：$sha ｜    [cask] ：$pkg  " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             fi
@@ -4924,16 +4957,33 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         local max_sha_retry=${SHA_MISMATCH_MAX_RETRIES:-2}
         local download_attempt=0
         local sha_attempt=0
+        local success_note=""
         # 循环尝试：根据错误类型分别重试
         while true; do
             download_attempt=$((download_attempt + 1))
             # 在首次下载与重试之间增加头部提示，便于区分本次尝试是初次还是重试
             if [ "$download_attempt" -eq 1 ]; then
                 # 第一次下载
-                echo -e "✔︎  开始下载 [formula] ：$pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "✔︎  开始下载 [formula] : $pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             else
-                # 重试下载
-                echo -e "✔︎  重试中   [formula] ：$pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                # 重试下载（给出上一次失败的大类原因）
+                retry_reason="网络或源站异常"
+                retry_url=""
+                if [[ -f "$tmpfile" ]] && grep -qiE 'different checksum|checksum does not match|sha[- ]?256 mismatch|cask reports different checksum|sha-256 checksum of downloaded file' "$tmpfile"; then
+                    retry_reason="校验不一致"
+                elif [[ -f "$tmpfile" ]] && grep -qiE 'timed out|timeout|operation timed out' "$tmpfile"; then
+                    retry_reason="下载超时"
+                elif [[ -f "$tmpfile" ]] && grep -qiE 'could not resolve host|name or service not known|temporary failure in name resolution|nodename nor servname provided' "$tmpfile"; then
+                    retry_reason="DNS 解析失败"
+                fi
+                if [[ -f "$tmpfile" ]]; then
+                    retry_url=$(grep -oE 'https?://[^[:space:]]+' "$tmpfile" 2>/dev/null | tail -n1 || true)
+                fi
+                if [ -n "$retry_url" ]; then
+                    echo -e "✔︎  重试中   [formula] : $pkg  ( 原因 : $retry_reason ; 下载地址 :  $retry_url  )" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                else
+                    echo -e "✔︎  重试中   [formula] : $pkg  ( 原因 : $retry_reason )" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                fi
             fi
             # 调用 brew fetch 下载 formula（不设置超时，按用户要求无限等待）
             env HOMEBREW_NO_AUTO_UPDATE=1 brew fetch --formula --retry "$pkg" 2>&1 \
@@ -5030,9 +5080,12 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                 # 三方值输出，供排查
                 [ -z "$brew_expected_sha" ] && brew_expected_sha="(未获取)"
                 [ -z "$registry_sha" ] && registry_sha="(未获取)"
-                echo -e "      expected(formula)=$brew_expected_sha" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                echo -e "      expected(registry)=$registry_sha"     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-                echo -e "      local=$local_sha"                     | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                if [ "$brew_expected_sha" = "(未获取)" ]; then
+                    success_note="原因 : 校验值缺失 ; local_sha256 : ${local_sha:-未获取}"
+                else
+                    success_note="原因 : 校验值不一致 ; expected_sha256 : ${brew_expected_sha:-未获取} ; local_sha256 : ${local_sha:-未获取}"
+                fi
+                echo "[Debug] [formula:$pkg] expected(formula)=$brew_expected_sha ; expected(registry)=$registry_sha ; local=$local_sha" >> "$LOG_FULL_FILE"
                 success=2
                 break
             else
@@ -5042,8 +5095,12 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         done
         # 根据成功与否记录结果：成功(1/2)则写入成功文件，其余视为失败
         if [ "$success" -eq 1 ] || [ "$success" -eq 2 ]; then
-            # 成功下载 formula，将包名记录到成功文件。此处不输出成功信息，由汇总阶段统一处理
-            echo -e "✔︎  下载完成 [formula] ：$pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            # 成功下载 formula，将包名记录到成功文件；若存在校验提示则合并到完成行，避免重复提示。
+            if [ -n "$success_note" ]; then
+                echo -e "✔︎  下载完成 [formula] : $pkg  ( ⚠️  $success_note )" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            else
+                echo -e "✔︎  下载完成 [formula] : $pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            fi
             echo "$pkg" >> "$SUCCESS_FETCH_FORMULAS_FILE"
         else
             echo -e "❌  下载失败 [formula] ：$pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -5105,9 +5162,25 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             # 清空 HOMEBREW_CASK_OPTS 环境变量，保证 brew fetch 只接受必要参数。
             # 在首次下载与重试之间增加头部提示
             if [ "$download_attempt" -eq 1 ]; then
-                echo -e "✔︎  开始下载 [cask]    ：$pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                echo -e "✔︎  开始下载 [cask]    : $pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             else
-                echo -e "✔︎  重试中   [cask]    ：$pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                retry_reason="网络或源站异常"
+                retry_url=""
+                if [[ -f "$tmpfile" ]] && grep -qiE 'different checksum|checksum does not match|sha[- ]?256 mismatch|cask reports different checksum|sha-256 checksum of downloaded file' "$tmpfile"; then
+                    retry_reason="校验不一致"
+                elif [[ -f "$tmpfile" ]] && grep -qiE 'timed out|timeout|operation timed out' "$tmpfile"; then
+                    retry_reason="下载超时"
+                elif [[ -f "$tmpfile" ]] && grep -qiE 'could not resolve host|name or service not known|temporary failure in name resolution|nodename nor servname provided' "$tmpfile"; then
+                    retry_reason="DNS 解析失败"
+                fi
+                if [[ -f "$tmpfile" ]]; then
+                    retry_url=$(grep -oE 'https?://[^[:space:]]+' "$tmpfile" 2>/dev/null | tail -n1 || true)
+                fi
+                if [ -n "$retry_url" ]; then
+                    echo -e "✔︎  重试中   [cask]    : $pkg  ( 原因 : $retry_reason ; 下载地址 :  $retry_url  )" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                else
+                    echo -e "✔︎  重试中   [cask]    : $pkg  ( 原因 : $retry_reason )" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                fi
             fi
             # 调用 brew fetch 下载 cask（不设置超时，按用户要求无限等待）
             env HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_CASK_OPTS="" brew fetch --cask --retry "$pkg" 2>&1 \
@@ -5174,7 +5247,7 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         # 根据成功与否记录结果：成功(1/2)则写入成功文件，其余视为失败
         if [ "$success" -eq 1 ] || [ "$success" -eq 2 ]; then
             # 成功下载 cask，将包名记录到成功文件。此处不输出成功信息，由汇总阶段统一处理
-            echo -e "✔︎  下载完成 [cask]    ：$pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            echo -e "✔︎  下载完成 [cask]    : $pkg" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
             echo "$pkg" >> "$SUCCESS_FETCH_CASKS_FILE"
         else
             echo -e "✘  下载失败 [cask]    : $pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
@@ -5223,7 +5296,6 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
       brew_fetch_jobs="$PARALLEL_JOBS"
     fi
     [ "$brew_fetch_jobs" -gt 64 ] && brew_fetch_jobs=64
-    echo -e "[Info] HomeBrew 并行下载参数：jobs=${brew_fetch_jobs}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
     total_formula_count=${#packages_to_fetch_formulas[@]}
     total_cask_count=${#packages_to_fetch_casks[@]}
@@ -5238,7 +5310,11 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
     fi
     [ "$formula_jobs" -gt 64 ] && formula_jobs=64
     [ "$cask_jobs" -gt 64 ] && cask_jobs=64
-    echo -e "[Info] HomeBrew 下载并发分配：formula=${formula_jobs}，cask=${cask_jobs}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    if [ "$formula_jobs" -eq "$brew_fetch_jobs" ] && [ "$cask_jobs" -eq "$brew_fetch_jobs" ]; then
+      echo -e "[Info] HomeBrew 并行下载参数：jobs=${brew_fetch_jobs}，formula=${formula_jobs}，cask=${cask_jobs}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    else
+      echo -e "[Info] HomeBrew 并行下载参数：jobs=${brew_fetch_jobs}，分配 formula=${formula_jobs}，cask=${cask_jobs}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    fi
     if [ $total_formula_count -gt 0 ] || [ $total_cask_count -gt 0 ]; then
       # 将下载函数定义写入临时文件
       # 在 /tmp 下创建函数定义文件，避免目录权限限制导致普通用户无法读取
@@ -5381,31 +5457,31 @@ EOF
        ## 如果存在成功的包，则打印成功列表；否则仍然打印一条分隔线，以便后续统计与下载提示之间有隔断
        #if [ ${#success_formulas_list[@]} -gt 0 ] || [ ${#success_casks_list[@]} -gt 0 ]; then
        #    for pkg in "${success_formulas_list[@]}"; do
-       #        echo -e "✔︎  下载成功 [formula] : $pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+       #        echo -e "✅ 下载成功 [formula] : $pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
        #    done
        #    for pkg in "${success_casks_list[@]}"; do
-       #        echo -e "✔︎  下载成功 [cask]    : $pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+       #        echo -e "✅ 下载成功 [cask]    : $pkg " | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
        #    done
        #fi
         #echo -e "------------------------------" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 打印成功统计
-        echo -e "✔︎  下载成功 [formula] : $success_formula/$total_formula_count" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-        echo -e "✔︎  下载成功 [cask]    : $success_cask/$total_cask_count" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✅ 下载成功 [formula] : $success_formula/$total_formula_count" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        echo -e "✅ 下载成功 [cask]    : $success_cask/$total_cask_count" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         # 输出失败软件列表 [WARNING]
         if [ "$failed_formula" -gt 0 ]; then
             formula_fail_list=$(cut -d'|' -f1 < "$FAILED_FETCH_FORMULAS_FILE" | xargs)
-            echo -e "✘  未完成的 formula 列表：$formula_fail_list" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            echo -e "❌ 下载失败 [formula] : $formula_fail_list" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         fi
         if [ "$failed_cask" -gt 0 ]; then
             cask_fail_list=$(cut -d'|' -f1 < "$FAILED_FETCH_CASKS_FILE" | xargs)
-            echo -e "✘  下载失败 [cask]    : $cask_fail_list" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            echo -e "❌ 下载失败 [cask]    : $cask_fail_list" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         fi
         # 输出未知软件列表 [WARNING]
         if [ ${#unknown_formulas[@]} -gt 0 ]; then
-            echo -e "✘  未完成（未知状态）的 formula 列表：${unknown_formulas[*]}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            echo -e "❌ 未完成的 [formula] : ${unknown_formulas[*]}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         fi
         if [ ${#unknown_casks[@]} -gt 0 ]; then
-            echo -e "✘  未完成（未知状态）的 cask    列表：${unknown_casks[*]}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+            echo -e "❌ 未完成的 [cask]    : ${unknown_casks[*]}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
         fi
     else
         # 如果没有任何下载任务，则输出“所有下载已全部完成”并统计扫描包数量
