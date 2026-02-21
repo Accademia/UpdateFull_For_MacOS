@@ -110,6 +110,15 @@ MAS_PARALLEL_JOBS=2
 HOMEBREW_FETCH_JOBS="${HOMEBREW_FETCH_JOBS:-32}"
 export HOMEBREW_FETCH_JOBS
 
+# ===== HomeBrew SHA256 预检查并行度设置 =====
+# 该并发仅用于下载前的缓存探测与 SHA256 比对，默认 8，避免对源站造成过高压力。
+HOMEBREW_PRECHECK_JOBS="${HOMEBREW_PRECHECK_JOBS:-8}"
+if ! echo "$HOMEBREW_PRECHECK_JOBS" | grep -qE '^[0-9]+$' || [ "$HOMEBREW_PRECHECK_JOBS" -lt 1 ]; then
+    HOMEBREW_PRECHECK_JOBS=8
+fi
+[ "$HOMEBREW_PRECHECK_JOBS" -gt 32 ] && HOMEBREW_PRECHECK_JOBS=32
+export HOMEBREW_PRECHECK_JOBS
+
 # 下载阶段“元信息行”（如 ✔︎ Cask xxx (ver)）左列宽度。用于与"| 下载链接"对齐。
 # 默认值设置为 40，让分隔竖线更靠近（可用 BREW_FETCH_META_WIDTH 覆盖）。
 BREW_FETCH_META_WIDTH="${BREW_FETCH_META_WIDTH:-40}"
@@ -4784,61 +4793,254 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
     # 筛选需要下载的 formula / cask 软件包：若缓存命中则跳过下载
     packages_to_fetch_formulas=()
     packages_to_fetch_casks=()
+    precheck_jobs="${HOMEBREW_PRECHECK_JOBS:-8}"
+    if ! echo "$precheck_jobs" | grep -qE '^[0-9]+$' || [ "$precheck_jobs" -lt 1 ]; then
+        precheck_jobs=8
+    fi
+    if echo "${PARALLEL_JOBS:-}" | grep -qE '^[0-9]+$' && [ "$PARALLEL_JOBS" -gt 0 ] && [ "$precheck_jobs" -gt "$PARALLEL_JOBS" ]; then
+        precheck_jobs="$PARALLEL_JOBS"
+    fi
+
+    precheck_wait_slot() {
+        local __limit="$1"
+        local __running=0
+        while true; do
+            __running=$(jobs -pr | wc -l | tr -d ' ')
+            [ -z "$__running" ] && __running=0
+            [ "$__running" -lt "$__limit" ] && break
+            sleep 0.05
+        done
+    }
+
+    precheck_get_cache_path() {
+        local __kind="$1"
+        local __pkg="$2"
+        local __cache_path=""
+        if [ "$(id -u)" -eq 0 ]; then
+            local __target_user="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+            __cache_path=$(sudo -n -H -u "$__target_user" /bin/bash -lc "HOMEBREW_NO_AUTO_UPDATE=1 brew --cache --${__kind} \"${__pkg}\"" 2>/dev/null || true)
+        else
+            __cache_path=$(HOMEBREW_NO_AUTO_UPDATE=1 brew --cache "--${__kind}" "$__pkg" 2>/dev/null || true)
+        fi
+        printf '%s' "$__cache_path"
+    }
+
+    precheck_probe_cache_entry() {
+        local __kind="$1"
+        local __pkg="$2"
+        local __outfile="$3"
+        local __cache_path=""
+        __cache_path="$(precheck_get_cache_path "$__kind" "$__pkg")"
+        if [ -n "$__cache_path" ] && [ -f "$__cache_path" ]; then
+            printf "%s\t%s\n" "$__pkg" "$__cache_path" >> "$__outfile"
+        fi
+    }
+
+    precheck_verify_formula_entry() {
+        local __pkg="$1"
+        local __cache_path="$2"
+        local __outfile="$3"
+        local __cache_dir=""
+        local __candidate=""
+        local __candidate_found=0
+        local __local_sha=""
+        local __json=""
+        local __expected_sha=""
+        local __status=""
+        local __reason=""
+        if [[ "$__cache_path" == *.bottle_manifest.json ]]; then
+            __cache_dir="$(dirname "$__cache_path")"
+            __candidate=""
+            for __candidate in "$__cache_dir"/*"${__pkg}"*.bottle*.tar.gz; do
+                [ -f "$__candidate" ] || continue
+                __cache_path="$__candidate"
+                __candidate_found=1
+                break
+            done
+            if [ "$__candidate_found" -ne 1 ]; then
+                printf "%s\tMISS_CACHE\t\t\t未找到对应 bottle 缓存文件\t%s\n" "$__pkg" "$__cache_path" >> "$__outfile"
+                return
+            fi
+        fi
+        if [ ! -f "$__cache_path" ]; then
+            printf "%s\tMISS_CACHE\t\t\t缓存文件不存在\t%s\n" "$__pkg" "$__cache_path" >> "$__outfile"
+            return
+        fi
+        __local_sha="$(shasum -a 256 "$__cache_path" | awk '{print $1}' 2>/dev/null || true)"
+        __json="$(get_brew_info_json "$__pkg" formula)"
+        __expected_sha=""
+        if [ -n "$__json" ]; then
+            if [ -n "$platform_key" ]; then
+                __expected_sha=$(/usr/bin/plutil -extract "formulae.0.bottle.stable.files.${platform_key}.sha256" raw -o - - <<< "$__json" 2>/dev/null || true)
+            fi
+            if [ -z "$__expected_sha" ]; then
+                __expected_sha=$(/usr/bin/plutil -extract "formulae.0.bottle.stable.files.all.sha256" raw -o - - <<< "$__json" 2>/dev/null || true)
+            fi
+            if [ -z "$__expected_sha" ]; then
+                __expected_sha=$(/usr/bin/plutil -extract "formulae.0.urls.stable.checksum" raw -o - - <<< "$__json" 2>/dev/null || true)
+            fi
+        fi
+        if [ -n "$__expected_sha" ] && [ "$__local_sha" = "$__expected_sha" ]; then
+            __status="HIT"
+            __reason="缓存包校验一致"
+        elif [ -z "$__expected_sha" ]; then
+            __status="MISS_EXPECTED"
+            __reason="未获取到 HomeBrew 期望校验值"
+        else
+            __status="MISS_MISMATCH"
+            __reason="缓存包与 HomeBrew 记录不一致"
+        fi
+        printf "%s\t%s\t%s\t%s\t%s\t%s\n" "$__pkg" "$__status" "$__local_sha" "$__expected_sha" "$__reason" "$__cache_path" >> "$__outfile"
+    }
+
+    precheck_verify_cask_entry() {
+        local __pkg="$1"
+        local __cache_path="$2"
+        local __outfile="$3"
+        local __local_sha=""
+        local __json=""
+        local __expected_sha=""
+        local __status=""
+        local __reason=""
+        if [ ! -f "$__cache_path" ]; then
+            printf "%s\tMISS_CACHE\t\t\t缓存文件不存在\t%s\n" "$__pkg" "$__cache_path" >> "$__outfile"
+            return
+        fi
+        __local_sha="$(shasum -a 256 "$__cache_path" | awk '{print $1}' 2>/dev/null || true)"
+        __json="$(get_brew_info_json "$__pkg" cask)"
+        __expected_sha=""
+        if [ -n "$__json" ]; then
+            __expected_sha=$(/usr/bin/plutil -extract "casks.0.sha256" raw -o - - <<< "$__json" 2>/dev/null || true)
+        fi
+        if [ -z "$__expected_sha" ] || [ "$__expected_sha" = "null" ] || [ "$__expected_sha" = "no_check" ]; then
+            __status="HIT_NOCHECK"
+            __reason="cask 无固定校验值"
+        elif [ "$__local_sha" = "$__expected_sha" ]; then
+            __status="HIT"
+            __reason="缓存包校验一致"
+        else
+            __status="MISS_MISMATCH"
+            __reason="缓存包与 HomeBrew 记录不一致"
+        fi
+        printf "%s\t%s\t%s\t%s\t%s\t%s\n" "$__pkg" "$__status" "$__local_sha" "$__expected_sha" "$__reason" "$__cache_path" >> "$__outfile"
+    }
 
     if [ "$skip_sha256_prefetch_check" -eq 1 ]; then
         packages_to_fetch_formulas=("${packages_brew_formulas[@]}")
         packages_to_fetch_casks=("${packages_brew_casks[@]}")
     else
+        echo -e "[Info] SHA256 预检查并发参数：jobs=${precheck_jobs}（先探测缓存，仅对命中缓存并行校验）" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+
         formula_total=${#packages_brew_formulas[@]}
         formula_idx=0
         for pkg_brew_formula in "${packages_brew_formulas[@]}"; do
             [[ -z "$pkg_brew_formula" ]] && continue
             formula_idx=$((formula_idx + 1))
             printf "•  [SHA256][formula] (%02d/%02d) : %s\n" "$formula_idx" "$formula_total" "$pkg_brew_formula" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        done
 
-            if [ "$(id -u)" -eq 0 ]; then
-                targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
-                brew_cache_path=$(sudo -n -H -u "$targetUser" /bin/bash -lc "brew --cache --formula \"$pkg_brew_formula\"" 2>/dev/null)
-            else
-                brew_cache_path=$(brew --cache --formula "$pkg_brew_formula")
+        cask_total=${#packages_brew_casks[@]}
+        cask_idx=0
+        for pkg_brew_cask in "${packages_brew_casks[@]}"; do
+            [[ -z "$pkg_brew_cask" ]] && continue
+            cask_idx=$((cask_idx + 1))
+            printf "•  [SHA256][cask]    (%02d/%02d) : %s\n" "$cask_idx" "$cask_total" "$pkg_brew_cask" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+        done
+
+        precheck_formula_probe_file="$(mktemp)"
+        precheck_cask_probe_file="$(mktemp)"
+        precheck_formula_verify_file="$(mktemp)"
+        precheck_cask_verify_file="$(mktemp)"
+
+        # 第 1 阶段：并行探测缓存路径（仅探测文件是否存在，不拉取 JSON）。
+        for pkg_brew_formula in "${packages_brew_formulas[@]}"; do
+            [[ -z "$pkg_brew_formula" ]] && continue
+            precheck_wait_slot "$precheck_jobs"
+            precheck_probe_cache_entry "formula" "$pkg_brew_formula" "$precheck_formula_probe_file" &
+        done
+        for pkg_brew_cask in "${packages_brew_casks[@]}"; do
+            [[ -z "$pkg_brew_cask" ]] && continue
+            precheck_wait_slot "$precheck_jobs"
+            precheck_probe_cache_entry "cask" "$pkg_brew_cask" "$precheck_cask_probe_file" &
+        done
+        wait
+
+        declare -A formula_cache_path_map=()
+        declare -A cask_cache_path_map=()
+        while IFS=$'\t' read -r __pkg __cache_path; do
+            [ -z "$__pkg" ] && continue
+            formula_cache_path_map["$__pkg"]="$__cache_path"
+        done < "$precheck_formula_probe_file"
+        while IFS=$'\t' read -r __pkg __cache_path; do
+            [ -z "$__pkg" ] && continue
+            cask_cache_path_map["$__pkg"]="$__cache_path"
+        done < "$precheck_cask_probe_file"
+
+        # 第 2 阶段：仅对“命中缓存”的包并行拉取 JSON 并计算 SHA256。
+        for pkg_brew_formula in "${packages_brew_formulas[@]}"; do
+            [[ -z "$pkg_brew_formula" ]] && continue
+            if [ -n "${formula_cache_path_map[$pkg_brew_formula]+x}" ]; then
+                precheck_wait_slot "$precheck_jobs"
+                precheck_verify_formula_entry "$pkg_brew_formula" "${formula_cache_path_map[$pkg_brew_formula]}" "$precheck_formula_verify_file" &
             fi
+        done
+        for pkg_brew_cask in "${packages_brew_casks[@]}"; do
+            [[ -z "$pkg_brew_cask" ]] && continue
+            if [ -n "${cask_cache_path_map[$pkg_brew_cask]+x}" ]; then
+                precheck_wait_slot "$precheck_jobs"
+                precheck_verify_cask_entry "$pkg_brew_cask" "${cask_cache_path_map[$pkg_brew_cask]}" "$precheck_cask_verify_file" &
+            fi
+        done
+        wait
 
-            if [ -f "$brew_cache_path" ]; then
-                if [[ "$brew_cache_path" == *.bottle_manifest.json ]]; then
-                    cache_dir="$(dirname "$brew_cache_path")"
-                    candidate=""
-                    for f in "$cache_dir"/*"${pkg_brew_formula}"*.bottle*.tar.gz; do
-                        candidate="$f"
-                        break
-                    done
-                    if [ -n "$candidate" ] && [ -f "$candidate" ]; then
-                        brew_cache_path="$candidate"
-                    fi
-                fi
+        declare -A formula_verify_status_map=()
+        declare -A formula_verify_sha_map=()
+        declare -A formula_verify_expected_map=()
+        declare -A formula_verify_reason_map=()
+        declare -A formula_verify_cache_map=()
+        declare -A cask_verify_status_map=()
+        declare -A cask_verify_sha_map=()
+        declare -A cask_verify_expected_map=()
+        declare -A cask_verify_reason_map=()
+        declare -A cask_verify_cache_map=()
 
-                local_sha=$(shasum -a 256 "$brew_cache_path" | awk '{print $1}')
-                json="$(get_brew_info_json "$pkg_brew_formula" formula)"
-                brew_expected_sha=""
-                if [ -n "$json" ]; then
-                    if [ -n "$platform_key" ]; then
-                        brew_expected_sha=$(/usr/bin/plutil -extract "formulae.0.bottle.stable.files.${platform_key}.sha256" \
-                                     raw -o - - <<< "$json" 2>/dev/null)
-                    fi
-                    if [ -z "$brew_expected_sha" ]; then
-                        brew_expected_sha=$(/usr/bin/plutil -extract "formulae.0.bottle.stable.files.all.sha256" \
-                                     raw -o - - <<< "$json" 2>/dev/null)
-                    fi
-                    if [ -z "$brew_expected_sha" ]; then
-                        brew_expected_sha=$(/usr/bin/plutil -extract "formulae.0.urls.stable.checksum" \
-                                     raw -o - - <<< "$json" 2>/dev/null)
-                    fi
-                fi
+        while IFS=$'\t' read -r __pkg __status __local_sha __expected_sha __reason __cache_path; do
+            [ -z "$__pkg" ] && continue
+            formula_verify_status_map["$__pkg"]="$__status"
+            formula_verify_sha_map["$__pkg"]="$__local_sha"
+            formula_verify_expected_map["$__pkg"]="$__expected_sha"
+            formula_verify_reason_map["$__pkg"]="$__reason"
+            formula_verify_cache_map["$__pkg"]="$__cache_path"
+        done < "$precheck_formula_verify_file"
+        while IFS=$'\t' read -r __pkg __status __local_sha __expected_sha __reason __cache_path; do
+            [ -z "$__pkg" ] && continue
+            cask_verify_status_map["$__pkg"]="$__status"
+            cask_verify_sha_map["$__pkg"]="$__local_sha"
+            cask_verify_expected_map["$__pkg"]="$__expected_sha"
+            cask_verify_reason_map["$__pkg"]="$__reason"
+            cask_verify_cache_map["$__pkg"]="$__cache_path"
+        done < "$precheck_cask_verify_file"
 
-                if [ -n "$brew_expected_sha" ] && [ "$local_sha" = "$brew_expected_sha" ]; then
+        # 按原始顺序生成“需下载列表”和“缓存命中列表”。
+        for pkg_brew_formula in "${packages_brew_formulas[@]}"; do
+            [[ -z "$pkg_brew_formula" ]] && continue
+            if [ -z "${formula_cache_path_map[$pkg_brew_formula]+x}" ]; then
+                packages_to_fetch_formulas+=("$pkg_brew_formula")
+                continue
+            fi
+            __status="${formula_verify_status_map[$pkg_brew_formula]:-MISS_CACHE}"
+            case "$__status" in
+                HIT)
                     cached_formulas+=("$pkg_brew_formula")
-                    cached_formula_entries+=("$pkg_brew_formula|$brew_expected_sha")
-                    continue
-                else
+                    __entry_sha="${formula_verify_expected_map[$pkg_brew_formula]}"
+                    [ -z "$__entry_sha" ] && __entry_sha="${formula_verify_sha_map[$pkg_brew_formula]}"
+                    cached_formula_entries+=("$pkg_brew_formula|$__entry_sha")
+                    ;;
+                *)
+                    packages_to_fetch_formulas+=("$pkg_brew_formula")
+                    local_sha="${formula_verify_sha_map[$pkg_brew_formula]:-}"
+                    brew_expected_sha="${formula_verify_expected_map[$pkg_brew_formula]:-}"
+                    sha_reason="${formula_verify_reason_map[$pkg_brew_formula]:-缓存包校验失败}"
                     local_sha_short="$local_sha"
                     if [ -n "$local_sha_short" ] && [ "${#local_sha_short}" -gt 20 ]; then
                         local_sha_short="${local_sha_short:0:12}...${local_sha_short:$((${#local_sha_short}-8)):8}"
@@ -4848,66 +5050,53 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
                         if [ "${#expected_sha_short}" -gt 20 ]; then
                             expected_sha_short="${expected_sha_short:0:12}...${expected_sha_short:$((${#expected_sha_short}-8)):8}"
                         fi
-                        sha_reason="缓存包与 HomeBrew 记录不一致"
                     else
                         expected_sha_short="(未获取)"
-                        sha_reason="未获取到 HomeBrew 期望校验值"
                     fi
-                    # 预检查阶段仅记录日志，不额外打印“校验提示”，避免与下载阶段提示重复。
-                    echo "[Debug] [prefetch][formula:$pkg_brew_formula] reason=$sha_reason ; cache=$brew_cache_path ; local=$local_sha ; expected=$brew_expected_sha ; local_short=$local_sha_short ; expected_short=$expected_sha_short" >> "$LOG_FULL_FILE"
-                fi
-            fi
-
-            packages_to_fetch_formulas+=("$pkg_brew_formula")
+                    echo "[Debug] [prefetch][formula:$pkg_brew_formula] reason=$sha_reason ; cache=${formula_verify_cache_map[$pkg_brew_formula]:-${formula_cache_path_map[$pkg_brew_formula]}} ; local=$local_sha ; expected=$brew_expected_sha ; local_short=$local_sha_short ; expected_short=$expected_sha_short" >> "$LOG_FULL_FILE"
+                    ;;
+            esac
         done
 
-        cask_total=${#packages_brew_casks[@]}
-        cask_idx=0
         for pkg_brew_cask in "${packages_brew_casks[@]}"; do
             [[ -z "$pkg_brew_cask" ]] && continue
-            cask_idx=$((cask_idx + 1))
-            printf "•  [SHA256][cask]    (%02d/%02d) : %s\n" "$cask_idx" "$cask_total" "$pkg_brew_cask" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
-
-            if [ "$(id -u)" -eq 0 ]; then
-                targetUser="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
-                brew_cache_path=$(sudo -n -H -u "$targetUser" /bin/bash -lc "brew --cache --cask \"$pkg_brew_cask\"" 2>/dev/null)
-            else
-                brew_cache_path=$(brew --cache --cask "$pkg_brew_cask")
+            if [ -z "${cask_cache_path_map[$pkg_brew_cask]+x}" ]; then
+                packages_to_fetch_casks+=("$pkg_brew_cask")
+                continue
             fi
-
-            if [ -f "$brew_cache_path" ]; then
-                local_sha=$(shasum -a 256 "$brew_cache_path" | awk '{print $1}')
-                json="$(get_brew_info_json "$pkg_brew_cask" cask)"
-                brew_expected_sha=""
-                if [ -n "$json" ]; then
-                    brew_expected_sha=$(/usr/bin/plutil -extract "casks.0.sha256" raw -o - - <<< "$json" 2>/dev/null)
-                fi
-
-                if [[ "$brew_expected_sha" == "null" || -z "$brew_expected_sha" || "$brew_expected_sha" == "no_check" ]]; then
+            __status="${cask_verify_status_map[$pkg_brew_cask]:-MISS_CACHE}"
+            case "$__status" in
+                HIT_NOCHECK)
                     cached_casks+=("$pkg_brew_cask")
                     cached_cask_entries+=("$pkg_brew_cask|no_check")
-                    continue
-                fi
-                if [ "$local_sha" = "$brew_expected_sha" ]; then
+                    ;;
+                HIT)
                     cached_casks+=("$pkg_brew_cask")
-                    cached_cask_entries+=("$pkg_brew_cask|$brew_expected_sha")
-                    continue
-                else
+                    cached_cask_entries+=("$pkg_brew_cask|${cask_verify_expected_map[$pkg_brew_cask]}")
+                    ;;
+                *)
+                    packages_to_fetch_casks+=("$pkg_brew_cask")
+                    local_sha="${cask_verify_sha_map[$pkg_brew_cask]:-}"
+                    brew_expected_sha="${cask_verify_expected_map[$pkg_brew_cask]:-}"
+                    sha_reason="${cask_verify_reason_map[$pkg_brew_cask]:-缓存包校验失败}"
                     local_sha_short="$local_sha"
                     if [ -n "$local_sha_short" ] && [ "${#local_sha_short}" -gt 20 ]; then
                         local_sha_short="${local_sha_short:0:12}...${local_sha_short:$((${#local_sha_short}-8)):8}"
                     fi
-                    expected_sha_short="$brew_expected_sha"
-                    if [ -n "$expected_sha_short" ] && [ "${#expected_sha_short}" -gt 20 ]; then
-                        expected_sha_short="${expected_sha_short:0:12}...${expected_sha_short:$((${#expected_sha_short}-8)):8}"
+                    if [ -n "$brew_expected_sha" ]; then
+                        expected_sha_short="$brew_expected_sha"
+                        if [ "${#expected_sha_short}" -gt 20 ]; then
+                            expected_sha_short="${expected_sha_short:0:12}...${expected_sha_short:$((${#expected_sha_short}-8)):8}"
+                        fi
+                    else
+                        expected_sha_short="(未获取)"
                     fi
-                    # 预检查阶段仅记录日志，不额外打印“校验提示”，避免与下载阶段提示重复。
-                    echo "[Debug] [prefetch][cask:$pkg_brew_cask] reason=缓存包与 HomeBrew 记录不一致 ; cache=$brew_cache_path ; local=$local_sha ; expected=$brew_expected_sha ; local_short=$local_sha_short ; expected_short=$expected_sha_short" >> "$LOG_FULL_FILE"
-                fi
-            fi
-
-            packages_to_fetch_casks+=("$pkg_brew_cask")
+                    echo "[Debug] [prefetch][cask:$pkg_brew_cask] reason=$sha_reason ; cache=${cask_verify_cache_map[$pkg_brew_cask]:-${cask_cache_path_map[$pkg_brew_cask]}} ; local=$local_sha ; expected=$brew_expected_sha ; local_short=$local_sha_short ; expected_short=$expected_sha_short" >> "$LOG_FULL_FILE"
+                    ;;
+            esac
         done
+
+        rm -f "$precheck_formula_probe_file" "$precheck_cask_probe_file" "$precheck_formula_verify_file" "$precheck_cask_verify_file" 2>/dev/null || true
     fi
 
 
