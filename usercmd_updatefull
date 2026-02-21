@@ -21,7 +21,7 @@ export PATH="/usr/local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/opt/local/bin:
 export HOMEBREW_NO_COLOR=1
 
 # 脚本版本号：用于调试和确认是否使用最新脚本
-SCRIPT_VERSION="2026.02.21.v28"
+SCRIPT_VERSION="2026.02.22.v40"
 # 预先解析 GNU Parallel 的绝对路径。在某些 sudo 环境下 PATH 可能被重置，导致找不到 parallel。
 if command -v parallel >/dev/null 2>&1; then
     PARALLEL_BIN="$(command -v parallel)"
@@ -110,12 +110,28 @@ MAS_PARALLEL_JOBS=2
 HOMEBREW_FETCH_JOBS="${HOMEBREW_FETCH_JOBS:-32}"
 export HOMEBREW_FETCH_JOBS
 
+# 下载阶段“元信息行”（如 ✔︎ Cask xxx (ver)）左列宽度。用于与"| 下载链接"对齐。
+# 默认值设置为 40，让分隔竖线更靠近（可用 BREW_FETCH_META_WIDTH 覆盖）。
+BREW_FETCH_META_WIDTH="${BREW_FETCH_META_WIDTH:-40}"
+if ! echo "$BREW_FETCH_META_WIDTH" | grep -qE '^[0-9]+$' || [ "$BREW_FETCH_META_WIDTH" -lt 24 ]; then
+    BREW_FETCH_META_WIDTH=40
+fi
+[ "$BREW_FETCH_META_WIDTH" -gt 120 ] && BREW_FETCH_META_WIDTH=120
+export BREW_FETCH_META_WIDTH
+
 # ===== HomeBrew 过期扫描来源设置 =====
 # update   : 仅使用 brew update 阶段列表（快，但会漏掉大量 --greedy cask）
 # auto     : 优先执行 brew outdated --greedy，失败时回退到 update 列表（推荐）
 # realtime : 仅执行 brew outdated --greedy，不回退
 HOMEBREW_OUTDATED_SOURCE="${HOMEBREW_OUTDATED_SOURCE:-auto}"
 export HOMEBREW_OUTDATED_SOURCE
+
+# ===== HomeBrew outdated 扫描超时设置（秒） =====
+# 说明：实时扫描在网络不稳定或个别 cask 源站异常时容易长时间阻塞。
+# 可通过环境变量覆盖：HOMEBREW_OUTDATED_TIMEOUT_FORMULA_SEC / HOMEBREW_OUTDATED_TIMEOUT_CASK_SEC
+HOMEBREW_OUTDATED_TIMEOUT_FORMULA_SEC="${HOMEBREW_OUTDATED_TIMEOUT_FORMULA_SEC:-60}"
+HOMEBREW_OUTDATED_TIMEOUT_CASK_SEC="${HOMEBREW_OUTDATED_TIMEOUT_CASK_SEC:-75}"
+export HOMEBREW_OUTDATED_TIMEOUT_FORMULA_SEC HOMEBREW_OUTDATED_TIMEOUT_CASK_SEC
 
 # ===== TopGrade Cursor 扩展失败自动修复 =====
 # 当 TopGrade 的 Cursor extensions 步骤失败时，自动重试 cursor --update-extensions
@@ -4436,8 +4452,9 @@ scan_brew_outdated() {
   local out_file=""
   local err_file=""
   local scan_rc=0
-  local default_scan_timeout=90
+  local default_scan_timeout=60
   local scan_timeout=""
+  local scan_timeout_env=""
   local cmd_pid=""
   local timed_out=0
   local elapsed=0
@@ -4448,20 +4465,30 @@ scan_brew_outdated() {
     return 2
   fi
   case "$scope" in
-    formula) scan_cmd='HOMEBREW_NO_AUTO_UPDATE=1 brew outdated --formula --greedy 2>&1' ;;
+    formula)
+      scan_cmd='HOMEBREW_NO_AUTO_UPDATE=1 brew outdated --formula --greedy 2>&1'
+      default_scan_timeout=60
+      scan_timeout_env="${HOMEBREW_OUTDATED_TIMEOUT_FORMULA_SEC:-}"
+      ;;
     cask)
       scan_cmd='HOMEBREW_NO_AUTO_UPDATE=1 brew outdated --cask --greedy 2>&1'
-      default_scan_timeout=180
+      default_scan_timeout=75
+      scan_timeout_env="${HOMEBREW_OUTDATED_TIMEOUT_CASK_SEC:-}"
       ;;
     *)       return 2 ;;
   esac
-  scan_timeout="${HOMEBREW_OUTDATED_TIMEOUT_SEC:-$default_scan_timeout}"
+  if [ -n "$scan_timeout_env" ]; then
+    scan_timeout="$scan_timeout_env"
+  else
+    scan_timeout="${HOMEBREW_OUTDATED_TIMEOUT_SEC:-$default_scan_timeout}"
+  fi
   if ! echo "$scan_timeout" | grep -qE '^[0-9]+$' || [ "$scan_timeout" -lt 10 ]; then
     scan_timeout="$default_scan_timeout"
   fi
-  if [ "$scope" = "cask" ] && [ "$scan_timeout" -lt 120 ]; then
-    scan_timeout=120
+  if [ "$scope" = "cask" ] && [ "$scan_timeout" -lt 30 ]; then
+    scan_timeout=30
   fi
+  echo -e "[Info] brew outdated 扫描中（scope=${scope}, timeout=${scan_timeout}s）..." | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
 
   out_file=$(mktemp "/tmp/brew_outdated_${scope}_out.XXXXXX")
   err_file=$(mktemp "/tmp/brew_outdated_${scope}_err.XXXXXX")
@@ -4965,6 +4992,9 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         local pkg="$1"
         local success=0
         local tmpfile
+        local meta_line=""
+        local meta_url=""
+        local download_item=""
         tmpfile=$(mktemp)
         # 下载失败重试次数与校验失败重试次数
         local max_download_retry=${DOWNLOAD_MAX_RETRIES:-5}
@@ -5006,8 +5036,33 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             > "$tmpfile"
             fetch_exit=${PIPESTATUS[0]}
             if [[ -s "$tmpfile" ]]; then
-                cat "$tmpfile" >> "$LOG_FULL_LAST"
-                cat "$tmpfile" >> "$LOG_FULL_FILE"
+                meta_line="$(grep -E '^✔︎ (Bottle|Formula) ' "$tmpfile" | tail -n1 || true)"
+                meta_url="$(grep -oE 'https?://[^[:space:]]+' "$tmpfile" | tail -n1 || true)"
+                if [ -n "$meta_line" ]; then
+                    download_item="$(printf '%s' "$meta_line" | sed -E 's/^✔︎[[:space:]]+(Bottle|Formula|Cask)[[:space:]]+//')"
+                    [ -z "$download_item" ] && download_item="$pkg"
+                    if [ "${#download_item}" -gt "${BREW_FETCH_META_WIDTH}" ]; then
+                        download_item="${download_item:0:$((BREW_FETCH_META_WIDTH-3))}..."
+                    fi
+                    if [ -z "$meta_url" ]; then
+                        # 某些 brew 版本不会在 fetch 输出中带下载链接，回退从 brew info JSON 提取
+                        meta_json=""
+                        if [ "$(id -u)" -eq 0 ]; then
+                            targetUserMeta="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+                            meta_json=$(sudo -n -H -u "$targetUserMeta" /bin/bash -lc "HOMEBREW_NO_AUTO_UPDATE=1 brew info --json=v2 \"$pkg\"" 2>/dev/null || true)
+                        else
+                            meta_json=$(HOMEBREW_NO_AUTO_UPDATE=1 brew info --json=v2 "$pkg" 2>/dev/null || true)
+                        fi
+                        if [ -n "$meta_json" ]; then
+                            meta_url=$(/usr/bin/plutil -extract "formulae.0.urls.stable.url" raw -o - - <<< "$meta_json" 2>/dev/null || true)
+                        fi
+                    fi
+                    if [ -z "$meta_url" ]; then
+                        meta_url="(未捕获下载链接)"
+                    fi
+                    # 这里将 Downloading 标签补齐到 18 列（7 个尾随空格），用于与“下载完成 [cask]    :”的冒号列对齐。
+                    printf "✔︎  %-18s : %-${BREW_FETCH_META_WIDTH}s | %s\n" "Downloading" "$download_item" "$meta_url" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                fi
             fi
             if [ $fetch_exit -ne 0 ]; then
                 # 校验失败仅再尝试一次（总计两次）；其他网络失败按常规重试次数执行
@@ -5162,6 +5217,9 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
         local pkg="$1"
         local success=0
         local tmpfile
+        local meta_line=""
+        local meta_url=""
+        local download_item=""
         # 提前声明用于跨迭代的校验码变量
         local local_sha=""
         local brew_expected_sha=""
@@ -5207,8 +5265,33 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
             > "$tmpfile"
             fetch_exit=${PIPESTATUS[0]}
             if [[ -s "$tmpfile" ]]; then
-                cat "$tmpfile" >> "$LOG_FULL_LAST"
-                cat "$tmpfile" >> "$LOG_FULL_FILE"
+                meta_line="$(grep -E '^✔︎ Cask ' "$tmpfile" | tail -n1 || true)"
+                meta_url="$(grep -oE 'https?://[^[:space:]]+' "$tmpfile" | tail -n1 || true)"
+                if [ -n "$meta_line" ]; then
+                    download_item="$(printf '%s' "$meta_line" | sed -E 's/^✔︎[[:space:]]+(Bottle|Formula|Cask)[[:space:]]+//')"
+                    [ -z "$download_item" ] && download_item="$pkg"
+                    if [ "${#download_item}" -gt "${BREW_FETCH_META_WIDTH}" ]; then
+                        download_item="${download_item:0:$((BREW_FETCH_META_WIDTH-3))}..."
+                    fi
+                    if [ -z "$meta_url" ]; then
+                        # 某些 brew 版本不会在 fetch 输出中带下载链接，回退从 brew info JSON 提取
+                        meta_json=""
+                        if [ "$(id -u)" -eq 0 ]; then
+                            targetUserMeta="${SUDO_USER:-$(stat -f '%Su' /dev/console)}"
+                            meta_json=$(sudo -n -H -u "$targetUserMeta" /bin/bash -lc "HOMEBREW_NO_AUTO_UPDATE=1 brew info --json=v2 \"$pkg\"" 2>/dev/null || true)
+                        else
+                            meta_json=$(HOMEBREW_NO_AUTO_UPDATE=1 brew info --json=v2 "$pkg" 2>/dev/null || true)
+                        fi
+                        if [ -n "$meta_json" ]; then
+                            meta_url=$(/usr/bin/plutil -extract "casks.0.url" raw -o - - <<< "$meta_json" 2>/dev/null || true)
+                        fi
+                    fi
+                    if [ -z "$meta_url" ]; then
+                        meta_url="(未捕获下载链接)"
+                    fi
+                    # 这里将 Downloading 标签补齐到 18 列（7 个尾随空格），用于与“下载完成 [cask]    :”的冒号列对齐。
+                    printf "✔︎  %-18s : %-${BREW_FETCH_META_WIDTH}s | %s\n" "Downloading" "$download_item" "$meta_url" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+                fi
             fi
             if [ $fetch_exit -ne 0 ]; then
                 # 校验失败仅再尝试一次（总计两次）；其他网络失败按常规重试次数执行
@@ -5331,10 +5414,10 @@ if [ ${#packages_brew[@]} -ne 0 ]; then
     fi
     [ "$formula_jobs" -gt 64 ] && formula_jobs=64
     [ "$cask_jobs" -gt 64 ] && cask_jobs=64
-    if [ "$formula_jobs" -eq "$brew_fetch_jobs" ] && [ "$cask_jobs" -eq "$brew_fetch_jobs" ]; then
-      echo -e "[Info] HomeBrew 并行下载参数：jobs=${brew_fetch_jobs}，formula=${formula_jobs}，cask=${cask_jobs}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+    if [ "$formula_jobs" -eq "$cask_jobs" ]; then
+      echo -e "[Info] HomeBrew 并行下载参数：formula=${formula_jobs}，cask=${cask_jobs}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     else
-      echo -e "[Info] HomeBrew 并行下载参数：jobs=${brew_fetch_jobs}，分配 formula=${formula_jobs}，cask=${cask_jobs}" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
+      echo -e "[Info] HomeBrew 并行下载参数：formula=${formula_jobs}，cask=${cask_jobs}（默认并发=${brew_fetch_jobs}）" | tee -a "$LOG_FULL_LAST" "$LOG_FULL_FILE"
     fi
     if [ $total_formula_count -gt 0 ] || [ $total_cask_count -gt 0 ]; then
       # 将下载函数定义写入临时文件
